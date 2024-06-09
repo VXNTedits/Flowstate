@@ -12,6 +12,10 @@ import glm
 
 import glm
 
+import glm
+
+import glm
+
 class Camera:
     def __init__(self, position, up, yaw=-90.0, pitch=0.0):
         self.position = position
@@ -52,18 +56,24 @@ class Camera:
         self.right = glm.normalize(glm.cross(self.front, self.world_up))
         self.up = glm.normalize(glm.cross(self.right, self.front))
 
-    def toggle_view(self):
+    def toggle_view(self, player_position):
+        if self.first_person:
+            self.set_third_person(player_position)
+        else:
+            self.set_first_person(player_position)
         self.first_person = not self.first_person
 
     def set_first_person(self, player_position):
-        self.position = player_position
+        offset = glm.vec3(0.02, 0.2, 0.0)
+        self.position = player_position + offset
         self.update_camera_vectors()
 
     def set_third_person(self, player_position):
-        offset = glm.vec3(0.0, 2.0, 5.0)
-        self.position = player_position - offset
+        offset = glm.vec3(-0.2, 0.6, 0.0)
+        self.position = player_position + offset
         self.update_camera_vectors()
 
     def set_position(self, position):
         self.position = position
         self.update_camera_vectors()
+

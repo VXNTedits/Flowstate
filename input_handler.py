@@ -1,5 +1,7 @@
 import glfw
 
+import glfw
+
 class InputHandler:
     def __init__(self, camera, player):
         self.camera = camera
@@ -16,7 +18,7 @@ class InputHandler:
             if key == glfw.KEY_ESCAPE:
                 glfw.set_window_should_close(window, True)
             elif key == glfw.KEY_V:
-                self.camera.toggle_view()
+                self.camera.toggle_view(self.player.position)
             if key in self.keys:
                 self.keys[key] = True
         elif action == glfw.RELEASE:
