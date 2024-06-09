@@ -30,9 +30,12 @@ class Shader:
     def use(self):
         glUseProgram(self.id)
 
-    def set_uniform_matrix4fv(self, name: str, matrix: glm.mat4):
-        location = glGetUniformLocation(self.id, name)
-        glUniformMatrix4fv(location, 1, GL_FALSE, glm.value_ptr(matrix))
+    def set_uniform_matrix4fv(self, name: str, matrix):
+        if isinstance(matrix, glm.mat4):
+            location = glGetUniformLocation(self.id, name)
+            glUniformMatrix4fv(location, 1, GL_FALSE, glm.value_ptr(matrix))
+        else:
+            raise TypeError("Expected glm.mat4 type for the matrix parameter")
 
     def set_uniform3f(self, name: str, vector: glm.vec3):
         location = glGetUniformLocation(self.id, name)

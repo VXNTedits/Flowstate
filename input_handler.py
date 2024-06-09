@@ -13,8 +13,10 @@ import glfw
 
 import glfw
 
+import glfw
+
 class InputHandler:
-    def __init__(self, camera: Camera, player: Player):
+    def __init__(self, camera, player):
         self.camera = camera
         self.player = player
         self.keys = {

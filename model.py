@@ -22,12 +22,34 @@ import glm
 from OpenGL.GL import *
 import os
 
+import numpy as np
+import glm
+from OpenGL.GL import *
+import os
+
 class Model:
     def __init__(self, filepath: str):
         self.vertices, self.indices = self.load_obj(filepath)
         self.vao, self.vbo, self.ebo = self.setup_buffers()
+        self.min_point, self.max_point = self.calculate_bounding_box()
+        self.model_matrix = glm.mat4(1.0)  # Initialize model matrix
 
-    def parse_obj(self, filepath: str):
+    def calculate_bounding_box(self):
+        min_point = glm.vec3(float('inf'), float('inf'), float('inf'))
+        max_point = glm.vec3(float('-inf'), float('-inf'), float('-inf'))
+
+        for i in range(0, len(self.vertices), 6):  # assuming 3 positions + 3 normals
+            vertex = glm.vec3(self.vertices[i], self.vertices[i+1], self.vertices[i+2])
+            min_point.x = min(min_point.x, vertex.x)
+            min_point.y = min(min_point.y, vertex.y)
+            min_point.z = min(min_point.z, vertex.z)
+            max_point.x = max(max_point.x, vertex.x)
+            max_point.y = max(max_point.y, vertex.y)
+            max_point.z = max(max_point.z, vertex.z)
+
+        return min_point, max_point
+
+    def load_obj(self, filepath: str):
         vertices = []
         normals = []
         faces = []
@@ -50,7 +72,18 @@ class Model:
                         face.append((vertex_index, normal_index))
                     faces.append(face)
 
-        return vertices, normals, faces
+        if len(normals) == 0:
+            normals = self.calculate_normals(vertices, faces)
+
+        vertex_data = []
+        for face in faces:
+            for vertex_index, normal_index in face:
+                vertex_data.extend(vertices[vertex_index])
+                vertex_data.extend(normals[normal_index])
+
+        vertex_data = np.array(vertex_data, dtype=np.float32)
+        indices = np.arange(len(vertex_data) // 6, dtype=np.uint32)
+        return vertex_data, indices
 
     def calculate_normals(self, vertices, faces):
         normals = np.zeros((len(vertices), 3), dtype=np.float32)
@@ -63,24 +96,6 @@ class Model:
                 normals[vertex_index] += normal
         normals = np.array([n / np.linalg.norm(n) for n in normals])
         return normals
-
-    def load_obj(self, filepath: str):
-        vertices, file_normals, faces = self.parse_obj(filepath)
-
-        if len(file_normals) == 0:
-            normals = self.calculate_normals(vertices, faces)
-        else:
-            normals = file_normals
-
-        vertex_data = []
-        for face in faces:
-            for vertex_index, normal_index in face:
-                vertex_data.extend(vertices[vertex_index])
-                vertex_data.extend(normals[vertex_index])
-
-        vertex_data = np.array(vertex_data, dtype=np.float32)
-        indices = np.arange(len(vertex_data) // 6, dtype=np.uint32)
-        return vertex_data, indices
 
     def setup_buffers(self):
         vao = glGenVertexArrays(1)
