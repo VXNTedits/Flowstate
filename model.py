@@ -26,7 +26,7 @@ class Model:
             v1 = glm.vec3(self.vertices[6 * self.indices[i + 1]], self.vertices[6 * self.indices[i + 1] + 1], self.vertices[6 * self.indices[i + 1] + 2])
             v2 = glm.vec3(self.vertices[6 * self.indices[i + 2]], self.vertices[6 * self.indices[i + 2] + 1], self.vertices[6 * self.indices[i + 2] + 2])
             surfaces.append((v0, v1, v2))
-        print(f"get_surfaces: {surfaces}")
+        #print(f"get_surfaces: {surfaces}")
         assert surfaces is not None, "get_surfaces should not return None"
         assert all(isinstance(surface, tuple) and len(surface) == 3 for surface in surfaces), "Surfaces must be tuples of three vertices"
         return surfaces
@@ -65,7 +65,7 @@ class Model:
 
         vertex_data = np.array(vertex_data, dtype=np.float32)
         indices = np.arange(len(vertex_data) // 6, dtype=np.uint32)
-        print(f"Loaded OBJ: vertices={len(vertices)}, indices={len(indices)}")
+        #print(f"Loaded OBJ: vertices={len(vertices)}, indices={len(indices)}")
         return vertex_data, indices
 
     def calculate_normals(self, vertices: List[List[float]], faces: List[List[Tuple[int, int]]]) -> np.ndarray:
@@ -101,3 +101,7 @@ class Model:
         glBindVertexArray(self.vao)
         glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, None)
         glBindVertexArray(0)
+
+    def get_indices(self, file_path):
+        v, indices = self.load_obj(file_path)
+        return indices

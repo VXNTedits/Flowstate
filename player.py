@@ -1,8 +1,8 @@
-from interfaces import PlayerInterface, WorldInterface
+
 import glm
 from model import Model
 
-class Player(PlayerInterface):
+class Player(Model):
     def __init__(self, model_path: str, camera):
         self._model = Model(model_path)
         self._position = glm.vec3(10.0, 10.0, -10.0)  # Initialize at the specified position
@@ -13,7 +13,7 @@ class Player(PlayerInterface):
         self.camera = camera
         self.thrust = glm.vec3(0.0, 0.0, 0.0)
         self._velocity = glm.vec3(0, 0, 0)
-
+        self.vertices, self.indices = Model.load_obj(self, model_path)
     def update_position(self, direction: str, delta_time: float):
         self.thrust = glm.vec3(0.0, 0.0, 0.0)
         front = glm.vec3(glm.cos(glm.radians(self.camera.yaw)), 0, glm.sin(glm.radians(self.camera.yaw)))

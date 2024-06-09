@@ -65,13 +65,13 @@ class Game:
         self.text_renderer = TextRenderer(self.window_width, self.window_height)  # Initialize TextRenderer with window size
 
         # Initialize physics
-        #self.physics = Physics(self.world, self.player)
+        self.physics = Physics(self.world, self.player)
 
         # Add colliders for the models in the scene
-        #for model in self.models:
-        #    surfaces = model.get_surfaces()
-        #    for surface in surfaces:
-        #        self.physics.add_collider(surface)
+        for model in self.models:
+            surfaces = model.get_surfaces()
+            for surface in surfaces:
+                self.physics.add_collider(surface)
 
         glfw.set_key_callback(self.window, self.input_handler.key_callback)
         glfw.set_cursor_pos_callback(self.window, self.input_handler.mouse_callback)
@@ -85,9 +85,9 @@ class Game:
             last_frame = current_frame
 
             self.input_handler.process_input(delta_time)
-            #self.physics.apply_gravity(self.player, delta_time)
+            self.physics.apply_gravity(self.player, delta_time)
             # Check for collisions
-            #self.physics.check_collision(self.player, self.world)
+            self.physics.check_collision(self.player, self.world)
 
             # Clear the screen
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)

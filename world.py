@@ -1,9 +1,8 @@
 from typing import List, Tuple
 import glm
-from interfaces import WorldInterface
 from model import Model
 
-class World(WorldInterface, Model):
+class World(Model):
     def __init__(self, filepath: str, rotation_angles=(0.0, 0.0, 0.0), translation=(0.0, 0.0, 0.0)):
         super().__init__(filepath)
         self.set_orientation(rotation_angles)
@@ -24,7 +23,7 @@ class World(WorldInterface, Model):
 
     def get_surfaces(self) -> List[Tuple[glm.vec3, glm.vec3, glm.vec3]]:
         surfaces = super().get_surfaces()
-        print(f"World.get_surfaces: {surfaces}")
+        #print(f"World.get_surfaces: {surfaces}")
         assert surfaces is not None, "get_surfaces should not return None"
         assert all(isinstance(surface, tuple) and len(surface) == 3 for surface in surfaces), "Surfaces must be tuples of three vertices"
         return surfaces

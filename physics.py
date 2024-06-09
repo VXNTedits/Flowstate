@@ -2,22 +2,11 @@ from collections import defaultdict
 from typing import Tuple, List, Set
 import glfw
 import glm
-import sys
-from camera import Camera
-from shader import Shader
-from world import World
-from player import Player
-from renderer import Renderer
-from input_handler import InputHandler
-from model import Model
-from text_renderer import TextRenderer
-from interfaces import WorldInterface, PlayerInterface
+
 
 
 class Physics:
-    def __init__(self, world: WorldInterface, player: PlayerInterface):
-        assert isinstance(world, WorldInterface), "World must implement WorldInterface."
-        assert isinstance(player, PlayerInterface), "Player must implement PlayerInterface."
+    def __init__(self, world, player):
         self.world = world
         self.player = player
         self.colliders = []
@@ -33,8 +22,7 @@ class Physics:
         self.colliders.append((collider, min_point, max_point))
         self.add_to_grid(collider, min_point, max_point)
 
-    def add_model_collider(self, model: WorldInterface):
-        assert isinstance(model, WorldInterface), "Model must implement WorldInterface."
+    def add_model_collider(self, model):
         surfaces = model.get_surfaces()
         assert all(isinstance(surface, tuple) and len(surface) == 3 for surface in surfaces), "Surfaces must be tuples of three vertices."
         for surface in surfaces:
@@ -57,24 +45,27 @@ class Physics:
             int(point.z // self.grid_size)
         )
 
-    def apply_gravity(self, player: PlayerInterface, delta_time: float):
+    def apply_gravity(self, player, delta_time: float):
         assert isinstance(delta_time, float), "Delta time must be a float."
         assert hasattr(player, 'velocity') and hasattr(player, 'position'), "Player must have velocity and position attributes."
         assert isinstance(player.velocity, glm.vec3) and isinstance(player.position, glm.vec3), "Player's velocity and position must be glm.vec3."
         player.velocity += self.gravity * delta_time
         player.position += player.velocity * delta_time + 0.5 * self.gravity * delta_time ** 2
 
-    def check_collision(self, model1: WorldInterface, model2: WorldInterface) -> bool:
-        assert hasattr(model1, 'get_surfaces') and hasattr(model2, 'get_surfaces'), "Model objects must have get_surfaces methods."
-        colliders1 = self.get_model_colliders(model1)
-        colliders2 = self.get_model_colliders(model2)
-        for surface1 in colliders1:
-            for surface2 in colliders2:
-                if self.check_surface_collision(surface1, surface2):
+    def check_collision(self, player, world) -> bool:
+        print('checking collision...', end='\r')
+        assert hasattr(player, 'get_surfaces') and hasattr(world, 'get_surfaces'), "Model objects must have get_surfaces methods."
+        colliders_player = self.get_model_colliders(player)
+        colliders_world = self.get_model_colliders(world)
+        for surface1 in colliders_player:
+            for surface2 in colliders_world:
+                if self.check_surface_collision(tuple(surface1), tuple(surface2)):
+                    print("COLLISION.")
+                    self.resolve_collision(player)
                     return True
         return False
 
-    def get_model_colliders(self, model: WorldInterface) -> Set:
+    def get_model_colliders(self, model):
         assert hasattr(model, 'get_surfaces'), "Model object must have a get_surfaces method."
         colliders = set()
         for surface in model.get_surfaces():
@@ -118,8 +109,8 @@ class Physics:
                (box1_min.y <= box2_max.y and box1_max.y >= box2_min.y) and \
                (box1_min.z <= box2_max.z and box1_max.z >= box2_min.z)
 
-    def resolve_collision(self, player: PlayerInterface, collider: Tuple[glm.vec3, glm.vec3, glm.vec3]):
+    def resolve_collision(self, player):
         assert hasattr(player, 'velocity') and hasattr(player, 'position'), "Player must have velocity and position attributes."
         assert isinstance(player.velocity, glm.vec3) and isinstance(player.position, glm.vec3), "Player's velocity and position must be glm.vec3."
         player.position -= player.velocity  # Revert to previous position
-        player.velocity = glm.vec3(0, 0, 0)  # Stop the player
+        #player.velocity = glm.vec3(0, 0, 0)  # Stop the player
