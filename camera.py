@@ -63,3 +63,7 @@ class Camera:
         offset = glm.vec3(0.0, 2.0, 5.0)
         self.position = player_position - offset
         self.update_camera_vectors()
+
+    def set_position(self, position):
+        self.position = position
+        self.update_camera_vectors()

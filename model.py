@@ -1,55 +1,37 @@
-import glfw
-from OpenGL.GL import *
-from OpenGL.GL.shaders import compileProgram, compileShader
-import numpy as np
-import glm
-import os
-
-import glm
-from OpenGL.GL import *
-import numpy as np
-
-import glm
-from OpenGL.GL import *
-import numpy as np
-
-import glm
-from OpenGL.GL import *
-import numpy as np
-
 import numpy as np
 import glm
 from OpenGL.GL import *
 import os
-
-import numpy as np
-import glm
-from OpenGL.GL import *
-import os
+from typing import List, Tuple
 
 class Model:
     def __init__(self, filepath: str):
+        print(f"Initializing Model with filepath: {filepath}")
         self.vertices, self.indices = self.load_obj(filepath)
         self.vao, self.vbo, self.ebo = self.setup_buffers()
-        self.min_point, self.max_point = self.calculate_bounding_box()
         self.model_matrix = glm.mat4(1.0)  # Initialize model matrix
 
-    def calculate_bounding_box(self):
-        min_point = glm.vec3(float('inf'), float('inf'), float('inf'))
-        max_point = glm.vec3(float('-inf'), float('-inf'), float('-inf'))
+    def get_vertices(self) -> List[glm.vec3]:
+        # Returns the vertices in glm.vec3 format for collision detection
+        vertices = []
+        for i in range(0, len(self.vertices), 6):
+            vertices.append(glm.vec3(self.vertices[i], self.vertices[i+1], self.vertices[i+2]))
+        return vertices
 
-        for i in range(0, len(self.vertices), 6):  # assuming 3 positions + 3 normals
-            vertex = glm.vec3(self.vertices[i], self.vertices[i+1], self.vertices[i+2])
-            min_point.x = min(min_point.x, vertex.x)
-            min_point.y = min(min_point.y, vertex.y)
-            min_point.z = min(min_point.z, vertex.z)
-            max_point.x = max(max_point.x, vertex.x)
-            max_point.y = max(max_point.y, vertex.y)
-            max_point.z = max(max_point.z, vertex.z)
+    def get_surfaces(self) -> List[Tuple[glm.vec3, glm.vec3, glm.vec3]]:
+        # Returns surfaces as list of triangles (each triangle is a tuple of three vertices)
+        surfaces = []
+        for i in range(0, len(self.indices), 3):
+            v0 = glm.vec3(self.vertices[6 * self.indices[i]], self.vertices[6 * self.indices[i] + 1], self.vertices[6 * self.indices[i] + 2])
+            v1 = glm.vec3(self.vertices[6 * self.indices[i + 1]], self.vertices[6 * self.indices[i + 1] + 1], self.vertices[6 * self.indices[i + 1] + 2])
+            v2 = glm.vec3(self.vertices[6 * self.indices[i + 2]], self.vertices[6 * self.indices[i + 2] + 1], self.vertices[6 * self.indices[i + 2] + 2])
+            surfaces.append((v0, v1, v2))
+        print(f"get_surfaces: {surfaces}")
+        assert surfaces is not None, "get_surfaces should not return None"
+        assert all(isinstance(surface, tuple) and len(surface) == 3 for surface in surfaces), "Surfaces must be tuples of three vertices"
+        return surfaces
 
-        return min_point, max_point
-
-    def load_obj(self, filepath: str):
+    def load_obj(self, filepath: str) -> Tuple[np.ndarray, np.ndarray]:
         vertices = []
         normals = []
         faces = []
@@ -83,9 +65,10 @@ class Model:
 
         vertex_data = np.array(vertex_data, dtype=np.float32)
         indices = np.arange(len(vertex_data) // 6, dtype=np.uint32)
+        print(f"Loaded OBJ: vertices={len(vertices)}, indices={len(indices)}")
         return vertex_data, indices
 
-    def calculate_normals(self, vertices, faces):
+    def calculate_normals(self, vertices: List[List[float]], faces: List[List[Tuple[int, int]]]) -> np.ndarray:
         normals = np.zeros((len(vertices), 3), dtype=np.float32)
         for face in faces:
             v0, v1, v2 = face[0][0], face[1][0], face[2][0]
@@ -97,7 +80,7 @@ class Model:
         normals = np.array([n / np.linalg.norm(n) for n in normals])
         return normals
 
-    def setup_buffers(self):
+    def setup_buffers(self) -> Tuple[int, int, int]:
         vao = glGenVertexArrays(1)
         glBindVertexArray(vao)
         vbo = glGenBuffers(1)

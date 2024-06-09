@@ -1,116 +1,4 @@
-import os
-import sys
-
-import glfw
-import glm
-from player import Player
-from world import World
-from model import Model
-from renderer import Renderer
-from input_handler import InputHandler
-from text_renderer import TextRenderer
-from physics import Physics
-from camera import Camera
-from shader import Shader
 from OpenGL.GL import *
-
-
-import glfw
-import glm
-from camera import Camera
-from shader import Shader
-from world import World
-from player import Player
-from renderer import Renderer
-from input_handler import InputHandler
-from physics import Physics
-from model import Model
-from text_renderer import TextRenderer
-
-import glfw
-import glm
-from camera import Camera
-from shader import Shader
-from world import World
-from player import Player
-from renderer import Renderer
-from input_handler import InputHandler
-from physics import Physics
-from model import Model
-from text_renderer import TextRenderer
-
-import glfw
-import glm
-from camera import Camera
-from shader import Shader
-from world import World
-from player import Player
-from renderer import Renderer
-from input_handler import InputHandler
-from physics import Physics
-from model import Model
-from text_renderer import TextRenderer
-
-import glfw
-import glm
-from camera import Camera
-from shader import Shader
-from world import World
-from player import Player
-from renderer import Renderer
-from input_handler import InputHandler
-from physics import Physics
-from model import Model
-from text_renderer import TextRenderer
-
-import glfw
-import glm
-from camera import Camera
-from shader import Shader
-from world import World
-from player import Player
-from renderer import Renderer
-from input_handler import InputHandler
-from physics import Physics
-from model import Model
-from text_renderer import TextRenderer
-
-import glfw
-import glm
-from camera import Camera
-from shader import Shader
-from world import World
-from player import Player
-from renderer import Renderer
-from input_handler import InputHandler
-from physics import Physics
-from model import Model
-from text_renderer import TextRenderer
-
-import glfw
-import glm
-from camera import Camera
-from shader import Shader
-from world import World
-from player import Player
-from renderer import Renderer
-from input_handler import InputHandler
-from physics import Physics
-from model import Model
-from text_renderer import TextRenderer
-
-import glfw
-import glm
-from camera import Camera
-from shader import Shader
-from world import World
-from player import Player
-from renderer import Renderer
-from input_handler import InputHandler
-from physics import Physics
-from model import Model
-from text_renderer import TextRenderer
-
 import glfw
 import glm
 import sys
@@ -125,7 +13,7 @@ from model import Model
 from text_renderer import TextRenderer
 
 class Game:
-    def __init__(self, fullscreen=True):
+    def __init__(self, fullscreen=False):
         if not glfw.init():
             raise Exception("GLFW initialization failed")
 
@@ -177,11 +65,13 @@ class Game:
         self.text_renderer = TextRenderer(self.window_width, self.window_height)  # Initialize TextRenderer with window size
 
         # Initialize physics
-        self.physics = Physics(self.world, self.player)
+        #self.physics = Physics(self.world, self.player)
 
         # Add colliders for the models in the scene
-        for model in self.models:
-            self.physics.add_model_collider(model)
+        #for model in self.models:
+        #    surfaces = model.get_surfaces()
+        #    for surface in surfaces:
+        #        self.physics.add_collider(surface)
 
         glfw.set_key_callback(self.window, self.input_handler.key_callback)
         glfw.set_cursor_pos_callback(self.window, self.input_handler.mouse_callback)
@@ -195,9 +85,9 @@ class Game:
             last_frame = current_frame
 
             self.input_handler.process_input(delta_time)
-
+            #self.physics.apply_gravity(self.player, delta_time)
             # Check for collisions
-            self.physics.check_collision(self.player)
+            #self.physics.check_collision(self.player, self.world)
 
             # Clear the screen
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -205,7 +95,7 @@ class Game:
             # Toggle camera view mode
             if self.camera.first_person:
                 self.camera.set_first_person(self.player.position)
-                self.player.set_position(self.camera.position)  # Update the player's position to match the camera's position in first-person view
+                self.camera.set_position(self.player.position)  # Update the player's position to match the camera's position in first-person view
                 player_visible = False
             else:
                 self.camera.set_third_person(self.player.position)

@@ -1,25 +1,9 @@
-import glfw
-from OpenGL.GL import *
-from OpenGL.GL.shaders import compileProgram, compileShader
-import numpy as np
+from typing import List, Tuple
 import glm
-import os
-
-import glm
+from interfaces import WorldInterface
 from model import Model
 
-import os
-from model import Model
-
-from model import Model
-
-from model import Model
-import glm
-
-from model import Model
-import glm
-
-class World(Model):
+class World(WorldInterface, Model):
     def __init__(self, filepath: str, rotation_angles=(0.0, 0.0, 0.0), translation=(0.0, 0.0, 0.0)):
         super().__init__(filepath)
         self.set_orientation(rotation_angles)
@@ -37,3 +21,10 @@ class World(Model):
         # Apply translation
         translation_matrix = glm.translate(glm.mat4(1.0), glm.vec3(translation[0], translation[1], translation[2]))
         self.model_matrix = translation_matrix * self.model_matrix
+
+    def get_surfaces(self) -> List[Tuple[glm.vec3, glm.vec3, glm.vec3]]:
+        surfaces = super().get_surfaces()
+        print(f"World.get_surfaces: {surfaces}")
+        assert surfaces is not None, "get_surfaces should not return None"
+        assert all(isinstance(surface, tuple) and len(surface) == 3 for surface in surfaces), "Surfaces must be tuples of three vertices"
+        return surfaces
