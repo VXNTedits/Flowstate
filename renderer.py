@@ -23,6 +23,8 @@ class Renderer:
         self.shader = shader
         self.camera = camera
         glEnable(GL_DEPTH_TEST)
+        glViewport(0, 0, 800, 600)  # Set the viewport
+        glClearColor(0.0, 0.0, 0.0, 1.0)  # Set clear color (black)
 
     def render(self, model, view_matrix, projection_matrix):
         self.shader.use()
@@ -56,5 +58,3 @@ class Renderer:
         model.draw()
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
         glPopAttrib()  # Restore previous polygon mode
-
-

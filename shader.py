@@ -56,3 +56,4 @@ class Shader:
         if glGetShaderiv(shader, GL_COMPILE_STATUS) != GL_TRUE:
             raise RuntimeError(glGetShaderInfoLog(shader))
         return shader
+
