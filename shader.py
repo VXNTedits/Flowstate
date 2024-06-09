@@ -8,6 +8,10 @@ import os
 from OpenGL.GL import *
 from OpenGL.GL.shaders import compileProgram, compileShader
 
+import glm
+from OpenGL.GL import *
+from OpenGL.GL.shaders import compileProgram, compileShader
+
 class Shader:
     def __init__(self, vertex_path: str, fragment_path: str):
         self.id = self.create_shader_program(vertex_path, fragment_path)

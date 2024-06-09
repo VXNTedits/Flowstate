@@ -1,19 +1,4 @@
 import glfw
-from OpenGL.GL import *
-from OpenGL.GL.shaders import compileProgram, compileShader
-import numpy as np
-import glm
-import os
-
-from camera import Camera
-from player import Player
-
-
-import glfw
-
-import glfw
-
-import glfw
 
 class InputHandler:
     def __init__(self, camera, player):
@@ -53,7 +38,7 @@ class InputHandler:
         self.last_y = ypos
         self.camera.process_mouse_movement(xoffset, yoffset)
 
-    def process_input(self, delta_time):
+    def update(self, delta_time):
         if self.keys[glfw.KEY_W]:
             self.player.update_position('FORWARD', delta_time)
         if self.keys[glfw.KEY_S]:

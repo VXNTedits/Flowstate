@@ -1,6 +1,6 @@
-
 import glm
 from model import Model
+
 
 class Player(Model):
     def __init__(self, model_path: str, camera):
@@ -14,6 +14,7 @@ class Player(Model):
         self.thrust = glm.vec3(0.0, 0.0, 0.0)
         self._velocity = glm.vec3(0, 0, 0)
         self.vertices, self.indices = Model.load_obj(self, model_path)
+
     def update_position(self, direction: str, delta_time: float):
         self.thrust = glm.vec3(0.0, 0.0, 0.0)
         front = glm.vec3(glm.cos(glm.radians(self.camera.yaw)), 0, glm.sin(glm.radians(self.camera.yaw)))
@@ -43,6 +44,11 @@ class Player(Model):
 
     def draw(self):
         self._model.draw()
+
+    def update(self, delta_time: float):
+        # This method can be used to handle any updates needed per frame
+        # For now, it will call update_position with a default direction (if applicable)
+        pass  # You can modify this to call update_position if needed based on game state
 
     @property
     def model(self) -> Model:

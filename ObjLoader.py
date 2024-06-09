@@ -1,24 +1,4 @@
-import numpy as np
 
-import os
-import numpy as np
-
-import os
-import numpy as np
-
-import os
-import numpy as np
-
-import numpy as np
-from MaterialLoader import MaterialLoader
-
-import os
-import numpy as np
-from MaterialLoader import MaterialLoader
-
-import os
-import numpy as np
-from MaterialLoader import MaterialLoader
 
 import os
 import numpy as np

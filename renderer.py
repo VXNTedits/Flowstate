@@ -52,14 +52,9 @@ class Renderer:
 
         # Draw the wireframe over the model
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-        glColor3f(1.0, 1.0, 1.0)  # Set the wireframe color to white
-        glDisable(GL_DEPTH_TEST)  # Disable depth test to draw on top of everything else
+        glColor3f(1.0, 1.0, 1.0)  # Set the color for the bounding box (white)
+        model.draw()
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+        glPopAttrib()  # Restore previous polygon mode
 
-        glBindVertexArray(model.vao)
-        glDrawElements(GL_LINES, len(model.indices), GL_UNSIGNED_INT, None)
-        glBindVertexArray(0)
-
-        # Restore previous polygon mode and re-enable depth test
-        glEnable(GL_DEPTH_TEST)
-        glPopAttrib()
 
