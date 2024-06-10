@@ -1,10 +1,13 @@
 import glm
+
+from aabb import AABB
 from model import Model
 
 class Player(Model):
     def __init__(self, model_path: str, camera):
         self.camera = camera  # Ensure camera is assigned first
         self.model = Model(model_path)  # Change _model to model
+        self.aabb = AABB.calculate_aabb(self.model.get_vertices(), self.model.model_matrix)
         self._position = glm.vec3(10.0, 0.2, -10.0)  # Initialize at the specified position
         self.previous_position = glm.vec3(10.0, 10.0, -10.0)
         self.front = glm.vec3(0.0, 0.0, -1.0)
@@ -113,3 +116,4 @@ class Player(Model):
     @position.setter
     def position(self, value: glm.vec3):
         self._position = value
+

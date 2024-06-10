@@ -1,5 +1,7 @@
 from typing import List, Tuple
 import glm
+
+from aabb import AABB
 from model import Model
 
 class World(Model):
@@ -7,6 +9,7 @@ class World(Model):
         super().__init__(filepath)
         self.set_orientation(rotation_angles)
         self.set_position(translation)
+        self.aabb = AABB.calculate_aabb(self.get_vertices(), self.model_matrix)
 
     def set_orientation(self, rotation_angles):
         # Apply rotations around x, y, z axes respectively

@@ -21,10 +21,6 @@ class Components:
         self.text_renderer = TextRenderer(window.width, window.height)
         self.physics = Physics(self.world, self.player)
 
-        for model in self.models:
-            surfaces = model.get_surfaces()
-            for surface in surfaces:
-                self.physics.add_collider(surface)
 
     def set_input_callbacks(self, window):
         window.set_callbacks(self.input_handler.key_callback, self.input_handler.mouse_callback)
