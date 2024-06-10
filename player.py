@@ -17,7 +17,7 @@ class Player(Model):
 
         # Apply a rotation to make the model stand vertically
         self.model_matrix = glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
-        self.set_origin(glm.vec3(0.02, 0.2, 0.0))
+        self.set_origin(glm.vec3(-0.025, 0.2, 0.0))
         self.update_model_matrix()
 
     def set_origin(self, new_origin):
@@ -65,8 +65,8 @@ class Player(Model):
             self.camera.set_third_person(self._position, self.get_rotation_matrix())
 
     def update_model_matrix(self):
+        rotation = glm.rotate(glm.mat4(1.0), glm.radians(-self.yaw), glm.vec3(0.0, 1.0, 0.0))
         translation = glm.translate(glm.mat4(1.0), self._position)
-        rotation = glm.rotate(glm.mat4(1.0), glm.radians(self.yaw), glm.vec3(0.0, 1.0, 0.0))
         self.model.model_matrix = translation * rotation * self.model_matrix  # Use self.model
 
     def get_rotation_matrix(self):
