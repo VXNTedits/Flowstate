@@ -32,19 +32,19 @@ class Physics:
         return not (proj1[1] < proj2[0] or proj2[1] < proj1[0])
 
     @staticmethod
-    def sat_collision(model1: Model, model2: Model) -> bool:
-        axes1 = model1.get_normals(model1.compute_edges(model1.vertices.reshape(-1, 3)))
-        axes2 = model2.get_normals(model2.compute_edges(model2.vertices.reshape(-1, 3)))
+    def sat_collision(player: Model, world: Model) -> bool:
+        axes1 = player.get_normals(player.compute_edges(player.vertices.reshape(-1, 3)))
+        axes2 = world.static_normals
         axes = axes1 + axes2
         for axis in axes:
-            proj1 = Physics.project_shape(model1, axis)
-            proj2 = Physics.project_shape(model2, axis)
+            proj1 = Physics.project_shape(player, axis)
+            proj2 = Physics.project_shape(world, axis)
             if not Physics.overlap(proj1, proj2):
                 return False
         return True
 
     def check_collision(self, player: Model, world: Model) -> bool:
-        for shape1 in player.convex_components:
+        for shape1 in player.convex_components_obj:
             for shape2 in world.convex_components:
                 if Physics.sat_collision(shape1, shape2):
                     return True

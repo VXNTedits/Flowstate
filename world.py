@@ -22,4 +22,5 @@ class World(Model):
         translation_matrix = glm.translate(glm.mat4(1.0), glm.vec3(translation[0], translation[1], translation[2]))
         self.model_matrix = translation_matrix * self.model_matrix
 
-
+    def get_static_normals(self):
+        return self.static_normals

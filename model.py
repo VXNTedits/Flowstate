@@ -4,14 +4,20 @@ from typing import List, Tuple
 from OpenGL.GL import *
 
 class Model:
+
     def __init__(self, filepath: str, player=False):
         print(f"Initializing Model with filepath: {filepath}")
         self.vertices, self.indices = self.load_obj(filepath)
         self.vao, self.vbo, self.ebo = self.setup_buffers()
         self.model_matrix = glm.mat4(1.0)  # Initialize model matrix
         self.vertices, self.indices = self.load_obj(filepath)
+        self.static_normals = self.compute_edges(self.vertices.reshape(-1, 3))
         self.is_player = player
-        self.convex_components = self.decompose_model()
+        if self.is_player:
+            self.convex_components_list, self.convex_components_obj = self.decompose_model()
+        else:
+            self.convex_components = self.decompose_model()
+
 
     def load_obj(self, filepath: str) -> Tuple[np.ndarray, np.ndarray]:
         vertices = []
@@ -97,8 +103,9 @@ class Model:
             ]
 
             # Convert triangles to Models
-            bounding_shapes = [Model.from_vertices(triangle) for triangle in triangles]
-            return bounding_shapes
+            #bounding_shapes = [Model.from_vertices(triangle) for triangle in triangles]
+            #return bounding_shapes
+            return triangles, [Model.from_vertices(triangle) for triangle in triangles]
 
     def compute_edges(self, vertices: List[glm.vec3]) -> List[glm.vec3]:
         edges = []
@@ -115,6 +122,7 @@ class Model:
             normal = glm.normalize(glm.vec3(-edge[1], edge[0], 0))  # Perpendicular vector in 2D
             normals.append(normal)
         return normals
+
 
     def is_convex(self, vertices: List[glm.vec3]) -> bool:
         edges = self.compute_edges(vertices)
@@ -194,6 +202,7 @@ class Model:
         obj = cls.__new__(cls)  # Create a new instance without calling __init__
         obj.vertices = np.array(vertices, dtype=np.float32).flatten()
         obj.indices = np.arange(len(vertices), dtype=np.uint32)
+        obj.static_normals = obj.get_normals(obj.compute_edges(obj.vertices.reshape(-1, 3)))
         obj.convex_components = [obj]
         return obj
 
@@ -218,3 +227,4 @@ class Model:
         glBindVertexArray(self.vao)
         glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, None)
         glBindVertexArray(0)
+
