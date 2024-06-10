@@ -48,16 +48,12 @@ class Camera:
         self.first_person = not self.first_person
 
     def set_first_person(self, player_position, player_rotation_matrix):
-        offset = glm.vec3(-0.025, 0.2, 0.0)  # Offset to the eyes in player's local coordinates
-        offset = player_rotation_matrix * glm.vec4(offset, 1.0)  # Transform offset by player rotation
-        self.position = player_position + glm.vec3(offset)
-        self.update_camera_vectors()
+        offset = glm.vec3(0.0, 0.2, 0.0)  # Adjust offset as needed for correct eye level
+        self.position = player_position + offset
 
     def set_third_person(self, player_position, player_rotation_matrix):
-        offset = glm.vec3(0.0, 0.5, 0)  # Example third-person offset
-        offset = player_rotation_matrix * glm.vec4(offset, 1.0)  # Transform offset by player rotation
-        self.position = player_position + glm.vec3(offset)
-        self.update_camera_vectors()
+        offset = glm.vec3(0.02, 0.2, 0.02)  # Adjust offset for third-person view
+        self.position = player_position + offset
 
     def set_position(self, position):
         self.position = position

@@ -5,7 +5,7 @@ class Player(Model):
     def __init__(self, model_path: str, camera):
         self.camera = camera  # Ensure camera is assigned first
         self.model = Model(model_path)  # Change _model to model
-        self._position = glm.vec3(10.0, 10.0, -10.0)  # Initialize at the specified position
+        self._position = glm.vec3(10.0, 0.2, -10.0)  # Initialize at the specified position
         self.previous_position = glm.vec3(10.0, 10.0, -10.0)
         self.front = glm.vec3(0.0, 0.0, -1.0)
         self.up = glm.vec3(0.0, 1.0, 0.0)
@@ -14,10 +14,9 @@ class Player(Model):
         self._velocity = glm.vec3(0, 0, 0)
         self.yaw = camera.yaw  # Initialize yaw to camera's yaw
         self.vertices, self.indices = Model.load_obj(self, model_path)
-
         # Apply a rotation to make the model stand vertically
         self.model_matrix = glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
-        self.set_origin(glm.vec3(-0.025, 0.2, 0.0))
+        #self.set_origin(glm.vec3(-0.025, 0.2, 0.0))
         self.update_model_matrix()
 
     def set_origin(self, new_origin):
@@ -58,16 +57,21 @@ class Player(Model):
         self.update_model_matrix()
         print(f"Player position: {self._position} Camera position: {self.camera.position}")
 
-    def update_camera_position(self):
-        if self.camera.first_person:
-            self.camera.set_first_person(self._position, self.get_rotation_matrix())
-        else:
-            self.camera.set_third_person(self._position, self.get_rotation_matrix())
+    # def update_camera_position(self):
+    #     if self.camera.first_person:
+    #         self.camera.set_first_person(self._position, self.get_rotation_matrix())
+    #     else:
+    #         self.camera.set_third_person(self._position, self.get_rotation_matrix())
 
     def update_model_matrix(self):
-        rotation = glm.rotate(glm.mat4(1.0), glm.radians(-self.yaw), glm.vec3(0.0, 1.0, 0.0))
+        # Combine all rotations into a single transformation matrix
+        model_rotation = (
+                glm.rotate(glm.mat4(1.0), glm.radians(-self.yaw), glm.vec3(0.0, 1.0, 0.0)) *
+                glm.rotate(glm.mat4(1.0), glm.radians(90), glm.vec3(0.0, 1.0, 0.0)) *
+                glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
+        )
         translation = glm.translate(glm.mat4(1.0), self._position)
-        self.model.model_matrix = translation * rotation * self.model_matrix  # Use self.model
+        self.model.model_matrix = translation * model_rotation
 
     def get_rotation_matrix(self):
         return glm.rotate(glm.mat4(1.0), glm.radians(self.yaw), glm.vec3(0.0, 1.0, 0.0))
@@ -79,9 +83,20 @@ class Player(Model):
     def draw(self):
         self.model.draw()  # Use self.model
 
+    # In the Player class, ensure camera yaw is updated to match player yaw
     def process_mouse_movement(self, xoffset, yoffset):
         self.camera.process_mouse_movement(xoffset, yoffset)
         self.yaw = self.camera.yaw  # Update player's yaw based on camera's yaw
+        self.update_camera_position()
+
+    def update_camera_position(self):
+        # Always update camera yaw to match player yaw
+        self.camera.yaw = self.yaw
+        self.camera.update_camera_vectors()
+        if self.camera.first_person:
+            self.camera.set_first_person(self._position, self.get_rotation_matrix())
+        else:
+            self.camera.set_third_person(self._position, self.get_rotation_matrix())
 
     @property
     def velocity(self) -> glm.vec3:
