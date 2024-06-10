@@ -34,8 +34,6 @@ class Game:
             self.components.input_handler.update(delta_time)
             self.components.player.update(delta_time)
             self.components.physics.update(delta_time)
-            if self.components.physics.broad_phase_check():
-                print("Collision detected in broad phase!")
 
             view_matrix = self.components.camera.get_view_matrix()
             projection_matrix = glm.perspective(glm.radians(90.0), self.window.width / self.window.height, 0.001, 1000.0)

@@ -1,5 +1,7 @@
 import glm
 
+import model
+import shape
 from aabb import AABB
 from model import Model
 
@@ -7,7 +9,7 @@ class Player(Model):
     def __init__(self, model_path: str, camera):
         self.camera = camera  # Ensure camera is assigned first
         self.model = Model(model_path)  # Change _model to model
-        self.aabb = AABB.calculate_aabb(self.model.get_vertices(), self.model.model_matrix)
+        #self.aabb = AABB.calculate_aabb(self.model.get_vertices(), self.model.model_matrix)
         self._position = glm.vec3(10.0, 0.2, -10.0)  # Initialize at the specified position
         self.previous_position = glm.vec3(10.0, 10.0, -10.0)
         self.front = glm.vec3(0.0, 0.0, -1.0)
@@ -17,6 +19,7 @@ class Player(Model):
         self._velocity = glm.vec3(0, 0, 0)
         self.yaw = camera.yaw  # Initialize yaw to camera's yaw
         self.vertices, self.indices = Model.load_obj(self, model_path)
+        self.convex_components = self.model.convex_components
         # Apply a rotation to make the model stand vertically
         self.model_matrix = glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
         #self.set_origin(glm.vec3(-0.025, 0.2, 0.0))

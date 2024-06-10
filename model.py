@@ -1,35 +1,12 @@
 import numpy as np
 import glm
-from OpenGL.GL import *
-import os
 from typing import List, Tuple
+
 
 class Model:
     def __init__(self, filepath: str):
-        print(f"Initializing Model with filepath: {filepath}")
         self.vertices, self.indices = self.load_obj(filepath)
-        self.vao, self.vbo, self.ebo = self.setup_buffers()
-        self.model_matrix = glm.mat4(1.0)  # Initialize model matrix
-
-    def get_vertices(self) -> List[glm.vec3]:
-        # Returns the vertices in glm.vec3 format for collision detection
-        vertices = []
-        for i in range(0, len(self.vertices), 6):
-            vertices.append(glm.vec3(self.vertices[i], self.vertices[i+1], self.vertices[i+2]))
-        return vertices
-
-    def get_surfaces(self) -> List[Tuple[glm.vec3, glm.vec3, glm.vec3]]:
-        # Returns surfaces as list of triangles (each triangle is a tuple of three vertices)
-        surfaces = []
-        for i in range(0, len(self.indices), 3):
-            v0 = glm.vec3(self.vertices[6 * self.indices[i]], self.vertices[6 * self.indices[i] + 1], self.vertices[6 * self.indices[i] + 2])
-            v1 = glm.vec3(self.vertices[6 * self.indices[i + 1]], self.vertices[6 * self.indices[i + 1] + 1], self.vertices[6 * self.indices[i + 1] + 2])
-            v2 = glm.vec3(self.vertices[6 * self.indices[i + 2]], self.vertices[6 * self.indices[i + 2] + 1], self.vertices[6 * self.indices[i + 2] + 2])
-            surfaces.append((v0, v1, v2))
-        #print(f"get_surfaces: {surfaces}")
-        assert surfaces is not None, "get_surfaces should not return None"
-        assert all(isinstance(surface, tuple) and len(surface) == 3 for surface in surfaces), "Surfaces must be tuples of three vertices"
-        return surfaces
+        self.convex_components = self.decompose_model()
 
     def load_obj(self, filepath: str) -> Tuple[np.ndarray, np.ndarray]:
         vertices = []
@@ -65,59 +42,118 @@ class Model:
 
         vertex_data = np.array(vertex_data, dtype=np.float32)
         indices = np.arange(len(vertex_data) // 6, dtype=np.uint32)
-        #print(f"Loaded OBJ: vertices={len(vertices)}, indices={len(indices)}")
         return vertex_data, indices
 
-    def calculate_normals(self, vertices: List[List[float]], faces: List[List[Tuple[int, int]]]) -> np.ndarray:
-        normals = np.zeros((len(vertices), 3), dtype=np.float32)
-        for face in faces:
-            v0, v1, v2 = face[0][0], face[1][0], face[2][0]
-            p0, p1, p2 = np.array(vertices[v0]), np.array(vertices[v1]), np.array(vertices[v2])
-            normal = np.cross(p1 - p0, p2 - p0)
-            normal = normal / np.linalg.norm(normal)
-            for vertex_index, _ in face:
-                normals[vertex_index] += normal
-        normals = np.array([n / np.linalg.norm(n) for n in normals])
+    def decompose_model(self) -> List['Model']:
+        # Extract only the positional data for convex decomposition
+        positions = self.vertices.reshape(-1, 6)[:, :3]
+        positions = [glm.vec3(x, y, z) for x, y, z in positions]
+
+        shapes = []
+        for i in range(0, len(self.indices), 3):
+            triangle = [positions[self.indices[i]],
+                        positions[self.indices[i + 1]],
+                        positions[self.indices[i + 2]]]
+            shapes.append(triangle)
+
+        convex_shapes = []
+        for shape in shapes:
+            convex_shapes.extend(self.decompose_to_convex(shape))
+        return convex_shapes
+
+    def compute_edges(self, vertices: List[glm.vec3]) -> List[glm.vec3]:
+        edges = []
+        for i in range(len(vertices)):
+            start = vertices[i]
+            end = vertices[(i + 1) % len(vertices)]
+            edge = end - start
+            edges.append(edge)
+        return edges
+
+    def get_normals(self, edges: List[glm.vec3]) -> List[glm.vec3]:
+        normals = []
+        for edge in edges:
+            normal = glm.normalize(glm.vec3(-edge[1], edge[0], 0))  # Perpendicular vector in 2D
+            normals.append(normal)
         return normals
 
-    def setup_buffers(self) -> Tuple[int, int, int]:
-        vao = glGenVertexArrays(1)
-        glBindVertexArray(vao)
-        vbo = glGenBuffers(1)
-        glBindBuffer(GL_ARRAY_BUFFER, vbo)
-        glBufferData(GL_ARRAY_BUFFER, self.vertices.nbytes, self.vertices, GL_STATIC_DRAW)
-        ebo = glGenBuffers(1)
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.indices.nbytes, self.indices, GL_STATIC_DRAW)
-        stride = 6 * self.vertices.itemsize
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
-        glEnableVertexAttribArray(0)
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(3 * self.vertices.itemsize))
-        glEnableVertexAttribArray(1)
-        glBindVertexArray(0)
-        return vao, vbo, ebo
-
-    def draw(self):
-        glBindVertexArray(self.vao)
-        glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, None)
-        glBindVertexArray(0)
-
-    def get_indices(self, file_path):
-        v, indices = self.load_obj(file_path)
-        return indices
-
-    def translate(self, translation_vector):
-        """Translate the model's vertex data by the given vector."""
-        translation_matrix = glm.translate(glm.mat4(1.0), translation_vector)
-
-        # Convert vertices to numpy array for easier manipulation
-        vertices = np.array(self.vertices).reshape(-1, 3)  # Assuming vertices are stored as [x, y, z, ...]
-
-        # Apply the translation to each vertex
+    def is_convex(self, vertices: List[glm.vec3]) -> bool:
+        edges = self.compute_edges(vertices)
+        normals = self.get_normals(edges)
+        signs = []
         for i in range(len(vertices)):
-            vertex = glm.vec4(vertices[i][0], vertices[i][1], vertices[i][2], 1.0)
-            transformed_vertex = translation_matrix * vertex
-            vertices[i] = [transformed_vertex.x, transformed_vertex.y, transformed_vertex.z]
+            v1 = vertices[i] - vertices[i - 1]
+            v2 = vertices[(i + 1) % len(vertices)] - vertices[i]
+            cross_product = glm.cross(v1, v2)
+            signs.append(cross_product.z > 0)
+        return all(signs) or not any(signs)
 
-        # Update the model's vertex data
-        self.vertices = vertices.flatten().tolist()
+    def is_ear(self, vertices: List[glm.vec3], prev: int, curr: int, next: int) -> bool:
+        triangle = [vertices[prev], vertices[curr], vertices[next]]
+        cross1 = glm.cross(glm.vec3(triangle[1] - triangle[0], 0), glm.vec3(triangle[2] - triangle[1], 0))
+        cross2 = glm.cross(glm.vec3(triangle[2] - triangle[1], 0), glm.vec3(triangle[0] - triangle[2], 0))
+        cross3 = glm.cross(glm.vec3(triangle[0] - triangle[2], 0), glm.vec3(triangle[1] - triangle[0], 0))
+        if cross1.z <= 0 or cross2.z <= 0 or cross3.z <= 0:
+            return False
+        for i in range(len(vertices)):
+            if i in [prev, curr, next]:
+                continue
+            if self.point_in_triangle(vertices[i], triangle):
+                return False
+        return True
+
+    def point_in_triangle(self, pt: glm.vec3, tri: List[glm.vec3]) -> bool:
+        def sign(p1: glm.vec3, p2: glm.vec3, p3: glm.vec3) -> float:
+            return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y)
+
+        d1 = sign(pt, tri[0], tri[1])
+        d2 = sign(pt, tri[1], tri[2])
+        d3 = sign(pt, tri[2], tri[0])
+
+        has_neg = (d1 < 0) or (d2 < 0) or (d3 < 0)
+        has_pos = (d1 > 0) or (d2 > 0) or (d3 > 0)
+
+        return not (has_neg and has_pos)
+
+    def decompose_to_convex(self, vertices: List[glm.vec3]) -> List['Model']:
+        shapes = [vertices]
+        convex_shapes = []
+
+        while shapes:
+            shape = shapes.pop()
+            if self.is_convex(shape):
+                convex_shapes.append(Model.from_vertices(shape))
+            else:
+                vertex_count = len(shape)
+                if vertex_count < 3:
+                    continue
+
+                ears = []
+                for i in range(vertex_count):
+                    prev = (i - 1) % vertex_count
+                    curr = i
+                    next = (i + 1) % vertex_count
+                    if self.is_ear(shape, prev, curr, next):
+                        ears.append(curr)
+
+                if not ears:
+                    midpoint = vertex_count // 2
+                    shapes.append(shape[:midpoint])
+                    shapes.append(shape[midpoint:])
+                else:
+                    ear = ears[0]
+                    prev = (ear - 1) % vertex_count
+                    next = (ear + 1) % vertex_count
+                    new_vertices = shape[:ear] + shape[ear + 1:]
+                    shapes.append(new_vertices)
+                    convex_shapes.append(Model.from_vertices([shape[prev], shape[ear], shape[next]]))
+
+        return convex_shapes
+
+    @classmethod
+    def from_vertices(cls, vertices: List[glm.vec3]) -> 'Model':
+        obj = cls.__new__(cls)  # Create a new instance without calling __init__
+        obj.vertices = np.array(vertices, dtype=np.float32).flatten()
+        obj.indices = np.arange(len(vertices), dtype=np.uint32)
+        obj.convex_components = [obj]
+        return obj
