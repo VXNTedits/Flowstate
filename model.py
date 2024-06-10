@@ -105,3 +105,19 @@ class Model:
     def get_indices(self, file_path):
         v, indices = self.load_obj(file_path)
         return indices
+
+    def translate(self, translation_vector):
+        """Translate the model's vertex data by the given vector."""
+        translation_matrix = glm.translate(glm.mat4(1.0), translation_vector)
+
+        # Convert vertices to numpy array for easier manipulation
+        vertices = np.array(self.vertices).reshape(-1, 3)  # Assuming vertices are stored as [x, y, z, ...]
+
+        # Apply the translation to each vertex
+        for i in range(len(vertices)):
+            vertex = glm.vec4(vertices[i][0], vertices[i][1], vertices[i][2], 1.0)
+            transformed_vertex = translation_matrix * vertex
+            vertices[i] = [transformed_vertex.x, transformed_vertex.y, transformed_vertex.z]
+
+        # Update the model's vertex data
+        self.vertices = vertices.flatten().tolist()

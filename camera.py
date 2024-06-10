@@ -1,17 +1,3 @@
-import glfw
-from OpenGL.GL import *
-from OpenGL.GL.shaders import compileProgram, compileShader
-import numpy as np
-import glm
-import os
-
-import glm
-
-
-import glm
-
-import glm
-
 import glm
 
 import glm
@@ -56,21 +42,23 @@ class Camera:
         self.right = glm.normalize(glm.cross(self.front, self.world_up))
         self.up = glm.normalize(glm.cross(self.right, self.front))
 
-    def toggle_view(self, player_position):
+    def toggle_view(self, player_position, player_rotation_matrix):
         if self.first_person:
-            self.set_third_person(player_position)
+            self.set_third_person(player_position, player_rotation_matrix)
         else:
-            self.set_first_person(player_position)
+            self.set_first_person(player_position, player_rotation_matrix)
         self.first_person = not self.first_person
 
-    def set_first_person(self, player_position):
-        offset = glm.vec3(0.02, 0.2, 0.0)
-        self.position = player_position + offset
+    def set_first_person(self, player_position, player_rotation_matrix):
+        offset = glm.vec3(-0.0, 0.2, 0.0)
+        offset = player_rotation_matrix * glm.vec4(offset, 1.0)  # Transform offset by player rotation
+        self.position = player_position + glm.vec3(offset)
         self.update_camera_vectors()
 
-    def set_third_person(self, player_position):
-        offset = glm.vec3(-0.2, 0.6, 0.0)
-        self.position = player_position + offset
+    def set_third_person(self, player_position, player_rotation_matrix):
+        offset = glm.vec3(0.2, 1.0, 0.0)
+        offset = player_rotation_matrix * glm.vec4(offset, 1.0)  # Transform offset by player rotation
+        self.position = player_position + glm.vec3(offset)
         self.update_camera_vectors()
 
     def set_position(self, position):
