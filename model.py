@@ -1,11 +1,16 @@
 import numpy as np
 import glm
 from typing import List, Tuple
-
+from OpenGL.GL import *
 
 class Model:
-    def __init__(self, filepath: str):
+    def __init__(self, filepath: str, player=False):
+        print(f"Initializing Model with filepath: {filepath}")
         self.vertices, self.indices = self.load_obj(filepath)
+        self.vao, self.vbo, self.ebo = self.setup_buffers()
+        self.model_matrix = glm.mat4(1.0)  # Initialize model matrix
+        self.vertices, self.indices = self.load_obj(filepath)
+        self.is_player = player
         self.convex_components = self.decompose_model()
 
     def load_obj(self, filepath: str) -> Tuple[np.ndarray, np.ndarray]:
@@ -31,9 +36,6 @@ class Model:
                         face.append((vertex_index, normal_index))
                     faces.append(face)
 
-        if len(normals) == 0:
-            normals = self.calculate_normals(vertices, faces)
-
         vertex_data = []
         for face in faces:
             for vertex_index, normal_index in face:
@@ -45,21 +47,58 @@ class Model:
         return vertex_data, indices
 
     def decompose_model(self) -> List['Model']:
-        # Extract only the positional data for convex decomposition
-        positions = self.vertices.reshape(-1, 6)[:, :3]
-        positions = [glm.vec3(x, y, z) for x, y, z in positions]
+        if not self.is_player:
+            # Extract only the positional data for convex decomposition
+            positions = self.vertices.reshape(-1, 6)[:, :3]
+            positions = [glm.vec3(x, y, z) for x, y, z in positions]
 
-        shapes = []
-        for i in range(0, len(self.indices), 3):
-            triangle = [positions[self.indices[i]],
-                        positions[self.indices[i + 1]],
-                        positions[self.indices[i + 2]]]
-            shapes.append(triangle)
+            shapes = []
+            for i in range(0, len(self.indices), 3):
+                triangle = [positions[self.indices[i]],
+                            positions[self.indices[i + 1]],
+                            positions[self.indices[i + 2]]]
+                shapes.append(triangle)
 
-        convex_shapes = []
-        for shape in shapes:
-            convex_shapes.extend(self.decompose_to_convex(shape))
-        return convex_shapes
+            convex_shapes = []
+            for shape in shapes:
+                convex_shapes.extend(self.decompose_to_convex(shape))
+            return convex_shapes
+        else:
+            # Basic bounding box calculation for simple rectangular object
+            min_x, min_y, min_z = np.min(self.vertices.reshape(-1, 6)[:, :3], axis=0)
+            max_x, max_y, max_z = np.max(self.vertices.reshape(-1, 6)[:, :3], axis=0)
+
+            # Define the 8 corners of the bounding box
+            bounding_box = [
+                glm.vec3(min_x, min_y, min_z),
+                glm.vec3(max_x, min_y, min_z),
+                glm.vec3(max_x, max_y, min_z),
+                glm.vec3(min_x, max_y, min_z),
+                glm.vec3(min_x, min_y, max_z),
+                glm.vec3(max_x, min_y, max_z),
+                glm.vec3(max_x, max_y, max_z),
+                glm.vec3(min_x, max_y, max_z)
+            ]
+
+            # Create two triangles for each face of the bounding box (12 triangles in total)
+            triangles = [
+                [bounding_box[0], bounding_box[1], bounding_box[2]],
+                [bounding_box[0], bounding_box[2], bounding_box[3]],
+                [bounding_box[4], bounding_box[5], bounding_box[6]],
+                [bounding_box[4], bounding_box[6], bounding_box[7]],
+                [bounding_box[0], bounding_box[1], bounding_box[5]],
+                [bounding_box[0], bounding_box[5], bounding_box[4]],
+                [bounding_box[2], bounding_box[3], bounding_box[7]],
+                [bounding_box[2], bounding_box[7], bounding_box[6]],
+                [bounding_box[0], bounding_box[3], bounding_box[7]],
+                [bounding_box[0], bounding_box[7], bounding_box[4]],
+                [bounding_box[1], bounding_box[2], bounding_box[6]],
+                [bounding_box[1], bounding_box[6], bounding_box[5]]
+            ]
+
+            # Convert triangles to Models
+            bounding_shapes = [Model.from_vertices(triangle) for triangle in triangles]
+            return bounding_shapes
 
     def compute_edges(self, vertices: List[glm.vec3]) -> List[glm.vec3]:
         edges = []
@@ -157,3 +196,25 @@ class Model:
         obj.indices = np.arange(len(vertices), dtype=np.uint32)
         obj.convex_components = [obj]
         return obj
+
+    def setup_buffers(self) -> Tuple[int, int, int]:
+        vao = glGenVertexArrays(1)
+        glBindVertexArray(vao)
+        vbo = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo)
+        glBufferData(GL_ARRAY_BUFFER, self.vertices.nbytes, self.vertices, GL_STATIC_DRAW)
+        ebo = glGenBuffers(1)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.indices.nbytes, self.indices, GL_STATIC_DRAW)
+        stride = 6 * self.vertices.itemsize
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
+        glEnableVertexAttribArray(0)
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(3 * self.vertices.itemsize))
+        glEnableVertexAttribArray(1)
+        glBindVertexArray(0)
+        return vao, vbo, ebo
+
+    def draw(self):
+        glBindVertexArray(self.vao)
+        glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, None)
+        glBindVertexArray(0)

@@ -1,21 +1,5 @@
-import glfw
-from OpenGL.GL import *
-from OpenGL.GL.shaders import compileProgram, compileShader
-import numpy as np
-import glm
-import os
-
-from camera import Camera
-from model import Model
-from shader import Shader
-
 
 import glm
-from OpenGL.GL import *
-from shader import Shader
-
-from OpenGL.GL import *
-
 from OpenGL.GL import *
 
 class Renderer:

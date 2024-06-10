@@ -13,7 +13,7 @@ class Components:
     def __init__(self, window):
         self.camera = Camera(glm.vec3(0.0, 0.0, 3.0), glm.vec3(0.0, 1.0, 0.0))
         self.shader = Shader('vertex_shader.glsl', 'fragment_shader.glsl')
-        self.world = World('obj/world1.obj', rotation_angles=(-90.0, 0.0, 0.0), translation=(-70.0, -2.0, 50.0))
+        self.world = World('obj/world_test.obj', rotation_angles=(-90.0, 0.0, 0.0), translation=(-70.0, -2.0, 50.0))
         self.player = Player('obj/player1.obj', self.camera)
         self.models = [Model('obj/cube.obj'), self.world, self.player.model]
         self.renderer = Renderer(self.shader, self.camera)

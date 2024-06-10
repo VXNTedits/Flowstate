@@ -1,15 +1,6 @@
-import glm
-from OpenGL.GL import *
 
-import player
-import renderer
-from window import Window
-from components import Components
-import glfw
 import glm
 from OpenGL.GL import *
-import player
-import renderer
 from window import Window
 from components import Components
 import glfw
@@ -30,16 +21,15 @@ class Game:
             delta_time = current_frame_time - last_frame_time
             last_frame_time = current_frame_time
 
-            # Update and render logic
+            # Update game logic
             self.components.input_handler.update(delta_time)
             self.components.player.update(delta_time)
             self.components.physics.update(delta_time)
 
+            # Rendering
             view_matrix = self.components.camera.get_view_matrix()
             projection_matrix = glm.perspective(glm.radians(90.0), self.window.width / self.window.height, 0.001, 1000.0)
-
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)  # Clear the screen
-
             self.components.renderer.render(self.components.world, view_matrix, projection_matrix)
             for model in self.components.models:
                 self.components.renderer.render(model, view_matrix, projection_matrix)

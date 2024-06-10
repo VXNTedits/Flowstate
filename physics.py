@@ -3,8 +3,6 @@ from typing import Tuple, List, Set
 import glfw
 import glm
 
-import shape
-from aabb import AABB
 from model import Model
 
 
@@ -54,4 +52,5 @@ class Physics:
 
     def update(self, delta_time: float):
         self.apply_gravity(self.player, delta_time)
-        self.check_collision(self.player, self.world)
+        if self.check_collision(self.player, self.world):
+            print("Collision detected!")
