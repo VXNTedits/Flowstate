@@ -36,7 +36,7 @@ class InputHandler:
         yoffset = self.last_y - ypos  # Reversed since y-coordinates range from bottom to top
         self.last_x = xpos
         self.last_y = ypos
-        self.camera.process_mouse_movement(xoffset, yoffset)
+        self.player.process_mouse_movement(xoffset, yoffset)
 
     def update(self, delta_time):
         if self.keys[glfw.KEY_W]:

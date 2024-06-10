@@ -1,16 +1,10 @@
 import glm
 from model import Model
 
-
-import glm
-from model import Model
-
 class Player(Model):
-    def __init__(self, model_path: str, camera, filepath: str):
-        super().__init__(model_path)
-        self.camera = camera
-        self._model = Model(model_path)
-        self.set_origin(glm.vec3(0.02,0.2,0.0))
+    def __init__(self, model_path: str, camera):
+        self.camera = camera  # Ensure camera is assigned first
+        self.model = Model(model_path)  # Change _model to model
         self._position = glm.vec3(10.0, 10.0, -10.0)  # Initialize at the specified position
         self.previous_position = glm.vec3(10.0, 10.0, -10.0)
         self.front = glm.vec3(0.0, 0.0, -1.0)
@@ -18,11 +12,18 @@ class Player(Model):
         self.speed = 2.5
         self.thrust = glm.vec3(0.0, 0.0, 0.0)
         self._velocity = glm.vec3(0, 0, 0)
+        self.yaw = camera.yaw  # Initialize yaw to camera's yaw
         self.vertices, self.indices = Model.load_obj(self, model_path)
 
         # Apply a rotation to make the model stand vertically
         self.model_matrix = glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
-        #self.model_matrix = glm.translate(glm.mat4(1.0), glm.vec3(0.0, 0.0, 0.0))
+        self.set_origin(glm.vec3(0.02, 0.2, 0.0))
+        self.update_model_matrix()
+
+    def set_origin(self, new_origin):
+        """Set the player object's (0,0,0) coordinate to new_origin."""
+        self.model.translate(new_origin)  # Use self.model
+        self._position = new_origin
         self.update_model_matrix()
 
     def update(self, delta_time: float):
@@ -37,7 +38,7 @@ class Player(Model):
 
     def update_position(self, direction: str, delta_time: float):
         self.thrust = glm.vec3(0.0, 0.0, 0.0)
-        front = glm.vec3(glm.cos(glm.radians(self.camera.yaw)), 0, glm.sin(glm.radians(self.camera.yaw)))
+        front = glm.vec3(glm.cos(glm.radians(self.yaw)), 0, glm.sin(glm.radians(self.yaw)))
         right = glm.normalize(glm.cross(front, self.up))
 
         if direction == 'FORWARD':
@@ -65,33 +66,22 @@ class Player(Model):
 
     def update_model_matrix(self):
         translation = glm.translate(glm.mat4(1.0), self._position)
-        rotation = glm.rotate(glm.mat4(1.0), glm.radians(self.camera.yaw), glm.vec3(0.0, -1.0, 0.0))
-        self._model.model_matrix = translation * rotation * self.model_matrix
+        rotation = glm.rotate(glm.mat4(1.0), glm.radians(self.yaw), glm.vec3(0.0, 1.0, 0.0))
+        self.model.model_matrix = translation * rotation * self.model_matrix  # Use self.model
 
     def get_rotation_matrix(self):
-        return glm.rotate(glm.mat4(1.0), glm.radians(self.camera.yaw), glm.vec3(0.0, 1.0, 0.0))
+        return glm.rotate(glm.mat4(1.0), glm.radians(self.yaw), glm.vec3(0.0, 1.0, 0.0))
 
     def set_position(self, position):
         self._position = position
         self.update_model_matrix()
 
-    def set_origin(self, new_origin):
-        """Set the player object's (0,0,0) coordinate to new_origin."""
-        translation_vector = new_origin
-        self._model.translate(translation_vector)
-        self._position = new_origin
-        self.update_model_matrix()
-
     def draw(self):
-        self._model.draw()
+        self.model.draw()  # Use self.model
 
-    @property
-    def model(self) -> Model:
-        return self._model
-
-    @model.setter
-    def model(self, value: Model):
-        self._model = value
+    def process_mouse_movement(self, xoffset, yoffset):
+        self.camera.process_mouse_movement(xoffset, yoffset)
+        self.yaw = self.camera.yaw  # Update player's yaw based on camera's yaw
 
     @property
     def velocity(self) -> glm.vec3:

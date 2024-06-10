@@ -1,7 +1,5 @@
 import glm
 
-import glm
-
 class Camera:
     def __init__(self, position, up, yaw=-90.0, pitch=0.0):
         self.position = position
@@ -50,13 +48,13 @@ class Camera:
         self.first_person = not self.first_person
 
     def set_first_person(self, player_position, player_rotation_matrix):
-        offset = glm.vec3(-0.0, 0.2, 0.0)
+        offset = glm.vec3(0.02, 0.2, 0.0)  # Offset to the eyes in player's local coordinates
         offset = player_rotation_matrix * glm.vec4(offset, 1.0)  # Transform offset by player rotation
         self.position = player_position + glm.vec3(offset)
         self.update_camera_vectors()
 
     def set_third_person(self, player_position, player_rotation_matrix):
-        offset = glm.vec3(0.2, 1.0, 0.0)
+        offset = glm.vec3(0.0, 0.5, 0)  # Example third-person offset
         offset = player_rotation_matrix * glm.vec4(offset, 1.0)  # Transform offset by player rotation
         self.position = player_position + glm.vec3(offset)
         self.update_camera_vectors()
@@ -64,4 +62,3 @@ class Camera:
     def set_position(self, position):
         self.position = position
         self.update_camera_vectors()
-
