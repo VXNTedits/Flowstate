@@ -3,10 +3,23 @@ import glm
 from typing import List, Tuple
 from OpenGL.GL import *
 
+import numpy as np
+import glm
+from typing import List, Tuple
+from OpenGL.GL import *
+
 class Model:
-    def __init__(self, filepath: str, player=False, draw_convex_only=False, rotation_angles=(0.0, 0.0, 0.0), translation=(0.0, 0.0, 0.0)):
+    def __init__(self, filepath: str, mtl_filepath: str, player=False, draw_convex_only=False,
+                 rotation_angles=(0.0, 0.0, 0.0), translation=(0.0, 0.0, 0.0),
+                 kd_override=None, ks_override=None, ns_override=None):
         print(f"Initializing Model with filepath: {filepath}")
+        self.name = filepath
         self.vertices, self.indices = self.load_obj(filepath)
+        self.materials = self.load_mtl(mtl_filepath) #if mtl_filepath else {}
+        self.kd_override = glm.vec3(kd_override) if kd_override else None
+        self.ks_override = glm.vec3(ks_override) if ks_override else None
+        self.ns_override = float(ns_override) if ns_override else None
+        self.override_materials()
         self.vao, self.vbo, self.ebo = self.setup_buffers()
         self.model_matrix = glm.mat4(1.0)  # Initialize model matrix
         self.is_player = player
@@ -21,6 +34,110 @@ class Model:
             self.bounding_box = self.calculate_bounding_box()
             self.voxels = self.decompose_to_voxels(self.vertices, 5)
             self.voxel_size = 5
+        print(f"{self.name}'s Materials: {self.materials} ")
+        print()
+    def override_materials(self):
+        for material in self.materials.values():
+            if self.kd_override is not None:
+                material['diffuse'] = self.kd_override
+            if self.ks_override is not None:
+                material['specular'] = self.ks_override
+            if self.ns_override is not None:
+                material['shininess'] = self.ns_override
+
+    def load_obj(self, filepath: str) -> Tuple[np.ndarray, np.ndarray]:
+        vertices = []
+        normals = []
+        faces = []
+
+        with open(filepath, 'r') as file:
+            for line in file:
+                if line.startswith('v '):
+                    parts = line.split()
+                    vertices.append([float(parts[1]), float(parts[2]), float(parts[3])])
+                elif line.startswith('vn '):
+                    parts = line.split()
+                    normals.append([float(parts[1]), float(parts[2]), float(parts[3])])
+                elif line.startswith('f '):
+                    parts = line.split()
+                    face = []
+                    for part in parts[1:]:
+                        indices = part.split('/')
+                        vertex_index = int(indices[0]) - 1
+                        normal_index = int(indices[2]) - 1 if len(indices) > 2 and indices[2] else vertex_index
+                        face.append((vertex_index, normal_index))
+                    faces.append(face)
+
+        vertex_data = []
+        for face in faces:
+            for vertex_index, normal_index in face:
+                vertex_data.extend(vertices[vertex_index])
+                vertex_data.extend(normals[normal_index])
+
+        vertex_data = np.array(vertex_data, dtype=np.float32)
+        indices = np.arange(len(vertex_data) // 6, dtype=np.uint32)
+        return vertex_data, indices
+
+    def load_mtl(self, mtl_filepath: str) -> dict:
+        materials = {}
+        current_material = None
+
+        #print(f"Loading MTL file: {mtl_filepath}")
+
+        with open(mtl_filepath, 'r') as file:
+            # Read and print the entire contents of the file for debugging
+            file_contents = file.read()
+            #print("MTL File Contents:\n", file_contents)
+
+            # Reset the file pointer to the beginning of the file
+            file.seek(0)
+
+            for line in file:
+                if line.startswith('newmtl'):
+                    current_material = line.split()[1]
+                    materials[current_material] = {'diffuse': [0.8, 0.8, 0.8], 'specular': [0.0, 0.0, 0.0],
+                                                   'shininess': 32.0}
+                elif current_material:
+                    if line.startswith('Kd '):
+                        parts = line.split()
+                        materials[current_material]['diffuse'] = [float(parts[1]), float(parts[2]), float(parts[3])]
+                    elif line.startswith('Ks '):
+                        parts = line.split()
+                        materials[current_material]['specular'] = [float(parts[1]), float(parts[2]), float(parts[3])]
+                    elif line.startswith('Ns '):
+                        materials[current_material]['shininess'] = float(line.split()[1])
+
+        #print('Parsed materials:', materials)
+        return materials
+
+    def setup_buffers(self) -> Tuple[int, int, int]:
+        vao = glGenVertexArrays(1)
+        glBindVertexArray(vao)
+        vbo = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo)
+        glBufferData(GL_ARRAY_BUFFER, self.vertices.nbytes, self.vertices, GL_STATIC_DRAW)
+        ebo = glGenBuffers(1)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.indices.nbytes, self.indices, GL_STATIC_DRAW)
+        stride = 6 * self.vertices.itemsize
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
+        glEnableVertexAttribArray(0)
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(3 * self.vertices.itemsize))
+        glEnableVertexAttribArray(1)
+        glBindVertexArray(0)
+        return vao, vbo, ebo
+
+    def draw(self):
+        if self.draw_convex_only:
+            if not self.is_player:
+                for component in self.convex_components:
+                    glBindVertexArray(component.vao)
+                    glDrawElements(GL_TRIANGLES, len(component.indices), GL_UNSIGNED_INT, None)
+                    glBindVertexArray(0)
+        else:
+            glBindVertexArray(self.vao)
+            glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, None)
+            glBindVertexArray(0)
 
     def decompose_to_voxels(self, vertices: np.ndarray, voxel_size: float) -> List[glm.vec3]:
         # Reshape vertices from flat array to list of vec3
@@ -93,39 +210,6 @@ class Model:
             return True  # Ray intersects the triangle
         else:
             return False  # Line intersection but not a ray intersection
-
-    def load_obj(self, filepath: str) -> Tuple[np.ndarray, np.ndarray]:
-        vertices = []
-        normals = []
-        faces = []
-
-        with open(filepath, 'r') as file:
-            for line in file:
-                if line.startswith('v '):
-                    parts = line.split()
-                    vertices.append([float(parts[1]), float(parts[2]), float(parts[3])])
-                elif line.startswith('vn '):
-                    parts = line.split()
-                    normals.append([float(parts[1]), float(parts[2]), float(parts[3])])
-                elif line.startswith('f '):
-                    parts = line.split()
-                    face = []
-                    for part in parts[1:]:
-                        indices = part.split('/')
-                        vertex_index = int(indices[0]) - 1
-                        normal_index = int(indices[2]) - 1 if len(indices) > 2 and indices[2] else vertex_index
-                        face.append((vertex_index, normal_index))
-                    faces.append(face)
-
-        vertex_data = []
-        for face in faces:
-            for vertex_index, normal_index in face:
-                vertex_data.extend(vertices[vertex_index])
-                vertex_data.extend(normals[normal_index])
-
-        vertex_data = np.array(vertex_data, dtype=np.float32)
-        indices = np.arange(len(vertex_data) // 6, dtype=np.uint32)
-        return vertex_data, indices
 
     def set_orientation(self, rotation_angles):
         # Apply rotations around x, y, z axes respectively
@@ -295,33 +379,4 @@ class Model:
         has_pos = (d1 > 0) or (d2 > 0) or (d3 > 0)
 
         return not (has_neg and has_pos)
-
-    def setup_buffers(self) -> Tuple[int, int, int]:
-        vao = glGenVertexArrays(1)
-        glBindVertexArray(vao)
-        vbo = glGenBuffers(1)
-        glBindBuffer(GL_ARRAY_BUFFER, vbo)
-        glBufferData(GL_ARRAY_BUFFER, self.vertices.nbytes, self.vertices, GL_STATIC_DRAW)
-        ebo = glGenBuffers(1)
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.indices.nbytes, self.indices, GL_STATIC_DRAW)
-        stride = 6 * self.vertices.itemsize
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
-        glEnableVertexAttribArray(0)
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(3 * self.vertices.itemsize))
-        glEnableVertexAttribArray(1)
-        glBindVertexArray(0)
-        return vao, vbo, ebo
-
-    def draw(self):
-        if self.draw_convex_only:
-            if not self.is_player:
-                for component in self.convex_components:
-                    glBindVertexArray(component.vao)
-                    glDrawElements(GL_TRIANGLES, len(component.indices), GL_UNSIGNED_INT, None)
-                    glBindVertexArray(0)
-        else:
-            glBindVertexArray(self.vao)
-            glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, None)
-            glBindVertexArray(0)
 

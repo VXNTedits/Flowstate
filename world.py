@@ -2,14 +2,19 @@ from model import Model
 
 
 class World(Model):
-    def __init__(self, filepaths: list, rotations: list, translations: list):
-        super().__init__(filepaths[0], rotation_angles=rotations[0], translation=translations[0])
+    def __init__(self, filepaths: list, mtl_filepaths: list, rotations: list, translations: list, material_overrides):
+        super().__init__(filepaths[0],  mtl_filepaths[0], rotation_angles=rotations[0], translation=translations[0],
+                         kd_override=material_overrides[0][0], ks_override=material_overrides[0][1],
+                         ns_override=material_overrides[0][2])
+
         self.objects = []
         self.world_aabb = None
         self.is_player = False
-               # Initialize each object and store it in the objects list
-        for filepath, rotation, translation in zip(filepaths, rotations, translations):
-            obj = Model(filepath, rotation_angles=rotation, translation=translation)
+        # Initialize each object and store it in the objects list
+        for filepath, mtl_filepath, rotation, translation, material_overrides in zip(filepaths, mtl_filepaths, rotations, translations,
+                                                                       material_overrides):
+            obj = Model(filepath, mtl_filepath, rotation_angles=rotation, translation=translation, kd_override=material_overrides[0],
+                        ks_override=material_overrides[1], ns_override=material_overrides[2])
             self.objects.append(obj)
 
         # Calculate world bounding box considering all objects

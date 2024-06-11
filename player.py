@@ -10,9 +10,9 @@ import glm
 from model import Model
 
 class Player(Model):
-    def __init__(self, model_path: str, camera):
+    def __init__(self, model_path: str, mtl_path: str, camera):
         self.camera = camera
-        self.model = Model(model_path, player=True)
+        self.model = Model(model_path, mtl_path, player=True)
         self.position = glm.vec3(10.0, 10.2, -10.0)
         self.previous_position = glm.vec3(10.0, 10.0, -10.0)
         self.front = glm.vec3(0.0, 0.0, -1.0)

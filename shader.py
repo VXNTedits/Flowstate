@@ -57,3 +57,9 @@ class Shader:
             raise RuntimeError(glGetShaderInfoLog(shader))
         return shader
 
+    def set_uniform1f(self, name, value):
+        location = glGetUniformLocation(self.id, name)
+        if location != -1:
+            glUniform1f(location, value)
+        else:
+            print(f"Uniform '{name}' not found in shader program.")

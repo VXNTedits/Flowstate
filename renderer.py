@@ -8,22 +8,30 @@ class Renderer:
         self.camera = camera
         glEnable(GL_DEPTH_TEST)
         glViewport(0, 0, 800, 600)  # Set the viewport
-        glClearColor(0.3, 0.2, 0.4, 1.0)  # Set clear color (black)
+        glClearColor(0.0, 0.0, 0.0, 1.0)  # Set clear color (black)
 
     def render(self, model, view_matrix, projection_matrix):
         self.shader.use()
         model_matrix = model.model_matrix
-        self.update_uniforms(model_matrix, view_matrix, projection_matrix)
+        self.update_uniforms(model_matrix, view_matrix, projection_matrix, model)
         model.draw()
 
-    def update_uniforms(self, model_matrix, view_matrix, projection_matrix):
+    def update_uniforms(self, model_matrix, view_matrix, projection_matrix, model):
         self.shader.set_uniform_matrix4fv("model", model_matrix)
         self.shader.set_uniform_matrix4fv("view", view_matrix)
         self.shader.set_uniform_matrix4fv("projection", projection_matrix)
         self.shader.set_uniform3f("lightPos", glm.vec3(1.2, 1.0, 2.0))
         self.shader.set_uniform3f("viewPos", self.camera.position)
-        self.shader.set_uniform3f("lightColor", glm.vec3(0.6, 0.2, 1.0))  # Neon purple light
-        self.shader.set_uniform3f("objectColor", glm.vec3(0.2, 0.2, 0.5))  # Dark blue object color
+        self.shader.set_uniform3f("lightColor", glm.vec3(1, 1, 1))  # Neon purple light
+
+        # Set material properties, prioritizing overrides if available
+        kd = model.kd_override if model.kd_override else glm.vec3(1, 0.0, 0.0)  # Default color
+        ks = model.ks_override if model.ks_override else glm.vec3(1.0, 1.0, 1.0)  # Default specular color
+        ns = model.ns_override if model.ns_override else 32.0  # Default shininess
+
+        self.shader.set_uniform3f("objectColor", kd)
+        self.shader.set_uniform3f("specularColor", ks)
+        self.shader.set_uniform1f("shininess", ns)
 
     def draw_model_bounding_box(self, model, view_matrix, projection_matrix):
         # Use a simple shader program for drawing the bounding box
