@@ -68,53 +68,68 @@ class Physics:
                 aabb[1] <= point.y <= aabb[4] and
                 aabb[2] <= point.z <= aabb[5])
 
-    def check_simple_collision(self, player, world):
+    def check_simple_collision(self):
+        player_position = self.player.position
+
+        for obj in self.world.get_objects():
+            obj_bounding_box = obj.calculate_bounding_box()
+            obj_aabb = self.get_aabb(obj_bounding_box)
+            obj.world_aabb = obj_aabb
+
+            if self.is_point_in_aabb(player_position, obj_aabb):
+                return True
+
+        return False
+
+    def resolve_collision(self, world, player):
         player_position = player.position
-        world_bounding_box = world.calculate_bounding_box()
-        world_aabb = self.get_aabb(world_bounding_box)
-        world.world_aabb = world_aabb
 
-        return self.is_point_in_aabb(player_position, world_aabb)
+        for obj in world.objects:
+            obj_bounding_box = obj.calculate_bounding_box()
+            obj_aabb = self.get_aabb(obj_bounding_box)
+            obj.world_aabb = obj_aabb
 
-    def resolve_collision(self, world_in_collision, player_in_collision):
-        if not self.check_simple_collision(player_in_collision, world_in_collision):
-            return
+            if self.is_point_in_aabb(player_position, obj_aabb):
+                # Y-axis collision resolution (gravity axis) - skip if jumping
+                if not self.player.is_jumping:
+                    if player_position.y <= obj_aabb[1] + self.EPSILON:
+                        player.position.y = obj_aabb[1]
+                        self.player.velocity.y = 0  # Reset vertical velocity to stop gravity from pulling through
+                        self.player.is_grounded = True  # Player is on the ground
+                    elif player_position.y >= obj_aabb[4] - self.EPSILON:
+                        player.position.y = obj_aabb[4]
+                        self.player.velocity.y = 0  # Reset vertical velocity to stop gravity from pulling through
 
-        player_position = player_in_collision.position
-        world_aabb = world_in_collision.world_aabb
+                # X-axis collision resolution
+                if player_position.x <= obj_aabb[0] + self.EPSILON:
+                    player.position.x = obj_aabb[0]
+                elif player_position.x >= obj_aabb[3] - self.EPSILON:
+                    player.position.x = obj_aabb[3]
 
-        # Y-axis collision resolution (gravity axis) - skip if jumping
-        if not self.player.is_jumping:
-            if player_position.y <= world_aabb[1] + self.EPSILON:
-                player_in_collision.position.y = world_aabb[1]
-                self.player.velocity.y = 0  # Reset vertical velocity to stop gravity from pulling through
-                self.player.is_grounded = True  # Player is on the ground
-            elif player_position.y >= world_aabb[4] - self.EPSILON:
-                player_in_collision.position.y = world_aabb[4]
-                self.player.velocity.y = 0  # Reset vertical velocity to stop gravity from pulling through
+                # Z-axis collision resolution
+                if player_position.z <= obj_aabb[2] + self.EPSILON:
+                    player.position.z = obj_aabb[2]
+                elif player_position.z >= obj_aabb[5] - self.EPSILON:
+                    player.position.z = obj_aabb[5]
 
-        # X-axis collision resolution
-        if player_position.x <= world_aabb[0] + self.EPSILON:
-            player_in_collision.position.x = world_aabb[0]
-        elif player_position.x >= world_aabb[3] - self.EPSILON:
-            player_in_collision.position.x = world_aabb[3]
+                # Update player position
+                player.position = player_position
 
-        # Z-axis collision resolution
-        if player_position.z <= world_aabb[2] + self.EPSILON:
-            player_in_collision.position.z = world_aabb[2]
-        elif player_position.z >= world_aabb[5] - self.EPSILON:
-            player_in_collision.position.z = world_aabb[5]
-
-        # Update player position
-        player.position = player_in_collision.position
     def handle_collisions(self, player, world, delta_time):
-        if self.check_voxel_collision(player, world):
-            print("Voxel collision detected!")
-        if self.check_simple_collision(player, world):
+        collision_detected = False
+
+        for obj in world.objects:
+            if self.check_voxel_collision(player, obj):
+                print("Voxel collision detected!")
+                collision_detected = True
+            if self.check_simple_collision():
+                self.resolve_collision(world, player)
+                collision_detected = True
+
+        if collision_detected:
             self.resolve_collision(world, player)
-            #print("Simple collision detected!")
 
     def update(self, delta_time: float):
-        if not self.check_simple_collision(self.player, self.world):
+        if not self.check_simple_collision():
             self.apply_gravity(delta_time)
         self.handle_collisions(self.player, self.world, delta_time)

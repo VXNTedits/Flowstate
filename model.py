@@ -155,6 +155,7 @@ class Model:
 
         return convex_shapes
 
+
     def calculate_bounding_box(self) -> list:
         if self.is_player:
             # Return a point at the bottom center of the player model: the player's feet

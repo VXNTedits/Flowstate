@@ -34,7 +34,7 @@ class Game:
             self.components.renderer.render(self.components.world, view_matrix, projection_matrix)
             for model in self.components.models:
                 self.components.renderer.render(model, view_matrix, projection_matrix)
-                self.components.renderer.draw_model_bounding_box(model, view_matrix, projection_matrix)
+                #self.components.renderer.draw_model_bounding_box(model, view_matrix, projection_matrix)
 
             #self.components.text_renderer.render_text("FPS: {}".format(int(1.0 / delta_time)), 10, 10)
 
