@@ -16,14 +16,14 @@ class Player(Model):
         self.yaw = camera.yaw  # Initialize yaw to camera's yaw
         self._rotation = glm.vec3(camera.pitch,camera.yaw,0)
         self.vertices, self.indices = Model.load_obj(self, model_path)
-        self.convex_components_list = self.model.bounding_box
-        self.convex_components_obj = self.model.bounding_box
-        self.bounding_box = self.convex_components_list
+        #self.convex_components_list = self.model.bounding_box
+        #self.convex_components_obj = self.model.bounding_box
+        #self.bounding_box = self.convex_components_list
         # Apply a rotation to make the model stand vertically
         self.model_matrix = glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
         #self.set_origin(glm.vec3(-0.025, 0.2, 0.0))
         self.update_model_matrix()
-        print('player bounding box init ', self.bounding_box)
+        #print('player bounding box init ', self.bounding_box)
     def set_origin(self, new_origin):
         """Set the player object's (0,0,0) coordinate to new_origin."""
         self.model.translate(new_origin)  # Use self.model
@@ -36,7 +36,7 @@ class Player(Model):
 
         # Ensure the camera position is updated to stay synchronized with the player
         self.update_camera_position()
-        self.update_bounding_box_position()
+        #self.update_bounding_box_position()
         self.update_model_matrix()
 
         #print(f"Player position: {self._position} Camera position: {self.camera.position}")
@@ -117,32 +117,11 @@ class Player(Model):
     @rotation.setter
     def rotation(self, value: glm.vec3):
         self._rotation = value
-        self.update_bounding_box_position()  # Update bounding box when rotation changes
+        #self.update_bounding_box_position()  # Update bounding box when rotation changes
 
     @position.setter
     def position(self, value: glm.vec3):
         self._position = value
-        self.update_bounding_box_position()
+        #self.update_bounding_box_position()
 
-    def update_bounding_box_position(self):
-        # Get the current transformation matrix
-        translation_matrix = glm.translate(glm.mat4(1.0), self._position)
-        rotation_matrix = glm.rotate(glm.mat4(1.0), self.rotation.y,
-                                     glm.vec3(0.0, 1.0, 0.0))  # Assuming rotation around Y-axis
-        # Initialize the transformed bounding box
-        transformed_bounding_box = []
-        # for vertex in self.bounding_box:
-        #     transformed_vertex = translation_matrix * rotation_matrix * glm.vec4(vertex, 1)
-        #     transformed_bounding_box.append(transformed_vertex)
 
-        # Apply transformations to each vertex of the bounding box
-        for v_obj in self.bounding_box:
-            transformed_v_obj = []  # Initialize a new transformed vertex object
-            for v_i in v_obj:
-                transformed_vertex = translation_matrix * rotation_matrix * v_i
-                transformed_v_obj.append(transformed_vertex)
-            transformed_bounding_box.append(transformed_v_obj)
-
-        # Update the bounding box with the newly transformed vertices
-        self.bounding_box = transformed_bounding_box
-        print(f'bounding box position updated {self.bounding_box}')

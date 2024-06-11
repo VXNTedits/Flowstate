@@ -14,7 +14,8 @@ class Model:
         self.set_position(translation)
         self.draw_convex_only = draw_convex_only
         if self.is_player:
-            self.bounding_box = self.calculate_bounding_box()#self.decompose_model()
+            pass
+            #self.bounding_box = self.calculate_bounding_box()
         else:
             self.convex_components = self.decompose_model()
             self.bounding_box = self.calculate_bounding_box()
@@ -154,27 +155,40 @@ class Model:
 
         return convex_shapes
 
-    def calculate_bounding_box(self) -> List[glm.vec3]:
-        positions = self.vertices.reshape(-1, 6)[:, :3]
+    def calculate_bounding_box(self) -> list:
+        if self.is_player:
+            # Return a point at the bottom center of the player model: the player's feet
+            return [glm.vec3(0, 0, 0)]  # Assuming the player's feet are at the origin
+        else:
+            # This handles the world object
+            positions = self.vertices.reshape(-1, 6)[:, :3]
 
-        if positions.size == 0:
-            print("Warning: No vertices found, cannot compute bounding box.")
-            return []
+            if positions.size == 0:
+                print("Warning: No vertices found, cannot compute bounding box.")
+                return []
 
-        min_x, min_y, min_z = np.min(positions, axis=0)
-        max_x, max_y, max_z = np.max(positions, axis=0)
+            min_x, min_y, min_z = np.min(positions, axis=0)
+            max_x, max_y, max_z = np.max(positions, axis=0)
 
-        bounding_box = [
-            glm.vec3(min_x, min_y, min_z),
-            glm.vec3(max_x, min_y, min_z),
-            glm.vec3(max_x, max_y, min_z),
-            glm.vec3(min_x, max_y, min_z),
-            glm.vec3(min_x, min_y, max_z),
-            glm.vec3(max_x, min_y, max_z),
-            glm.vec3(max_x, max_y, max_z),
-            glm.vec3(min_x, max_y, max_z)
-        ]
-        return bounding_box
+            bounding_box = [
+                glm.vec3(min_x, min_y, min_z),
+                glm.vec3(max_x, min_y, min_z),
+                glm.vec3(max_x, max_y, min_z),
+                glm.vec3(min_x, max_y, min_z),
+                glm.vec3(min_x, min_y, max_z),
+                glm.vec3(max_x, min_y, max_z),
+                glm.vec3(max_x, max_y, max_z),
+                glm.vec3(min_x, max_y, max_z)
+            ]
+
+            # Transform bounding box vertices by the model matrix
+            transformed_bounding_box = []
+            for vertex in bounding_box:
+                vec4_vertex = glm.vec4(vertex, 1.0)
+                transformed_vertex = glm.vec3(self.model_matrix * vec4_vertex)
+                transformed_bounding_box.append(transformed_vertex)
+
+            return transformed_bounding_box
 
     def compute_edges(self, vertices: List[glm.vec3]) -> List[glm.vec3]:
         edges = []

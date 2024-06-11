@@ -63,51 +63,34 @@ class Physics:
             print("Simple collision detected!")
 
     def check_simple_collision(self, player, world):
-        collision = False
-        box_player = player.bounding_box
-        box_world = world.bounding_box
+        # Get the player's position as a vec3
+        player_position = player.position
 
-        # Convert player's bounding box to world coordinates
-        player_vertices = []
-        for mat_set in box_player:
-            for mat in mat_set:
-                # Extract the translation part of the matrix (assuming the matrix class has a method or property for this)
-                translation = [mat[3][0], mat[3][1], mat[3][2]]
-                player_vertices.append(translation)
+        # Extract the transformed bounding box vertices for the world
+        world_bounding_box = world.calculate_bounding_box()
 
-        # Extract the bounding box vertices for the world
-        world_vertices = []
-        for vec in box_world:
-            world_vertices.append([vec[0], vec[1], vec[2]])
-
-        # Find the axis-aligned bounding boxes (AABB) for both player and world
+        # Find the axis-aligned bounding box (AABB) for the world
         def get_aabb(vertices):
-            min_x = min_y = min_z = float('inf')
-            max_x = max_y = max_z = float('-inf')
-
-            for v in vertices:
-                min_x = min(min_x, v[0])
-                min_y = min(min_y, v[1])
-                min_z = min(min_z, v[2])
-                max_x = max(max_x, v[0])
-                max_y = max(max_y, v[1])
-                max_z = max(max_z, v[2])
+            min_x = min(vertices, key=lambda v: v.x).x
+            min_y = min(vertices, key=lambda v: v.y).y
+            min_z = min(vertices, key=lambda v: v.z).z
+            max_x = max(vertices, key=lambda v: v.x).x
+            max_y = max(vertices, key=lambda v: v.y).y
+            max_z = max(vertices, key=lambda v: v.z).z
 
             return (min_x, min_y, min_z, max_x, max_y, max_z)
 
-        player_aabb = get_aabb(player_vertices)
-        world_aabb = get_aabb(world_vertices)
+        world_aabb = get_aabb(world_bounding_box)
 
-        # Check for overlap in all three axes
-        def aabb_overlap(aabb1, aabb2):
-            return (aabb1[0] <= aabb2[3] and aabb1[3] >= aabb2[0] and
-                    aabb1[1] <= aabb2[4] and aabb1[4] >= aabb2[1] and
-                    aabb1[2] <= aabb2[5] and aabb1[5] >= aabb2[2])
+        # Check if the player's position is within the world AABB
+        def is_point_in_aabb(point, aabb):
+            return (aabb[0] <= point.x <= aabb[3] and
+                    aabb[1] <= point.y <= aabb[4] and
+                    aabb[2] <= point.z <= aabb[5])
 
-        collision = aabb_overlap(player_aabb, world_aabb)
+        collision = is_point_in_aabb(player_position, world_aabb)
 
         return collision
-
 
 # Assuming this is part of the Model class
 def decompose_to_voxels(self, vertices: np.ndarray, voxel_size: float) -> List[glm.vec3]:
