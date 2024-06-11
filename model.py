@@ -8,18 +8,33 @@ import glm
 from typing import List, Tuple
 from OpenGL.GL import *
 
+
 class Model:
     def __init__(self, filepath: str, mtl_filepath: str, player=False, draw_convex_only=False,
                  rotation_angles=(0.0, 0.0, 0.0), translation=(0.0, 0.0, 0.0),
                  kd_override=None, ks_override=None, ns_override=None):
+        self.default_material = {
+            'diffuse': [1, 0.0, 0.0],  # Example values
+            'specular': [1.0, 1.0, 1.0],  # Example values (or a glm.vec3 if using glm)
+            'shininess': 10.0  # Example value
+        }
         print(f"Initializing Model with filepath: {filepath}")
         self.name = filepath
         self.vertices, self.indices = self.load_obj(filepath)
-        self.materials = self.load_mtl(mtl_filepath) #if mtl_filepath else {}
-        self.kd_override = glm.vec3(kd_override) if kd_override else None
-        self.ks_override = glm.vec3(ks_override) if ks_override else None
-        self.ns_override = float(ns_override) if ns_override else None
-        self.override_materials()
+        self.materials = self.load_mtl(mtl_filepath)  #if mtl_filepath else {}
+        # Apply overrides if provided
+        first_material_key = next(iter(self.materials))
+        if kd_override is not None:
+            print(f'{self.name}, kd: {kd_override}')
+            self.materials[first_material_key]['diffuse'] = kd_override
+        if ks_override is not None:
+            print(f'{self.name}, ks: {ks_override}')
+            self.materials[first_material_key]['specular'] = ks_override
+        if ns_override is not None:
+            print(f'{self.name}, ns: {ns_override}')
+            self.materials[first_material_key]['shininess'] = ns_override
+
+        self.default_material = self.materials[first_material_key]
         self.vao, self.vbo, self.ebo = self.setup_buffers()
         self.model_matrix = glm.mat4(1.0)  # Initialize model matrix
         self.is_player = player
@@ -36,14 +51,12 @@ class Model:
             self.voxel_size = 5
         print(f"{self.name}'s Materials: {self.materials} ")
         print()
-    def override_materials(self):
-        for material in self.materials.values():
-            if self.kd_override is not None:
-                material['diffuse'] = self.kd_override
-            if self.ks_override is not None:
-                material['specular'] = self.ks_override
-            if self.ns_override is not None:
-                material['shininess'] = self.ns_override
+        if kd_override is not None:
+            self.materials['diffuse'] = kd_override
+        if ks_override is not None:
+            self.materials['specular'] = ks_override
+        if ns_override is not None:
+            self.materials['shininess'] = ns_override
 
     def load_obj(self, filepath: str) -> Tuple[np.ndarray, np.ndarray]:
         vertices = []
@@ -82,21 +95,12 @@ class Model:
         materials = {}
         current_material = None
 
-        #print(f"Loading MTL file: {mtl_filepath}")
-
         with open(mtl_filepath, 'r') as file:
-            # Read and print the entire contents of the file for debugging
-            file_contents = file.read()
-            #print("MTL File Contents:\n", file_contents)
-
-            # Reset the file pointer to the beginning of the file
-            file.seek(0)
-
             for line in file:
                 if line.startswith('newmtl'):
                     current_material = line.split()[1]
-                    materials[current_material] = {'diffuse': [0.8, 0.8, 0.8], 'specular': [0.0, 0.0, 0.0],
-                                                   'shininess': 32.0}
+                    materials[current_material] = {'diffuse': [1.0, 0.0, 0.0], 'specular': [0.0, 1.0, 0.0],
+                                                   'shininess': 1000.0}
                 elif current_material:
                     if line.startswith('Kd '):
                         parts = line.split()
@@ -107,7 +111,7 @@ class Model:
                     elif line.startswith('Ns '):
                         materials[current_material]['shininess'] = float(line.split()[1])
 
-        #print('Parsed materials:', materials)
+        print('Parsed materials:', materials)
         return materials
 
     def setup_buffers(self) -> Tuple[int, int, int]:
@@ -238,7 +242,6 @@ class Model:
             convex_shapes.extend(decomposed)
 
         return convex_shapes
-
 
     def calculate_bounding_box(self) -> list:
         if self.is_player:
@@ -379,4 +382,3 @@ class Model:
         has_pos = (d1 > 0) or (d2 > 0) or (d3 > 0)
 
         return not (has_neg and has_pos)
-

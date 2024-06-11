@@ -24,15 +24,14 @@ class Renderer:
         self.shader.set_uniform3f("viewPos", self.camera.position)
         self.shader.set_uniform3f("lightColor", glm.vec3(1, 1, 1))  # Neon purple light
 
-        # Set material properties, prioritizing overrides if available
-        kd = model.kd_override if model.kd_override else glm.vec3(1, 0.0, 0.0)  # Default color
-        ks = model.ks_override if model.ks_override else glm.vec3(1.0, 1.0, 1.0)  # Default specular color
-        ns = model.ns_override if model.ns_override else 32.0  # Default shininess
+        # Set material properties using the first material found
+        kd = model.default_material['diffuse']
+        ks = model.default_material['specular']
+        ns = model.default_material['shininess']
 
-        self.shader.set_uniform3f("objectColor", kd)
-        self.shader.set_uniform3f("specularColor", ks)
+        self.shader.set_uniform3f("objectColor", glm.vec3(*kd))
+        self.shader.set_uniform3f("specularColor", glm.vec3(*ks))
         self.shader.set_uniform1f("shininess", ns)
-
     def draw_model_bounding_box(self, model, view_matrix, projection_matrix):
         # Use a simple shader program for drawing the bounding box
         glUseProgram(self.shader.id)
