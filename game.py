@@ -1,3 +1,4 @@
+from typing import List
 
 import glm
 from OpenGL.GL import *
@@ -25,6 +26,8 @@ class Game:
             self.components.input_handler.update(delta_time)
             self.components.player.update(delta_time)
             self.components.physics.update(delta_time)
+
+            #print('is_player_inside_bounding_box', self.is_player_inside_bounding_box(self.components.player.position,self.components.player.bounding_box))
 
             # Rendering
             view_matrix = self.components.camera.get_view_matrix()

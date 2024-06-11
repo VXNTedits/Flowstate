@@ -2,9 +2,7 @@ from collections import defaultdict
 from typing import Tuple, List, Set
 import glfw
 import glm
-
 from model import Model
-
 
 class Physics:
     def __init__(self, world, player):
@@ -16,38 +14,26 @@ class Physics:
         player.velocity += self.gravity * delta_time
         player.position += player.velocity * delta_time + 0.5 * self.gravity * delta_time ** 2
 
-    @staticmethod
-    def project_shape(model: Model, axis: glm.vec3) -> Tuple[float, float]:
-        min_proj = float('inf')
-        max_proj = float('-inf')
-        vertices = model.vertices.reshape(-1, 3)
-        for vertex in vertices:
-            proj = glm.dot(glm.vec3(vertex), axis)
-            min_proj = min(min_proj, proj)
-            max_proj = max(max_proj, proj)
-        return min_proj, max_proj
-
-    @staticmethod
-    def overlap(proj1: Tuple[float, float], proj2: Tuple[float, float]) -> bool:
-        return not (proj1[1] < proj2[0] or proj2[1] < proj1[0])
-
-    @staticmethod
-    def sat_collision(player: Model, world: Model) -> bool:
-        axes1 = player.get_normals(player.compute_edges(player.vertices.reshape(-1, 3)))
-        axes2 = world.static_normals
-        axes = axes1 + axes2
-        for axis in axes:
-            proj1 = Physics.project_shape(player, axis)
-            proj2 = Physics.project_shape(world, axis)
-            if not Physics.overlap(proj1, proj2):
+    def is_point_inside_convex_polyhedron(self, point: glm.vec3, convex_shape: Model) -> bool:
+        vertices = convex_shape.vertices.reshape(-1, 3)
+        indices = convex_shape.indices.reshape(-1, 3)
+        for i in range(len(indices)):
+            p1 = glm.vec3(vertices[indices[i][0]])
+            p2 = glm.vec3(vertices[indices[i][1]])
+            p3 = glm.vec3(vertices[indices[i][2]])
+            normal = glm.normalize(glm.cross(p2 - p1, p3 - p1))
+            if glm.dot(normal, point - p1) > 0:
+                print(f"Point {point} is outside the triangle formed by {p1}, {p2}, {p3}")
                 return False
         return True
 
     def check_collision(self, player: Model, world: Model) -> bool:
-        for shape1 in player.convex_components_obj:
-            for shape2 in world.convex_components:
-                if Physics.sat_collision(shape1, shape2):
-                    return True
+        player_position = self.player.position
+        print(f"Checking collision for player position: {player_position}")
+        for convex_shape in self.world.convex_components:
+            if self.is_point_inside_convex_polyhedron(player_position, convex_shape):
+                print(f"Collision detected with shape: {convex_shape.vertices}")
+                return True
         return False
 
     def update(self, delta_time: float):

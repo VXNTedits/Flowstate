@@ -16,8 +16,8 @@ class Player(Model):
         self.yaw = camera.yaw  # Initialize yaw to camera's yaw
         self._rotation = glm.vec3(camera.pitch,camera.yaw,0)
         self.vertices, self.indices = Model.load_obj(self, model_path)
-        self.convex_components_list = self.model.convex_components_list
-        self.convex_components_obj = self.model.convex_components_obj
+        self.convex_components_list = self.model.bounding_box
+        self.convex_components_obj = self.model.bounding_box
         self.bounding_box = self.convex_components_list
         # Apply a rotation to make the model stand vertically
         self.model_matrix = glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))

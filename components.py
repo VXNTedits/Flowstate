@@ -21,6 +21,5 @@ class Components:
         self.text_renderer = TextRenderer(window.width, window.height)
         self.physics = Physics(self.world, self.player)
 
-
     def set_input_callbacks(self, window):
         window.set_callbacks(self.input_handler.key_callback, self.input_handler.mouse_callback)
