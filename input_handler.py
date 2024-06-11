@@ -9,6 +9,7 @@ class InputHandler:
             glfw.KEY_A: False,
             glfw.KEY_S: False,
             glfw.KEY_D: False,
+            glfw.KEY_SPACE: False,  # Add spacebar key
         }
 
     def key_callback(self, window, key, scancode, action, mods):
@@ -39,6 +40,7 @@ class InputHandler:
         self.player.process_mouse_movement(xoffset, yoffset)
 
     def update(self, delta_time):
+        self.player.reset_thrust()  # Reset thrust before updating based on keys
         if self.keys[glfw.KEY_W]:
             self.player.update_position('FORWARD', delta_time)
         if self.keys[glfw.KEY_S]:
@@ -47,3 +49,10 @@ class InputHandler:
             self.player.update_position('LEFT', delta_time)
         if self.keys[glfw.KEY_D]:
             self.player.update_position('RIGHT', delta_time)
+        if self.keys.get(glfw.KEY_SPACE, False):
+            if not self.player.jump_key_previous:
+                self.player.update_position('JUMP', delta_time)
+                self.player.jump_key_previous = True
+        else:
+            self.player.jump_key_previous = False
+

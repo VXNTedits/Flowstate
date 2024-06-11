@@ -27,8 +27,6 @@ class Game:
             self.components.player.update(delta_time)
             self.components.physics.update(delta_time)
 
-            #print('is_player_inside_bounding_box', self.is_player_inside_bounding_box(self.components.player.position,self.components.player.bounding_box))
-
             # Rendering
             view_matrix = self.components.camera.get_view_matrix()
             projection_matrix = glm.perspective(glm.radians(90.0), self.window.width / self.window.height, 0.001, 1000.0)
