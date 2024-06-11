@@ -9,7 +9,7 @@ import world
 from model import Model
 
 class Physics:
-    EPSILON = 1e-3
+    EPSILON = 1e-6
 
     def __init__(self, world, player):
         self.world = world
@@ -86,43 +86,42 @@ class Physics:
 
         # Y-axis collision resolution (gravity axis)
         if player_position.y <= world_aabb[1] + self.EPSILON:
-            print(f"player_position.y < world_aabb[1]: {player_position.y} < {world_aabb[1]}")
+            #print(f"player_position.y < world_aabb[1]: {player_position.y} < {world_aabb[1]}")
             player_in_collision.position.y = world_aabb[1]
             self.player.velocity.y = 0  # Reset vertical velocity to stop gravity from pulling through
         elif player_position.y >= world_aabb[4] - self.EPSILON:
-            print(f"player_position.y > world_aabb[4]: {player_position.y} > {world_aabb[4]}")
+            #print(f"player_position.y > world_aabb[4]: {player_position.y} > {world_aabb[4]}")
             player_in_collision.position.y = world_aabb[4]
             self.player.velocity.y = 0  # Reset vertical velocity to stop gravity from pulling through
 
         # X-axis collision resolution
         if player_position.x <= world_aabb[0] + self.EPSILON:
-            print(f"player_position.x < world_aabb[0]: {player_position.x} < {world_aabb[0]}")
+            #print(f"player_position.x < world_aabb[0]: {player_position.x} < {world_aabb[0]}")
             player_in_collision.position.x = world_aabb[0]
         elif player_position.x >= world_aabb[3] - self.EPSILON:
-            print(f"player_position.x > world_aabb[3]: {player_position.x} > {world_aabb[3]}")
+            #print(f"player_position.x > world_aabb[3]: {player_position.x} > {world_aabb[3]}")
             player_in_collision.position.x = world_aabb[3]
 
         # Z-axis collision resolution
         if player_position.z <= world_aabb[2] + self.EPSILON:
-            print(f"player_position.z < world_aabb[2]: {player_position.z} < {world_aabb[2]}")
+            #print(f"player_position.z < world_aabb[2]: {player_position.z} < {world_aabb[2]}")
             player_in_collision.position.z = world_aabb[2]
         elif player_position.z >= world_aabb[5] - self.EPSILON:
-            print(f"player_position.z > world_aabb[5]: {player_position.z} > {world_aabb[5]}")
+            #print(f"player_position.z > world_aabb[5]: {player_position.z} > {world_aabb[5]}")
             player_in_collision.position.z = world_aabb[5]
 
         # Update player position
         player.position = player_in_collision.position
-        print(f"Player position corrected to: {player_in_collision.position}", end="\r")
+        #print(f"Player position corrected to: {player_in_collision.position}", end="\r")
 
     def handle_collisions(self, player, world, delta_time):
         if self.check_voxel_collision(player, world):
             print("Voxel collision detected!")
         if self.check_simple_collision(player, world):
             self.resolve_collision(world, player)
-            print("Simple collision detected!")
+            #print("Simple collision detected!")
 
     def update(self, delta_time: float):
         if not self.check_simple_collision(self.player, self.world):
             self.apply_gravity(self.player, delta_time)
         self.handle_collisions(self.player, self.world, delta_time)
-
