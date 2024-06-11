@@ -10,14 +10,88 @@ class Model:
         self.vao, self.vbo, self.ebo = self.setup_buffers()
         self.model_matrix = glm.mat4(1.0)  # Initialize model matrix
         self.is_player = player
-        self.draw_convex_only = draw_convex_only
         self.set_orientation(rotation_angles)
         self.set_position(translation)
+        self.draw_convex_only = draw_convex_only
         if self.is_player:
-            self.decompose_model()
+            self.bounding_box = self.calculate_bounding_box()#self.decompose_model()
         else:
             self.convex_components = self.decompose_model()
-            self.bounding_box = self.convex_components
+            self.bounding_box = self.calculate_bounding_box()
+            self.voxels = self.decompose_to_voxels(self.vertices, 5)
+            self.voxel_size = 5
+
+    def decompose_to_voxels(self, vertices: np.ndarray, voxel_size: float) -> List[glm.vec3]:
+        # Reshape vertices from flat array to list of vec3
+        vertices = vertices.reshape(-1, 3)
+        vertices_list = [glm.vec3(vertex[0], vertex[1], vertex[2]) for vertex in vertices]
+
+        # Calculate the bounding box from the given vertices
+        min_corner = glm.vec3(
+            min(vertex.x for vertex in vertices_list),
+            min(vertex.y for vertex in vertices_list),
+            min(vertex.z for vertex in vertices_list)
+        )
+        max_corner = glm.vec3(
+            max(vertex.x for vertex in vertices_list),
+            max(vertex.y for vertex in vertices_list),
+            max(vertex.z for vertex in vertices_list)
+        )
+
+        # Calculate the number of voxels along each axis
+        voxel_count_x = int((max_corner.x - min_corner.x) / voxel_size) + 1
+        voxel_count_y = int((max_corner.y - min_corner.y) / voxel_size) + 1
+        voxel_count_z = int((max_corner.z - min_corner.z) / voxel_size) + 1
+
+        voxels = []
+        for x in range(voxel_count_x):
+            for y in range(voxel_count_y):
+                for z in range(voxel_count_z):
+                    voxel_center = glm.vec3(
+                        min_corner.x + x * voxel_size + voxel_size / 2,
+                        min_corner.y + y * voxel_size + voxel_size / 2,
+                        min_corner.z + z * voxel_size + voxel_size / 2
+                    )
+                    if self.is_point_inside_shape(voxel_center, vertices_list):
+                        voxels.append(voxel_center)
+        return voxels
+
+    def is_point_inside_shape(self, point: glm.vec3, vertices: List[glm.vec3]) -> bool:
+        # Use a ray-casting algorithm to determine if the point is inside the shape
+        intersections = 0
+        direction = glm.vec3(1, 0, 0)  # Arbitrary direction
+        for i in range(0, len(vertices), 3):
+            p1 = vertices[i]
+            p2 = vertices[i + 1]
+            p3 = vertices[i + 2]
+            if self.ray_intersects_triangle(point, direction, p1, p2, p3):
+                intersections += 1
+        return intersections % 2 == 1
+
+    def ray_intersects_triangle(self, origin: glm.vec3, direction: glm.vec3, v0: glm.vec3, v1: glm.vec3,
+                                v2: glm.vec3) -> bool:
+        # Möller–Trumbore ray-triangle intersection algorithm
+        epsilon = 1e-8
+        edge1 = v1 - v0
+        edge2 = v2 - v0
+        h = glm.cross(direction, edge2)
+        a = glm.dot(edge1, h)
+        if -epsilon < a < epsilon:
+            return False  # Ray is parallel to the triangle
+        f = 1.0 / a
+        s = origin - v0
+        u = f * glm.dot(s, h)
+        if u < 0.0 or u > 1.0:
+            return False
+        q = glm.cross(s, edge1)
+        v = f * glm.dot(direction, q)
+        if v < 0.0 or u + v > 1.0:
+            return False
+        t = f * glm.dot(edge2, q)
+        if t > epsilon:
+            return True  # Ray intersects the triangle
+        else:
+            return False  # Line intersection but not a ray intersection
 
     def load_obj(self, filepath: str) -> Tuple[np.ndarray, np.ndarray]:
         vertices = []
@@ -66,30 +140,19 @@ class Model:
         self.model_matrix = translation_matrix * self.model_matrix
 
     def decompose_model(self) -> List['Model']:
-        if not self.is_player:
-            positions = self.vertices.reshape(-1, 6)[:, :3]
-            positions = [glm.vec3(x, y, z) for x, y, z in positions]
-            print(f"Decomposing model with positions: {positions}")
+        positions = self.vertices.reshape(-1, 6)[:, :3]
+        positions = [glm.vec3(x, y, z) for x, y, z in positions]
+        shapes = []
+        for i in range(0, len(self.indices), 3):
+            triangle = [positions[self.indices[i]], positions[self.indices[i + 1]], positions[self.indices[i + 2]]]
+            shapes.append(triangle)
 
-            shapes = []
-            for i in range(0, len(self.indices), 3):
-                triangle = [positions[self.indices[i]],
-                            positions[self.indices[i + 1]],
-                            positions[self.indices[i + 2]]]
-                shapes.append(triangle)
-                print(f"Triangle: {triangle}")
+        convex_shapes = []
+        for shape in shapes:
+            decomposed = self.decompose_to_convex(shape)
+            convex_shapes.extend(decomposed)
 
-            convex_shapes = []
-            for shape in shapes:
-                decomposed = self.decompose_to_convex(shape)
-                convex_shapes.extend(decomposed)
-                print(f"Decomposed to convex shapes: {decomposed}")
-
-            return convex_shapes
-        else:
-            self.bounding_box = self.calculate_bounding_box()
-            print(f"Player bounding box: {self.bounding_box}")
-            return []
+        return convex_shapes
 
     def calculate_bounding_box(self) -> List[glm.vec3]:
         positions = self.vertices.reshape(-1, 6)[:, :3]
@@ -133,7 +196,7 @@ class Model:
         num_vertices = len(vertices)
 
         # Ensure there are at least 4 vertices to form a 3D shape
-        if (num_vertices < 4):
+        if num_vertices < 4:
             return False
 
         # Compute the normal of the first face to use as a reference
@@ -155,6 +218,41 @@ class Model:
                             return False
 
         return True
+
+    def decompose_to_convex(self, vertices: List[glm.vec3]) -> List[List[glm.vec3]]:
+        shapes = [vertices]
+        convex_shapes = []
+
+        while shapes:
+            shape = shapes.pop()
+            if self.is_convex(shape):
+                convex_shapes.append(shape)
+            else:
+                vertex_count = len(shape)
+                if vertex_count < 3:
+                    continue
+
+                ears = []
+                for i in range(vertex_count):
+                    prev = (i - 1) % vertex_count
+                    curr = i
+                    next = (i + 1) % vertex_count
+                    if self.is_ear(shape, prev, curr, next):
+                        ears.append(curr)
+
+                if not ears:
+                    midpoint = vertex_count // 2
+                    shapes.append(shape[:midpoint])
+                    shapes.append(shape[midpoint:])
+                else:
+                    ear = ears[0]
+                    prev = (ear - 1) % vertex_count
+                    next = (ear + 1) % vertex_count
+                    new_vertices = shape[:ear] + shape[ear + 1:]
+                    shapes.append(new_vertices)
+                    convex_shapes.append([shape[prev], shape[ear], shape[next]])
+
+        return convex_shapes
 
     def is_ear(self, vertices: List[glm.vec3], prev: int, curr: int, next: int) -> bool:
         triangle = [vertices[prev], vertices[curr], vertices[next]]
@@ -183,51 +281,6 @@ class Model:
 
         return not (has_neg and has_pos)
 
-    def decompose_to_convex(self, vertices: List[glm.vec3]) -> List['Model']:
-        shapes = [vertices]
-        convex_shapes = []
-
-        while shapes:
-            shape = shapes.pop()
-            if self.is_convex(shape):
-                convex_shapes.append(Model.from_vertices(shape))
-            else:
-                vertex_count = len(shape)
-                if vertex_count < 3:
-                    continue
-
-                ears = []
-                for i in range(vertex_count):
-                    prev = (i - 1) % vertex_count
-                    curr = i
-                    next = (i + 1) % vertex_count
-                    if self.is_ear(shape, prev, curr, next):
-                        ears.append(curr)
-
-                if not ears:
-                    midpoint = vertex_count // 2
-                    shapes.append(shape[:midpoint])
-                    shapes.append(shape[midpoint:])
-                else:
-                    ear = ears[0]
-                    prev = (ear - 1) % vertex_count
-                    next = (ear + 1) % vertex_count
-                    new_vertices = shape[:ear] + shape[ear + 1:]
-                    shapes.append(new_vertices)
-                    convex_shapes.append(Model.from_vertices([shape[prev], shape[ear], shape[next]]))
-
-        return convex_shapes
-
-    @classmethod
-    def from_vertices(cls, vertices: List[glm.vec3]) -> 'Model':
-        obj = cls.__new__(cls)  # Create a new instance without calling __init__
-        obj.vertices = np.array(vertices, dtype=np.float32).flatten()
-        obj.indices = np.arange(len(vertices), dtype=np.uint32)
-        obj.static_normals = obj.get_normals(obj.compute_edges(obj.vertices.reshape(-1, 3)))
-        obj.convex_components = [obj]
-        obj.vao, obj.vbo, obj.ebo = obj.setup_buffers()  # Initialize buffers
-        return obj
-
     def setup_buffers(self) -> Tuple[int, int, int]:
         vao = glGenVertexArrays(1)
         glBindVertexArray(vao)
@@ -252,8 +305,8 @@ class Model:
                     glBindVertexArray(component.vao)
                     glDrawElements(GL_TRIANGLES, len(component.indices), GL_UNSIGNED_INT, None)
                     glBindVertexArray(0)
-
         else:
             glBindVertexArray(self.vao)
             glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, None)
             glBindVertexArray(0)
+

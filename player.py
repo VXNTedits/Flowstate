@@ -23,7 +23,7 @@ class Player(Model):
         self.model_matrix = glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
         #self.set_origin(glm.vec3(-0.025, 0.2, 0.0))
         self.update_model_matrix()
-
+        print('player bounding box init ', self.bounding_box)
     def set_origin(self, new_origin):
         """Set the player object's (0,0,0) coordinate to new_origin."""
         self.model.translate(new_origin)  # Use self.model
@@ -131,6 +131,10 @@ class Player(Model):
                                      glm.vec3(0.0, 1.0, 0.0))  # Assuming rotation around Y-axis
         # Initialize the transformed bounding box
         transformed_bounding_box = []
+        # for vertex in self.bounding_box:
+        #     transformed_vertex = translation_matrix * rotation_matrix * glm.vec4(vertex, 1)
+        #     transformed_bounding_box.append(transformed_vertex)
+
         # Apply transformations to each vertex of the bounding box
         for v_obj in self.bounding_box:
             transformed_v_obj = []  # Initialize a new transformed vertex object
@@ -141,3 +145,4 @@ class Player(Model):
 
         # Update the bounding box with the newly transformed vertices
         self.bounding_box = transformed_bounding_box
+        print(f'bounding box position updated {self.bounding_box}')
