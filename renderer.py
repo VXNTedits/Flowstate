@@ -20,7 +20,7 @@ class Renderer:
         self.shader.use()
         model_matrix = player_object.model_matrix
         self.update_uniforms(model_matrix, view_matrix, projection_matrix, player_object)
-        player_object.draw()
+        player_object.draw(self.camera)
 
     def render_world(self, world, view_matrix, projection_matrix):
         self.shader.use()

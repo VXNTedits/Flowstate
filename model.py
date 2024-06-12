@@ -245,9 +245,17 @@ class Model:
         self.model_matrix = rotation_matrix * self.model_matrix
 
     def set_position(self, translation):
-        # Apply translation
-        translation_matrix = glm.translate(glm.mat4(1.0), glm.vec3(translation[0], translation[1], translation[2]))
+        # Ensure the translation is a glm.vec3
+        translation_vec = glm.vec3(translation[0], translation[1], translation[2])
+
+        # Create the translation matrix
+        translation_matrix = glm.translate(glm.mat4(1.0), translation_vec)
+
+        # Multiply the translation matrix with the current model matrix
+        # Note the order of multiplication may need to be reversed depending on the use case
         self.model_matrix = translation_matrix * self.model_matrix
+        # If you want to set an absolute position, you might need to reset or reinitialize the model matrix
+        # self.model_matrix = translation_matrix  # Uncomment this line for absolute positioning
 
     def decompose_model(self) -> List['Model']:
         positions = self.vertices.reshape(-1, 6)[:, :3]

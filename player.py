@@ -1,14 +1,24 @@
 import sys
 import glm
 import numpy as np
+
+from camera import Camera
 from model import Model
 
 
 class Player(Model):
-    def __init__(self, model_path: str, mtl_path: str, camera, default_material):
+    def __init__(self,
+                 body_path: str,
+                 head_path: str,
+                 right_arm_path: str,
+                 mtl_path: str, camera,
+                 default_material):
+
         self.default_material = default_material
         self.camera = camera
-        self.model = Model(model_path, mtl_path, player=True,translation=(0,1,0))
+        self.torso = Model(body_path, mtl_path, player=True, translation=(0, 1, 0))
+        self.head = Model(head_path, mtl_path, player=True, translation=(0, 1, 0))
+        self.right_arm = Model(right_arm_path, mtl_path, player=True, translation=(0, 1, 0))
         self.position = glm.vec3(10.0, 10.2, -10.0)
         self.previous_position = glm.vec3(10.0, 10.2, -10.0)
         self.front = glm.vec3(0.0, 0.0, -1.0)
@@ -20,17 +30,13 @@ class Player(Model):
         self.velocity = glm.vec3(0, 0, 0)
         self.yaw = camera.yaw
         self.rotation = glm.vec3(camera.pitch, camera.yaw, 0)
-        self.vertices, self.indices = Model.load_obj(self, model_path)
+        self.vertices, self.indices = Model.load_obj(self, body_path)
         self.model_matrix = glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
         self.update_model_matrix()
         self.is_grounded = False
         self.is_jumping = False
         self.displacement = self.position - self.previous_position
 
-    def set_origin(self, new_origin):
-        self.model.translate(new_origin)
-        self.position = new_origin
-        self.update_model_matrix()
 
     def update(self, delta_time: float):
         if delta_time <= 0:
@@ -107,14 +113,25 @@ class Player(Model):
             self.thrust.y += up.y * self.jump_force
 
     def update_model_matrix(self):
-        model_rotation = (
-                glm.rotate(glm.mat4(1.0), glm.radians(-self.yaw), glm.vec3(0.0, 1.0, 0.0)) *
-                glm.rotate(glm.mat4(1.0), glm.radians(90), glm.vec3(0.0, 1.0, 0.0)) *
-                glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
-        )
+        # Rotate around the yaw axis (Y-axis)
+        model_rotation = glm.rotate(glm.mat4(1.0), glm.radians(-self.yaw), glm.vec3(0.0, 1.0, 0.0))
+
+        # Additional rotations if necessary
+        model_rotation *= glm.rotate(glm.mat4(1.0), glm.radians(90), glm.vec3(0.0, 1.0, 0.0))
+        model_rotation *= glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
+
+        # Apply translation after rotations
         translation = glm.translate(glm.mat4(1.0), self.position)
-        self.model.model_matrix = translation * model_rotation
-        self.model_matrix = self.model.model_matrix
+        final_model_matrix = translation * model_rotation
+
+        # Update model matrices for torso and right_arm
+        # Assuming torso and right_arm are at specific offsets from the main model
+        self.torso.model_matrix = final_model_matrix
+        self.right_arm.model_matrix = final_model_matrix  # Modify if right_arm has an offset
+        self.head.model_matrix = final_model_matrix
+
+        # Update the main model matrix
+        self.model_matrix = self.torso.model_matrix
 
     def get_rotation_matrix(self):
         return glm.rotate(glm.mat4(1.0), glm.radians(self.yaw), glm.vec3(0.0, 1.0, 0.0))
@@ -123,8 +140,15 @@ class Player(Model):
         self.position = position
         self.update_model_matrix()
 
-    def draw(self):
-        self.model.draw()
+    def draw(self, camera: Camera):
+        if not camera.first_person:
+            self.head.draw()
+            self.torso.draw()
+            self.right_arm.draw()
+        else:
+            self.torso.draw()
+            self.right_arm.draw()
+
 
     def process_mouse_movement(self, xoffset, yoffset):
         self.camera.process_mouse_movement(xoffset, yoffset)

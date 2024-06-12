@@ -65,10 +65,11 @@ class Components:
 
         self.world = World(filepaths, mtl_filepaths, rotations, translations, material_overrides, scales)
         print('World initialized')
-        self.player = Player('obj/player1.obj', 'obj/player1.mtl', self.camera, Model.default_material)
+        self.player = Player('obj/body.obj', 'obj/head.obj', 'obj/arm_right.obj', mtl_path='obj/body.mtl',
+                             camera=self.camera, default_material=Model.default_material)
         print('Player initialized')
-        self.models = [self.player.model]
-        self.models += self.world.objects #[self.world] +
+        self.models = [self.player.torso, self.player.right_arm]
+        self.models += self.world.objects  #[self.world] +
         for model in self.models:
             print("models in components.models: ", model.name)
         print('Models initialized')
