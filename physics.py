@@ -9,6 +9,7 @@ import player
 import world
 from model import Model
 
+
 class Physics:
     EPSILON = 1e-6
 
@@ -18,8 +19,9 @@ class Physics:
         self.gravity = glm.vec3(0, -10, 0)
 
     def apply_gravity(self, delta_time: float):
-        self.player.velocity += self.gravity * delta_time
-        self.player.position += self.player.velocity * delta_time + 0.5 * self.gravity * delta_time ** 2
+        if not self.player.is_grounded:
+            self.player.velocity += self.gravity * delta_time
+            self.player.position += self.player.velocity * delta_time + 0.5 * self.gravity * delta_time ** 2
 
     def is_player_below_world(self, player: glm.vec3):
         if player.y <= self.world.height:
@@ -54,20 +56,9 @@ class Physics:
                 return True
         return False
 
-    def get_aabb(self, vertices):
-        min_x = min(vertices, key=lambda v: v.x).x
-        min_y = min(vertices, key=lambda v: v.y).y
-        min_z = min(vertices, key=lambda v: v.z).z
-        max_x = max(vertices, key=lambda v: v.x).x
-        max_y = max(vertices, key=lambda v: v.y).y
-        max_z = max(vertices, key=lambda v: v.z).z
-
-        return (min_x, min_y, min_z, max_x, max_y, max_z)
-
     def is_point_in_aabb(self, point, aabb):
-        return (aabb[0] <= point.x <= aabb[3] and
-                aabb[1] <= point.y <= aabb[4] and
-                aabb[2] <= point.z <= aabb[5])
+        (min_x, min_y, min_z), (max_x, max_y, max_z) = aabb
+        return (min_x <= point.x <= max_x) and (min_y <= point.y <= max_y) and (min_z <= point.z <= max_z)
 
     def check_simple_collision(self):
         player_position = self.player.position
@@ -82,50 +73,85 @@ class Physics:
 
         return False
 
-    def resolve_collision(self, world, player):
-        player_position = player.position
+    def resolve_collision(self, obstacle_aabb, player_pos):
+        print('player pos = ', player_pos, ' obstacle aabb = ', obstacle_aabb)
+        min_x, min_y, min_z = obstacle_aabb[0]
+        max_x, max_y, max_z = obstacle_aabb[1]
 
-        for obj in world.objects:
-            obj_bounding_box = obj.calculate_bounding_box()
-            obj_aabb = self.get_aabb(obj_bounding_box)
-            obj.world_aabb = obj_aabb
+        # Helper function to resolve collisions for an axis
+        def resolve_axis(pos, min_val, max_val, velocity, axis):
+            if pos <= min_val + self.EPSILON:
+                if axis == 'y':
+                    self.player.is_grounded = True
+                    self.player.velocity.y = 0
+                return min_val - self.EPSILON
+            elif pos >= max_val - self.EPSILON:
+                if axis == 'y':
+                    self.player.velocity.y = 0
+                return max_val + self.EPSILON
+            return pos
 
-            if self.is_point_in_aabb(player_position, obj_aabb):
-                # Y-axis collision resolution (gravity axis) - skip if jumping
-                if not self.player.is_jumping:
-                    if player_position.y <= obj_aabb[1] + self.EPSILON:
-                        player.position.y = obj_aabb[1]
-                        self.player.velocity.y = 0  # Reset vertical velocity to stop gravity from pulling through
-                        self.player.is_grounded = True  # Player is on the ground
-                    elif player_position.y >= obj_aabb[4] - self.EPSILON:
-                        player.position.y = obj_aabb[4]
-                        self.player.velocity.y = 0  # Reset vertical velocity to stop gravity from pulling through
+        # Y-axis collision resolution (gravity axis)
+        if not self.player.is_jumping:
+            player_pos.y = resolve_axis(player_pos.y, min_y, max_y, self.player.velocity.y, 'y')
 
-                # X-axis collision resolution
-                if player_position.x <= obj_aabb[0] + self.EPSILON:
-                    player.position.x = obj_aabb[0]
-                elif player_position.x >= obj_aabb[3] - self.EPSILON:
-                    player.position.x = obj_aabb[3]
+        # X-axis collision resolution
+        player_pos.x = resolve_axis(player_pos.x, min_x, max_x, self.player.velocity.x, 'x')
 
-                # Z-axis collision resolution
-                if player_position.z <= obj_aabb[2] + self.EPSILON:
-                    player.position.z = obj_aabb[2]
-                elif player_position.z >= obj_aabb[5] - self.EPSILON:
-                    player.position.z = obj_aabb[5]
+        # Z-axis collision resolution
+        player_pos.z = resolve_axis(player_pos.z, min_z, max_z, self.player.velocity.z, 'z')
 
-                # Update player position
-                player.position = player_position
+        # Update player position
+        self.player.position = player_pos
+        print(f"Updated player position: {self.player.position}")
 
-    def handle_collisions(self, player, world, delta_time):
-        collision_detected = False
-        for obj in world.objects:
-            if self.check_simple_collision():
-                self.resolve_collision(world, player)
-                collision_detected = True
-        if collision_detected:
-            self.resolve_collision(world, player)
+    def handle_collisions(self, delta_time):
+        for obj in self.world.objects:
+            if self.check_linear_collision():
+                print('collision')
+                self.resolve_collision(obj.aabb, self.player.position)
+                break  # Stop checking further objects if a collision is detected
+
+    def check_linear_collision(self):
+        start_pos = self.player.previous_position
+        end_pos = self.player.position
+        for obj in self.world.get_objects():
+            if self.is_line_segment_intersecting_aabb(start_pos, end_pos, obj.aabb):
+                return True
+        return False
+
+    def is_line_segment_intersecting_aabb(self, start, end, aabb):
+        (min_x, min_y, min_z), (max_x, max_y, max_z) = aabb
+
+        def slab_check(p0, p1, min_b, max_b):
+            inv_d = 1.0 / (p1 - p0) if (p1 - p0) != 0 else float('inf')
+            t0 = (min_b - p0) * inv_d
+            t1 = (max_b - p0) * inv_d
+            if t0 > t1:
+                t0, t1 = t1, t0
+            return t0, t1
+
+        tmin, tmax = 0.0, 1.0
+
+        for axis in range(3):
+            p0 = start[axis]
+            p1 = end[axis]
+            min_b = [min_x, min_y, min_z][axis]
+            max_b = [max_x, max_y, max_z][axis]
+
+            if p0 == p1:
+                if p0 < min_b or p0 > max_b:
+                    return False
+            else:
+                t0, t1 = slab_check(p0, p1, min_b, max_b)
+                tmin = max(tmin, t0)
+                tmax = min(tmax, t1)
+                if tmin > tmax:
+                    return False
+
+        return True
 
     def update(self, delta_time: float):
-        if not self.check_simple_collision():
+        if not self.check_linear_collision():  # self.check_simple_collision():
             self.apply_gravity(delta_time)
-        self.handle_collisions(self.player, self.world, delta_time)
+        self.handle_collisions(delta_time=delta_time)

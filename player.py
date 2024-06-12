@@ -1,15 +1,8 @@
 import sys
-
 import glm
 import numpy as np
-
 from model import Model
 
-import glm
-from model import Model
-
-import glm
-from model import Model
 
 class Player(Model):
     def __init__(self, model_path: str, mtl_path: str, camera, default_material):
@@ -40,14 +33,15 @@ class Player(Model):
         self.update_model_matrix()
 
     def update(self, delta_time: float):
+        if delta_time <= 0:
+            print("Delta time is zero or negative!")
+            return
         self.apply_forces(delta_time)
+        self.previous_position = glm.vec3(self.position)  # Update previous position before changing current position
         self.position += self.velocity * delta_time
         self.update_camera_position()
         self.update_model_matrix()
         self.displacement = self.position - self.previous_position
-        sys.stdout.write(f"\rCALL: displacement update: {self.displacement}")
-        sys.stdout.flush()
-
         # Reset the is_jumping flag if the player has landed
         if self.is_grounded:
             self.is_jumping = False
@@ -58,7 +52,8 @@ class Player(Model):
             self.velocity.y = self.thrust.y
             self.is_grounded = False
             self.is_jumping = True
-            # Toggle off the is_jumping flag if the player is falling downwards
+
+        # Toggle off the is_jumping flag if the player is falling downwards
         if self.velocity.y < 0.0:
             self.is_jumping = False
 
@@ -84,6 +79,8 @@ class Player(Model):
         if abs(self.velocity.y) < 0.01:
             self.velocity.y = 0.0
 
+        #print(f"Updated Velocity: {self.velocity}")
+
     def reset_thrust(self):
         self.thrust = glm.vec3(0.0, 0.0, 0.0)
 
@@ -106,14 +103,12 @@ class Player(Model):
             self.thrust.z += right.z * self.accelerator
         if direction == 'JUMP' and self.is_grounded:
             self.thrust.y += up.y * self.jump_force
-        self.previous_position = self.position
-
 
     def update_model_matrix(self):
         model_rotation = (
-            glm.rotate(glm.mat4(1.0), glm.radians(-self.yaw), glm.vec3(0.0, 1.0, 0.0)) *
-            glm.rotate(glm.mat4(1.0), glm.radians(90), glm.vec3(0.0, 1.0, 0.0)) *
-            glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
+                glm.rotate(glm.mat4(1.0), glm.radians(-self.yaw), glm.vec3(0.0, 1.0, 0.0)) *
+                glm.rotate(glm.mat4(1.0), glm.radians(90), glm.vec3(0.0, 1.0, 0.0)) *
+                glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
         )
         translation = glm.translate(glm.mat4(1.0), self.position)
         self.model.model_matrix = translation * model_rotation

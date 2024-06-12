@@ -58,6 +58,7 @@ class Model:
         else:
             #self.convex_components = self.decompose_model()
             self.bounding_box = self.calculate_bounding_box()
+            self.aabb = self.calculate_aabb()
             self.voxels = None  #self.decompose_to_voxels(self.vertices, 5)
             self.voxel_size = 5
         print(f"{self.name}'s Materials: {self.materials} ")
@@ -68,6 +69,7 @@ class Model:
             self.materials['specular'] = ks_override
         if ns_override is not None:
             self.materials['shininess'] = ns_override
+
 
     def load_obj(self, filepath: str) -> Tuple[np.ndarray, np.ndarray]:
         vertices = []
@@ -401,3 +403,15 @@ class Model:
         has_pos = (d1 > 0) or (d2 > 0) or (d3 > 0)
 
         return not (has_neg and has_pos)
+
+    def get_objects(self):
+        return self
+
+    def calculate_aabb(self):
+        min_x = min(self.bounding_box, key=lambda v: v.x).x
+        max_x = max(self.bounding_box, key=lambda v: v.x).x
+        min_y = min(self.bounding_box, key=lambda v: v.y).y
+        max_y = max(self.bounding_box, key=lambda v: v.y).y
+        min_z = min(self.bounding_box, key=lambda v: v.z).z
+        max_z = max(self.bounding_box, key=lambda v: v.z).z
+        return (min_x, min_y, min_z), (max_x, max_y, max_z)
