@@ -30,7 +30,7 @@ class Components:
         object_attributes = [
             ObjectAttributes(
                 'obj/world_test.obj', 'obj/world_test.mtl',
-                (-90.0, 0.0, 0.0), (-70.0, -2.0, 50.0),
+                (-90.0, 0.0, 0.0), (-70.0, -100.0, 50.0),
                 MaterialOverride(None, glm.vec3(0, 1, 0), 1000)
             ),
             ObjectAttributes(

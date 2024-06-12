@@ -73,43 +73,64 @@ class Physics:
 
         return False
 
-    def resolve_collision(self, obstacle_aabb, player_pos):
-        print('player pos = ', player_pos, ' obstacle aabb = ', obstacle_aabb)
-        min_x, min_y, min_z = obstacle_aabb[0]
-        max_x, max_y, max_z = obstacle_aabb[1]
+    def calculate_toi(self, pos, min_val, max_val, velocity):
+        if velocity > 0:
+            return (max_val - pos) / velocity
+        elif velocity < 0:
+            return (min_val - pos) / velocity
+        return float('inf')
 
-        # Helper function to resolve collisions for an axis
-        def resolve_axis(pos, min_val, max_val, velocity, axis):
-            if pos <= min_val + self.EPSILON:
-                if axis == 'y':
+    def resolve_collision(self, obstacle_aabb):
+        (min_x, min_y, min_z), (max_x, max_y, max_z) = obstacle_aabb
+        player_pos = self.player.position
+        player_velocity = self.player.velocity
+
+        # Calculate overlap on each axis
+        overlap_x = min(max_x - player_pos.x, player_pos.x - min_x)
+        overlap_y = min(max_y - player_pos.y, player_pos.y - min_y)
+        overlap_z = min(max_z - player_pos.z, player_pos.z - min_z)
+
+        # Find the smallest overlap to determine the resolution axis
+        min_overlap = min(overlap_x, overlap_y, overlap_z)
+
+        if min_overlap == overlap_x:
+            # Resolve along x-axis
+            if player_pos.x > (max_x + min_x) / 2:
+                # Player is to the right of the obstacle
+                self.player.position.x += overlap_x
+            else:
+                # Player is to the left of the obstacle
+                self.player.position.x -= overlap_x
+            self.player.velocity.x = 0
+        elif min_overlap == overlap_y:
+            # Resolve along y-axis
+            if player_pos.y > (max_y + min_y) / 2:
+                # Player is above the obstacle
+                if self.player.velocity.y < 0: # Player is falling
+                    self.player.position.y += overlap_y
+                    self.player.velocity.y = 0 # Stop player from falling
                     self.player.is_grounded = True
-                    self.player.velocity.y = 0
-                return min_val - self.EPSILON
-            elif pos >= max_val - self.EPSILON:
-                if axis == 'y':
-                    self.player.velocity.y = 0
-                return max_val + self.EPSILON
-            return pos
-
-        # Y-axis collision resolution (gravity axis)
-        if not self.player.is_jumping:
-            player_pos.y = resolve_axis(player_pos.y, min_y, max_y, self.player.velocity.y, 'y')
-
-        # X-axis collision resolution
-        player_pos.x = resolve_axis(player_pos.x, min_x, max_x, self.player.velocity.x, 'x')
-
-        # Z-axis collision resolution
-        player_pos.z = resolve_axis(player_pos.z, min_z, max_z, self.player.velocity.z, 'z')
-
-        # Update player position
-        self.player.position = player_pos
-        print(f"Updated player position: {self.player.position}")
+                else: # Player is already moving in the direction that would resolve the collision
+                    pass#self.player.is_grounded = False
+            else:
+                # Player is below the obstacle
+                self.player.position.y -= overlap_y
+                self.player.velocity.y = 0
+        else:
+            # Resolve along z-axis
+            if player_pos.z > (max_z + min_z) / 2:
+                # Player is in front of the obstacle
+                self.player.position.z += overlap_z
+            else:
+                # Player is behind the obstacle
+                self.player.position.z -= overlap_z
+            self.player.velocity.z = 0
 
     def handle_collisions(self, delta_time):
         for obj in self.world.objects:
             if self.check_linear_collision():
-                print('collision')
-                self.resolve_collision(obj.aabb, self.player.position)
+                #print('collision')
+                self.resolve_collision(obj.aabb)
                 break  # Stop checking further objects if a collision is detected
 
     def check_linear_collision(self):
@@ -152,6 +173,6 @@ class Physics:
         return True
 
     def update(self, delta_time: float):
-        if not self.check_linear_collision():  # self.check_simple_collision():
-            self.apply_gravity(delta_time)
+        #if not self.check_linear_collision():  # self.check_simple_collision():
+        self.apply_gravity(delta_time)
         self.handle_collisions(delta_time=delta_time)

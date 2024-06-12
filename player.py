@@ -8,7 +8,7 @@ class Player(Model):
     def __init__(self, model_path: str, mtl_path: str, camera, default_material):
         self.default_material = default_material
         self.camera = camera
-        self.model = Model(model_path, mtl_path, player=True)
+        self.model = Model(model_path, mtl_path, player=True,translation=(0,1,0))
         self.position = glm.vec3(10.0, 10.2, -10.0)
         self.previous_position = glm.vec3(10.0, 10.2, -10.0)
         self.front = glm.vec3(0.0, 0.0, -1.0)
@@ -45,10 +45,12 @@ class Player(Model):
         # Reset the is_jumping flag if the player has landed
         if self.is_grounded:
             self.is_jumping = False
+        if self.is_jumping:
+            print('true')
 
     def apply_forces(self, delta_time: float):
         # Apply vertical thrust if jumping
-        if self.thrust.y > 1.0 and self.is_grounded:
+        if self.thrust.y > 0 and self.is_grounded:
             self.velocity.y = self.thrust.y
             self.is_grounded = False
             self.is_jumping = True

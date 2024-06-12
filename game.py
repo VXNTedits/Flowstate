@@ -41,11 +41,16 @@ class Game:
             view_matrix = self.components.camera.get_view_matrix()
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)  # Clear the screen
 
+
+
             # Render the player
             self.components.renderer.render_player(self.components.player, view_matrix, self.projection_matrix)
             # Render the world
             for model in self.components.world.models:
                 self.components.renderer.render_world(model, view_matrix, self.projection_matrix)
+
+            self.components.renderer.render_aabb(self.components.world.get_objects(), self.components.player.position,
+                                                 view_matrix, self.projection_matrix)
 
             self.window.swap_buffers()
 
