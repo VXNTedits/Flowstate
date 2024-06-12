@@ -1,6 +1,10 @@
+import time
 
 import glm
 from OpenGL.GL import *
+
+from model import Model
+
 
 class Renderer:
     def __init__(self, shader, camera):
@@ -10,19 +14,50 @@ class Renderer:
         glViewport(0, 0, 800, 600)  # Set the viewport
         glClearColor(0.0, 0.0, 0.0, 1.0)  # Set clear color (black)
 
-    def render(self, model, view_matrix, projection_matrix):
+    def render_player(self, player_object, view_matrix, projection_matrix):
         self.shader.use()
-        model_matrix = model.model_matrix
-        self.update_uniforms(model_matrix, view_matrix, projection_matrix, model)
-        model.draw()
+        model_matrix = player_object.model_matrix
+        self.update_uniforms(model_matrix, view_matrix, projection_matrix, player_object)
+        player_object.draw()
+
+    def render_world(self, world, view_matrix, projection_matrix):
+        self.shader.use()
+        model_matrix = world.model_matrix
+        self.update_uniforms(model_matrix, view_matrix, projection_matrix, world)
+        world.draw()
 
     def update_uniforms(self, model_matrix, view_matrix, projection_matrix, model):
         self.shader.set_uniform_matrix4fv("model", model_matrix)
         self.shader.set_uniform_matrix4fv("view", view_matrix)
         self.shader.set_uniform_matrix4fv("projection", projection_matrix)
-        self.shader.set_uniform3f("lightPos", glm.vec3(1.2, 1.0, 2.0))
         self.shader.set_uniform3f("viewPos", self.camera.position)
-        self.shader.set_uniform3f("lightColor", glm.vec3(1, 1, 1))  # Neon purple light
+
+        # Animate light properties
+        current_time = time.time()
+
+        # Use sinusoidal functions to oscillate between 0 and 1
+        def oscillate(frequency, phase_shift=0):
+            return (glm.sin(current_time * frequency + phase_shift) + 1) / 2
+
+        light_positions = [glm.vec3(100.2, 1.0, 2.0), glm.vec3(-1.2, 2.0, 200.0), glm.vec3(10.0, 3.0, 20.0)]
+
+        # Define base colors
+        base_colors = [
+            glm.vec3(1.0, 0.08, 0.58),  # Pink
+            glm.vec3(0.08, 0.08, 1.0),  # Blue
+            glm.vec3(0.08, 1.0, 0.08)   # Green
+        ]
+
+        # Animate colors
+        animated_colors = [
+            glm.vec3(oscillate(1.0), oscillate(0.1, 2), oscillate(0.1, 4)),  # Example frequency for Pink
+            glm.vec3(oscillate(0.1, 2), oscillate(0.1, 4), oscillate(0.1, 6)), # Example frequency for Blue
+            glm.vec3(oscillate(0.1, 4), oscillate(0.2, 6), oscillate(0.1, 8))  # Example frequency for Green
+        ]
+
+        for i, (lightPos, lightColor) in enumerate(zip(light_positions, animated_colors)):
+            self.shader.set_uniform3f(f"lights[{i}].position", lightPos)
+            self.shader.set_uniform3f(f"lights[{i}].color", lightColor)
 
         # Set material properties using the first material found
         kd = model.default_material['diffuse']

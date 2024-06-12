@@ -1,3 +1,5 @@
+import sys
+
 import glm
 import numpy as np
 
@@ -10,11 +12,12 @@ import glm
 from model import Model
 
 class Player(Model):
-    def __init__(self, model_path: str, mtl_path: str, camera):
+    def __init__(self, model_path: str, mtl_path: str, camera, default_material):
+        self.default_material = default_material
         self.camera = camera
         self.model = Model(model_path, mtl_path, player=True)
         self.position = glm.vec3(10.0, 10.2, -10.0)
-        self.previous_position = glm.vec3(10.0, 10.0, -10.0)
+        self.previous_position = glm.vec3(10.0, 10.2, -10.0)
         self.front = glm.vec3(0.0, 0.0, -1.0)
         self.up = glm.vec3(0.0, 1.0, 0.0)
         self.accelerator = 10
@@ -29,6 +32,7 @@ class Player(Model):
         self.update_model_matrix()
         self.is_grounded = False
         self.is_jumping = False
+        self.displacement = self.position - self.previous_position
 
     def set_origin(self, new_origin):
         self.model.translate(new_origin)
@@ -40,6 +44,9 @@ class Player(Model):
         self.position += self.velocity * delta_time
         self.update_camera_position()
         self.update_model_matrix()
+        self.displacement = self.position - self.previous_position
+        sys.stdout.write(f"\rCALL: displacement update: {self.displacement}")
+        sys.stdout.flush()
 
         # Reset the is_jumping flag if the player has landed
         if self.is_grounded:
@@ -110,6 +117,7 @@ class Player(Model):
         )
         translation = glm.translate(glm.mat4(1.0), self.position)
         self.model.model_matrix = translation * model_rotation
+        self.model_matrix = self.model.model_matrix
 
     def get_rotation_matrix(self):
         return glm.rotate(glm.mat4(1.0), glm.radians(self.yaw), glm.vec3(0.0, 1.0, 0.0))

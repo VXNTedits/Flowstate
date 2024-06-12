@@ -1,3 +1,4 @@
+import sys
 from collections import defaultdict
 from typing import Tuple, List, Set
 import glfw
@@ -9,7 +10,7 @@ import world
 from model import Model
 
 class Physics:
-    EPSILON = 1e-1
+    EPSILON = 1e-6
 
     def __init__(self, world, player):
         self.world = world
@@ -117,15 +118,10 @@ class Physics:
 
     def handle_collisions(self, player, world, delta_time):
         collision_detected = False
-
         for obj in world.objects:
-            if self.check_voxel_collision(player, obj):
-                print("Voxel collision detected!")
-                collision_detected = True
             if self.check_simple_collision():
                 self.resolve_collision(world, player)
                 collision_detected = True
-
         if collision_detected:
             self.resolve_collision(world, player)
 

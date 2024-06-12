@@ -8,26 +8,41 @@ class MaterialOverride:
     ks_override: glm.vec3
     ns_override: float
 
-class World(Model):
-    def __init__(self, filepaths: list, mtl_filepaths: list, rotations: list, translations: list, material_overrides: list):
-        # Initialize the Model with the first object's parameters
-        initial_material_override = material_overrides[0]
-        super().__init__(filepaths[0], mtl_filepaths[0], rotation_angles=rotations[0], translation=translations[0],
-                         kd_override=initial_material_override.kd_override, ks_override=initial_material_override.ks_override,
-                         ns_override=initial_material_override.ns_override)
+class World:
+    def __init__(self, filepaths: list, mtl_filepaths: list, rotations: list, translations: list, material_overrides: list, scales: list):
+        self.models = []
+        for i in range(len(filepaths)):
+            material_override = material_overrides[i]
+            model = Model(filepaths[i], mtl_filepaths[i],
+                          rotation_angles=rotations[i],
+                          translation=translations[i],
+                          kd_override=material_override.kd_override,
+                          ks_override=material_override.ks_override,
+                          ns_override=material_override.ns_override,
+                          scale=scales[i]
+                          )
+            self.models.append(model)
 
         self.objects = []
         self.world_aabb = None
         self.is_player = False
 
         # Initialize each object and store it in the objects list
-        for filepath, mtl_filepath, rotation, translation, material_override in zip(filepaths, mtl_filepaths, rotations, translations, material_overrides):
-            obj = Model(filepath, mtl_filepath, rotation_angles=rotation, translation=translation, kd_override=material_override.kd_override,
-                        ks_override=material_override.ks_override, ns_override=material_override.ns_override)
+        for filepath, mtl_filepath, rotation, translation, material_override, scale in zip(filepaths, mtl_filepaths, rotations, translations, material_overrides, scales):
+            obj = Model(filepath, mtl_filepath,
+                        rotation_angles=rotation,
+                        translation=translation,
+                        kd_override=material_override.kd_override,
+                        ks_override=material_override.ks_override,
+                        ns_override=material_override.ns_override,
+                        scale=scale
+                        )
             self.objects.append(obj)
 
+        #self.model_matrix =
+
         # Calculate world bounding box considering all objects
-        self.calculate_world_bounding_box()
+        #self.calculate_world_bounding_box()
 
     def calculate_world_bounding_box(self):
         min_x, min_y, min_z = float('inf'), float('inf'), float('inf')
@@ -47,3 +62,6 @@ class World(Model):
 
     def get_objects(self):
         return self.objects
+
+    def update(self, delta_time):
+        pass

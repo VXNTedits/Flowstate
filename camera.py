@@ -1,3 +1,5 @@
+import sys
+
 import glm
 
 class Camera:
@@ -40,6 +42,7 @@ class Camera:
         self.right = glm.normalize(glm.cross(self.front, self.world_up))
         self.up = glm.normalize(glm.cross(self.right, self.front))
 
+
     def toggle_view(self, player_position, player_rotation_matrix):
         if self.first_person:
             self.set_third_person(player_position, player_rotation_matrix)
@@ -58,3 +61,6 @@ class Camera:
     def set_position(self, position):
         self.position = position
         self.update_camera_vectors()
+
+    def update(self, delta_time):
+        pass

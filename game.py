@@ -9,8 +9,12 @@ import glfw
 class Game:
     def __init__(self, fullscreen=False):
         self.window = Window(800, 600, "3D Game", fullscreen)
+        print('Window initialized')
         self.components = Components(self.window)
+        print('Components initialized')
         self.components.set_input_callbacks(self.window)
+        print('Inputs initialized')
+        self.projection_matrix = glm.perspective(glm.radians(90.0), self.window.width / self.window.height, 0.001, 1000.0)
 
     def run(self):
         last_frame_time = glfw.get_time()
@@ -23,20 +27,20 @@ class Game:
             last_frame_time = current_frame_time
 
             # Update game logic
+            #self.components.update_components(delta_time)
             self.components.input_handler.update(delta_time)
             self.components.player.update(delta_time)
             self.components.physics.update(delta_time)
 
             # Rendering
             view_matrix = self.components.camera.get_view_matrix()
-            projection_matrix = glm.perspective(glm.radians(90.0), self.window.width / self.window.height, 0.001, 1000.0)
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)  # Clear the screen
-            self.components.renderer.render(self.components.world, view_matrix, projection_matrix)
-            for model in self.components.models:
-                self.components.renderer.render(model, view_matrix, projection_matrix)
-                #self.components.renderer.draw_model_bounding_box(model, view_matrix, projection_matrix)
 
-            #self.components.text_renderer.render_text("FPS: {}".format(int(1.0 / delta_time)), 10, 10)
+            # Render the player
+            self.components.renderer.render_player(self.components.player, view_matrix, self.projection_matrix)
+            # Render the world
+            for model in self.components.world.models:
+                self.components.renderer.render_world(model, view_matrix, self.projection_matrix)
 
             self.window.swap_buffers()
 

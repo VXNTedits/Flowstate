@@ -10,14 +10,24 @@ from OpenGL.GL import *
 
 
 class Model:
-    def __init__(self, filepath: str, mtl_filepath: str, player=False, draw_convex_only=False,
-                 rotation_angles=(0.0, 0.0, 0.0), translation=(0.0, 0.0, 0.0),
-                 kd_override=None, ks_override=None, ns_override=None):
-        self.default_material = {
+    default_material = {
             'diffuse': [1, 0.0, 0.0],  # Example values
             'specular': [1.0, 1.0, 1.0],  # Example values (or a glm.vec3 if using glm)
             'shininess': 10.0  # Example value
         }
+
+    def __init__(self,
+                 filepath: str,
+                 mtl_filepath: str,
+                 player=False,
+                 draw_convex_only=False,
+                 rotation_angles=(0.0, 0.0, 0.0),
+                 translation=(0.0, 0.0, 0.0),
+                 kd_override=None,
+                 ks_override=None,
+                 ns_override=None,
+                 scale=None):
+        self.default_material = self.default_material
         print(f"Initializing Model with filepath: {filepath}")
         self.name = filepath
         self.vertices, self.indices = self.load_obj(filepath)
@@ -40,14 +50,15 @@ class Model:
         self.is_player = player
         self.set_orientation(rotation_angles)
         self.set_position(translation)
+        self.set_scale(scale)
         self.draw_convex_only = draw_convex_only
         if self.is_player:
             pass
             #self.bounding_box = self.calculate_bounding_box()
         else:
-            self.convex_components = self.decompose_model()
+            #self.convex_components = self.decompose_model()
             self.bounding_box = self.calculate_bounding_box()
-            self.voxels = self.decompose_to_voxels(self.vertices, 5)
+            self.voxels = None  #self.decompose_to_voxels(self.vertices, 5)
             self.voxel_size = 5
         print(f"{self.name}'s Materials: {self.materials} ")
         print()
@@ -214,6 +225,14 @@ class Model:
             return True  # Ray intersects the triangle
         else:
             return False  # Line intersection but not a ray intersection
+
+    def set_scale(self, scale):
+        if scale is not None:
+            if isinstance(scale, (int, float)):
+                self.model_matrix = glm.scale(self.model_matrix, glm.vec3(scale, scale, scale))
+            elif isinstance(scale, glm.vec3):
+                self.model_matrix = glm.scale(self.model_matrix, scale)
+            print("scale set")
 
     def set_orientation(self, rotation_angles):
         # Apply rotations around x, y, z axes respectively
