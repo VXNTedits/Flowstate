@@ -31,6 +31,7 @@ class Player(Model):
         self.thrust = glm.vec3(0.0, 0.0, 0.0)
         self.velocity = glm.vec3(0, 0, 0)
         self.yaw = camera.yaw
+        self.pitch = camera.pitch
         self.rotation = glm.vec3(camera.pitch, camera.yaw, 0)
         self.vertices, self.indices = Model.load_obj(self, body_path)
         self.model_matrix = glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
@@ -134,6 +135,7 @@ class Player(Model):
         self.head.model_matrix = final_model_matrix
 
         # Update the main model matrix
+        self.rotation = model_rotation
         self.model_matrix = self.torso.model_matrix
 
     def get_rotation_matrix(self):
@@ -155,10 +157,12 @@ class Player(Model):
     def process_mouse_movement(self, xoffset, yoffset):
         self.camera.process_mouse_movement(xoffset, yoffset)
         self.yaw = self.camera.yaw
+        self.pitch = self.camera.pitch
         self.update_camera_position()
 
     def update_camera_position(self):
         self.camera.yaw = self.yaw
+        self.camera.pitch = self.pitch
         self.camera.update_camera_vectors()
         if self.camera.first_person:
             self.camera.set_first_person(self.position, self.get_rotation_matrix())
@@ -171,8 +175,7 @@ class Player(Model):
 
     def set_hand_position(self):
         # Define the local position of the hand relative to the right arm
-        local_hand_position = glm.vec3(0.2, 0.2, 0.2)  # Example position at the end of the arm
-
+        local_hand_position = glm.vec3(0, -0.5, 1)  # Example position at the end of the arm
         # Transform the local hand position to world coordinates using the right arm's model matrix
         world_hand_position = glm.vec3(self.right_arm.model_matrix * glm.vec4(local_hand_position, 1.0))
 

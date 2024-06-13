@@ -20,7 +20,7 @@ class InteractableObject(Model):
         self.orientation = rotation
         self.update_model_matrix()
         self.interactable = interactable
-        self.interaction_threshold = 20
+        self.interaction_threshold = 200
         self.name = filepath
         self.scale = scale
         self.velocity = velocity
@@ -64,10 +64,10 @@ class InteractableObject(Model):
 
     def check_interactions(self, player, delta_time):
         if glm.distance(player.position, self.position) < self.interaction_threshold:
-            print("Highlight should take place now")
+            #print("Highlight should take place now")
             self.highlight(delta_time)
             if player.interact:
-                print("interaction should take place now")
+                #print("interaction should take place now")
                 self.interact(player)
                 player.pick_up(self)
 
@@ -75,8 +75,9 @@ class InteractableObject(Model):
         if self.interactable:
             self.check_interactions(player, delta_time)
         if self.picked_up:
+            self.orientation = glm.vec3(player.camera.pitch, -player.yaw, 0)
             self.position = player.right_hand
-            self.orientation = player.rotation
+            #print(f"pitch = {self.orientation.x} yaw = {self.orientation.y}, roll = {self.orientation.z}")
             self.update_model_matrix()
 
     def highlight(self, delta_time):
@@ -89,7 +90,7 @@ class InteractableObject(Model):
         centroid = self.centroid
 
         # Update the position and orientation based on rotation around centroid
-        self.update_position_and_orientation_with_centroid(centroid, rotation_angle, delta_time)
+        self.update_position_and_orientation_with_centroid(centroid, glm.vec3(0,rotation_angle,0), delta_time)
 
         # Bounce up and down (apply after rotation to avoid interference)
         bounce_offset = self.bounce_amplitude * glm.sin(2.0 * glm.pi() * self.bounce_frequency * glfw.get_time())
@@ -103,7 +104,7 @@ class InteractableObject(Model):
         translate_to_centroid = glm.translate(glm.mat4(1.0), -centroid)
 
         # Create rotation matrix for y-axis
-        rotation_y = glm.rotate(glm.mat4(1.0), glm.radians(rotation_angle), glm.vec3(0.0, 1.0, 0.0))
+        rotation_y = glm.rotate(glm.mat4(1.0), glm.radians(rotation_angle.y), glm.vec3(0.0, 1.0, 0.0))
 
         # Translate back from centroid
         translate_back = glm.translate(glm.mat4(1.0), centroid)
