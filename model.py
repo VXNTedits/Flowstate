@@ -1,10 +1,4 @@
 from dataclasses import dataclass
-
-import numpy as np
-import glm
-from typing import List, Tuple
-from OpenGL.GL import *
-
 import numpy as np
 import glm
 from typing import List, Tuple
@@ -18,10 +12,10 @@ class MaterialOverride:
 
 class Model:
     default_material = {
-            'diffuse': [1, 0.0, 0.0],  # Example values
-            'specular': [1.0, 1.0, 1.0],  # Example values (or a glm.vec3 if using glm)
-            'shininess': 10.0  # Example value
-        }
+        'diffuse': [1, 0.0, 0.0],  # Example values
+        'specular': [1.0, 1.0, 1.0],  # Example values (or a glm.vec3 if using glm)
+        'shininess': 10.0  # Example value
+    }
 
     def __init__(self,
                  filepath: str,
@@ -35,15 +29,14 @@ class Model:
                  ns_override=None,
                  scale=None,
                  is_collidable=True,
-                 shift_to_centroid=False
-                 ):
+                 shift_to_centroid=False):
+
         self.shift_to_centroid = shift_to_centroid
         self.is_collidable = is_collidable
-        self.default_material = self.default_material
         print(f"Initializing Model with filepath: {filepath}")
         self.name = filepath
-        self.vertices, self.indices = self.load_obj(filepath,shift_to_centroid=self.shift_to_centroid)
-        self.materials = self.load_mtl(mtl_filepath)  #if mtl_filepath else {}
+        self.vertices, self.indices = self.load_obj(filepath, shift_to_centroid=self.shift_to_centroid)
+        self.materials = self.load_mtl(mtl_filepath)  # if mtl_filepath else {}
         # Apply overrides if provided
         first_material_key = next(iter(self.materials))
         if kd_override is not None:
@@ -65,14 +58,15 @@ class Model:
         self.set_position(translation)
         self.draw_convex_only = draw_convex_only
         if self.is_player:
-            self.aabb = None
-            #self.bounding_box = self.calculate_bounding_box()
+            self.bounding_box = self.calculate_bounding_box()
+            self.aabb = self.calculate_aabb()
+            #
         else:
-            #self.convex_components = self.decompose_model()
+            # self.convex_components = self.decompose_model()
             if self.is_collidable:
                 self.bounding_box = self.calculate_bounding_box()
                 self.aabb = self.calculate_aabb()
-                self.voxels = None  #self.decompose_to_voxels(self.vertices, 5)
+                self.voxels = None  # self.decompose_to_voxels(self.vertices, 5)
                 self.voxel_size = 5
         print(f"{self.name}'s Materials: {self.materials} ")
         print()
@@ -190,78 +184,6 @@ class Model:
         glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, None)
         glBindVertexArray(0)
 
-    def decompose_to_voxels(self, vertices: np.ndarray, voxel_size: float) -> List[glm.vec3]:
-        # Reshape vertices from flat array to list of vec3
-        vertices = vertices.reshape(-1, 3)
-        vertices_list = [glm.vec3(vertex[0], vertex[1], vertex[2]) for vertex in vertices]
-
-        # Calculate the bounding box from the given vertices
-        min_corner = glm.vec3(
-            min(vertex.x for vertex in vertices_list),
-            min(vertex.y for vertex in vertices_list),
-            min(vertex.z for vertex in vertices_list)
-        )
-        max_corner = glm.vec3(
-            max(vertex.x for vertex in vertices_list),
-            max(vertex.y for vertex in vertices_list),
-            max(vertex.z for vertex in vertices_list)
-        )
-
-        # Calculate the number of voxels along each axis
-        voxel_count_x = int((max_corner.x - min_corner.x) / voxel_size) + 1
-        voxel_count_y = int((max_corner.y - min_corner.y) / voxel_size) + 1
-        voxel_count_z = int((max_corner.z - min_corner.z) / voxel_size) + 1
-
-        voxels = []
-        for x in range(voxel_count_x):
-            for y in range(voxel_count_y):
-                for z in range(voxel_count_z):
-                    voxel_center = glm.vec3(
-                        min_corner.x + x * voxel_size + voxel_size / 2,
-                        min_corner.y + y * voxel_size + voxel_size / 2,
-                        min_corner.z + z * voxel_size + voxel_size / 2
-                    )
-                    if self.is_point_inside_shape(voxel_center, vertices_list):
-                        voxels.append(voxel_center)
-        return voxels
-
-    def is_point_inside_shape(self, point: glm.vec3, vertices: List[glm.vec3]) -> bool:
-        # Use a ray-casting algorithm to determine if the point is inside the shape
-        intersections = 0
-        direction = glm.vec3(1, 0, 0)  # Arbitrary direction
-        for i in range(0, len(vertices), 3):
-            p1 = vertices[i]
-            p2 = vertices[i + 1]
-            p3 = vertices[i + 2]
-            if self.ray_intersects_triangle(point, direction, p1, p2, p3):
-                intersections += 1
-        return intersections % 2 == 1
-
-    def ray_intersects_triangle(self, origin: glm.vec3, direction: glm.vec3, v0: glm.vec3, v1: glm.vec3,
-                                v2: glm.vec3) -> bool:
-        # Möller–Trumbore ray-triangle intersection algorithm
-        epsilon = 1e-8
-        edge1 = v1 - v0
-        edge2 = v2 - v0
-        h = glm.cross(direction, edge2)
-        a = glm.dot(edge1, h)
-        if -epsilon < a < epsilon:
-            return False  # Ray is parallel to the triangle
-        f = 1.0 / a
-        s = origin - v0
-        u = f * glm.dot(s, h)
-        if u < 0.0 or u > 1.0:
-            return False
-        q = glm.cross(s, edge1)
-        v = f * glm.dot(direction, q)
-        if v < 0.0 or u + v > 1.0:
-            return False
-        t = f * glm.dot(edge2, q)
-        if t > epsilon:
-            return True  # Ray intersects the triangle
-        else:
-            return False  # Line intersection but not a ray intersection
-
     def set_scale(self, scale):
         if scale is not None:
             if isinstance(scale, (int, float)):
@@ -291,21 +213,7 @@ class Model:
         # If you want to set an absolute position, you might need to reset or reinitialize the model matrix
         # self.model_matrix = translation_matrix  # Uncomment this line for absolute positioning
 
-    def decompose_model(self) -> List['Model']:
-        positions = self.vertices.reshape(-1, 6)[:, :3]
-        positions = [glm.vec3(x, y, z) for x, y, z in positions]
-        shapes = []
-        for i in range(0, len(self.indices), 3):
-            triangle = [positions[self.indices[i]], positions[self.indices[i + 1]], positions[self.indices[i + 2]]]
-            shapes.append(triangle)
-
-        convex_shapes = []
-        for shape in shapes:
-            decomposed = self.decompose_to_convex(shape)
-            convex_shapes.extend(decomposed)
-
-        return convex_shapes
-
+    # Implement other methods as required
     def calculate_bounding_box(self) -> list:
         if self.is_player:
             # Return a point at the bottom center of the player model: the player's feet
@@ -340,114 +248,6 @@ class Model:
                 transformed_bounding_box.append(transformed_vertex)
 
             return transformed_bounding_box
-
-    def compute_edges(self, vertices: List[glm.vec3]) -> List[glm.vec3]:
-        edges = []
-        for i in range(len(vertices)):
-            start = vertices[i]
-            end = vertices[(i + 1) % len(vertices)]
-            edge = end - start
-            edges.append(edge)
-        return edges
-
-    def get_normals(self, edges: List[glm.vec3]) -> List[glm.vec3]:
-        normals = []
-        for edge in edges:
-            normal = glm.normalize(glm.cross(edge, glm.vec3(0, 0, 1)))  # Assuming a default normal in Z direction
-            normals.append(normal)
-        return normals
-
-    def is_convex(self, vertices: List[glm.vec3]) -> bool:
-        num_vertices = len(vertices)
-
-        # Ensure there are at least 4 vertices to form a 3D shape
-        if num_vertices < 4:
-            return False
-
-        # Compute the normal of the first face to use as a reference
-        v0 = vertices[0]
-        v1 = vertices[1]
-        v2 = vertices[2]
-        reference_normal = glm.cross(v1 - v0, v2 - v0)
-
-        # Check if all other faces have the same orientation relative to the reference normal
-        for i in range(num_vertices):
-            for j in range(i + 1, num_vertices):
-                for k in range(j + 1, num_vertices):
-                    if i != j and j != k and i != k:
-                        vi = vertices[i]
-                        vj = vertices[j]
-                        vk = vertices[k]
-                        current_normal = glm.cross(vj - vi, vk - vi)
-                        if glm.dot(reference_normal, current_normal) < 0:
-                            return False
-
-        return True
-
-    def decompose_to_convex(self, vertices: List[glm.vec3]) -> List[List[glm.vec3]]:
-        shapes = [vertices]
-        convex_shapes = []
-
-        while shapes:
-            shape = shapes.pop()
-            if self.is_convex(shape):
-                convex_shapes.append(shape)
-            else:
-                vertex_count = len(shape)
-                if vertex_count < 3:
-                    continue
-
-                ears = []
-                for i in range(vertex_count):
-                    prev = (i - 1) % vertex_count
-                    curr = i
-                    next = (i + 1) % vertex_count
-                    if self.is_ear(shape, prev, curr, next):
-                        ears.append(curr)
-
-                if not ears:
-                    midpoint = vertex_count // 2
-                    shapes.append(shape[:midpoint])
-                    shapes.append(shape[midpoint:])
-                else:
-                    ear = ears[0]
-                    prev = (ear - 1) % vertex_count
-                    next = (ear + 1) % vertex_count
-                    new_vertices = shape[:ear] + shape[ear + 1:]
-                    shapes.append(new_vertices)
-                    convex_shapes.append([shape[prev], shape[ear], shape[next]])
-
-        return convex_shapes
-
-    def is_ear(self, vertices: List[glm.vec3], prev: int, curr: int, next: int) -> bool:
-        triangle = [vertices[prev], vertices[curr], vertices[next]]
-        cross1 = glm.cross(triangle[1] - triangle[0], triangle[2] - triangle[1])
-        cross2 = glm.cross(triangle[2] - triangle[1], triangle[0] - triangle[2])
-        cross3 = glm.cross(triangle[0] - triangle[2], triangle[1] - triangle[0])
-        if cross1.z <= 0 or cross2.z <= 0 or cross3.z <= 0:
-            return False
-        for i in range(len(vertices)):
-            if i in [prev, curr, next]:
-                continue
-            if self.point_in_triangle(vertices[i], triangle):
-                return False
-        return True
-
-    def point_in_triangle(self, pt: glm.vec3, tri: List[glm.vec3]) -> bool:
-        def sign(p1: glm.vec3, p2: glm.vec3, p3: glm.vec3) -> float:
-            return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y)
-
-        d1 = sign(pt, tri[0], tri[1])
-        d2 = sign(pt, tri[1], tri[2])
-        d3 = sign(pt, tri[2], tri[0])
-
-        has_neg = (d1 < 0) or (d2 < 0) or (d3 < 0)
-        has_pos = (d1 > 0) or (d2 > 0) or (d3 > 0)
-
-        return not (has_neg and has_pos)
-
-    def get_objects(self):
-        return self
 
     def calculate_aabb(self):
         min_x = min(self.bounding_box, key=lambda v: v.x).x

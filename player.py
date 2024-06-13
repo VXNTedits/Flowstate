@@ -3,9 +3,9 @@ import glm
 import numpy as np
 
 from camera import Camera
-from interactable import InteractableObject
-from model import Model
 
+from model import Model
+from interactable import InteractableObject
 
 class Player(Model):
     def __init__(self, body_path: str, head_path: str, right_arm_path: str, mtl_path: str, camera, default_material,

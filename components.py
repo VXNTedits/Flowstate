@@ -59,16 +59,21 @@ class Components:
         material_overrides = [attr.material_override for attr in object_attributes]
         scales = [attr.scale for attr in object_attributes]
 
+        deagle = InteractableObject(
+            filepath='obj/deagle_main.obj',
+            mtl_filepath='obj/deagle_main.mtl',
+            translation=glm.vec3(0.0, 1.0, 0.0),
+            rotation=glm.vec3(-90, 0, 0),
+            scale=1,
+            is_collidable=False,
+            material_overrides=MaterialOverride(None, glm.vec3(1, 1, 1), 500)
+        )
+        deagle_slide = Model(filepath='obj/deagle_slide.obj',mtl_filepath='obj/deagle_slide.mtl',translation=glm.vec3(0,0,0),rotation_angles=glm.vec3(0,0,0))
+        deagle.add_sub_model(deagle_slide,relative_position=glm.vec3(0,0,0),relative_rotation=glm.vec3(0,0,0))
+
         self.interactables = [
-            InteractableObject(
-                filepath='obj/deagle_main.obj',
-                mtl_filepath='obj/deagle_main.mtl',
-                translation=glm.vec3(20.0, 1.0, -40.0),
-                rotation=glm.vec3(-90,0,0),
-                scale=1.5,
-                is_collidable=False,
-                material_overrides=MaterialOverride(None,glm.vec3(1,1,1),500)
-            )]
+            deagle
+        ]
 
         self.world = World(filepaths, mtl_filepaths, rotations, translations, material_overrides, scales)
         print('World initialized')
