@@ -1,13 +1,20 @@
-import numpy as np
-import glm
-from typing import List, Tuple
-from OpenGL.GL import *
+from dataclasses import dataclass
 
 import numpy as np
 import glm
 from typing import List, Tuple
 from OpenGL.GL import *
 
+import numpy as np
+import glm
+from typing import List, Tuple
+from OpenGL.GL import *
+
+@dataclass
+class MaterialOverride:
+    kd_override: glm.vec3
+    ks_override: glm.vec3
+    ns_override: float
 
 class Model:
     default_material = {
@@ -27,13 +34,15 @@ class Model:
                  ks_override=None,
                  ns_override=None,
                  scale=None,
-                 is_collidable=True
+                 is_collidable=True,
+                 shift_to_centroid=False
                  ):
+        self.shift_to_centroid = shift_to_centroid
         self.is_collidable = is_collidable
         self.default_material = self.default_material
         print(f"Initializing Model with filepath: {filepath}")
         self.name = filepath
-        self.vertices, self.indices = self.load_obj(filepath)
+        self.vertices, self.indices = self.load_obj(filepath,shift_to_centroid=self.shift_to_centroid)
         self.materials = self.load_mtl(mtl_filepath)  #if mtl_filepath else {}
         # Apply overrides if provided
         first_material_key = next(iter(self.materials))
@@ -51,9 +60,9 @@ class Model:
         self.vao, self.vbo, self.ebo = self.setup_buffers()
         self.model_matrix = glm.mat4(1.0)  # Initialize model matrix
         self.is_player = player
+        self.set_scale(scale)
         self.set_orientation(rotation_angles)
         self.set_position(translation)
-        self.set_scale(scale)
         self.draw_convex_only = draw_convex_only
         if self.is_player:
             self.aabb = None
@@ -93,7 +102,7 @@ class Model:
 
         return glm.vec3(centroid_x, 0, centroid_z)
 
-    def load_obj(self, filepath: str) -> Tuple[np.ndarray, np.ndarray]:
+    def load_obj(self, filepath: str, shift_to_centroid=False) -> Tuple[np.ndarray, np.ndarray]:
         vertices = []
         normals = []
         faces = []
@@ -115,6 +124,15 @@ class Model:
                         normal_index = int(indices[2]) - 1 if len(indices) > 2 and indices[2] else vertex_index
                         face.append((vertex_index, normal_index))
                     faces.append(face)
+
+        if shift_to_centroid:
+            x_coords = [vertex[0] for vertex in vertices]
+            z_coords = [vertex[2] for vertex in vertices]
+            centroid_x = sum(x_coords) / len(x_coords)
+            centroid_z = sum(z_coords) / len(z_coords)
+            for i in range(len(vertices)):
+                vertices[i][0] -= centroid_x
+                vertices[i][2] -= centroid_z
 
         vertex_data = []
         for face in faces:

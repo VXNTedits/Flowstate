@@ -8,19 +8,14 @@ from model import Model
 
 
 class Player(Model):
-    def __init__(self,
-                 body_path: str,
-                 head_path: str,
-                 right_arm_path: str,
-                 mtl_path: str, camera,
-                 default_material):
-
+    def __init__(self, body_path: str, head_path: str, right_arm_path: str, mtl_path: str, camera, default_material,
+                 filepath: str, mtl_filepath: str):
         self.default_material = default_material
         self.camera = camera
         self.torso = Model(body_path, mtl_path, player=True, translation=(0, 1, 0))
         self.head = Model(head_path, mtl_path, player=True, translation=(0, 1, 0))
         self.right_arm = Model(right_arm_path, mtl_path, player=True, translation=(0, 1, 0))
-        self.right_hand = self.set_hand_position()
+        self.right_hand_model_matrix = self.set_hand_position()
         self.position = glm.vec3(10.0, 10.2, -10.0)
         self.previous_position = glm.vec3(10.0, 10.2, -10.0)
         self.front = glm.vec3(0.0, 0.0, -1.0)
@@ -133,7 +128,6 @@ class Player(Model):
         self.torso.model_matrix = final_model_matrix
         self.right_arm.model_matrix = final_model_matrix  # Modify if right_arm has an offset
         self.head.model_matrix = final_model_matrix
-
         # Update the main model matrix
         self.rotation = model_rotation
         self.model_matrix = self.torso.model_matrix
@@ -175,8 +169,25 @@ class Player(Model):
 
     def set_hand_position(self):
         # Define the local position of the hand relative to the right arm
-        local_hand_position = glm.vec3(0, -0.5, 1)  # Example position at the end of the arm
+        local_hand_position = glm.vec3(0, -0.5,1)#glm.vec3(0, -0.5, 1)  # Example position at the end of the arm
         # Transform the local hand position to world coordinates using the right arm's model matrix
-        world_hand_position = glm.vec3(self.right_arm.model_matrix * glm.vec4(local_hand_position, 1.0))
+        world_hand_position = glm.vec3(self.right_arm.model_matrix * glm.vec4(-local_hand_position.x, local_hand_position.y, local_hand_position.z, 1.0))
 
-        return world_hand_position
+
+        # """xxx"""
+        # model_rotation = glm.rotate(glm.mat4(1.0), glm.radians(-self.yaw), glm.vec3(0.0, 1.0, 0.0))
+        #
+        # # Additional rotations if necessary
+        # model_rotation *= glm.rotate(glm.mat4(1.0), glm.radians(90), glm.vec3(0.0, 1.0, 0.0))
+        # model_rotation *= glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
+        #
+        # # Apply translation after rotations
+        # translation = glm.translate(glm.mat4(1.0), self.position)
+        # final_model_matrix = translation * model_rotation
+        #
+        # # Update model matrices for torso and right_arm
+        # # Assuming torso and right_arm are at specific offsets from the main model
+        # self.right_hand_model_matrix = final_model_matrix
+        # """xxx"""
+
+        #return final_model_matrix
