@@ -30,7 +30,7 @@ class Player(Model):
         self.rotation = glm.vec3(camera.pitch, camera.yaw, 0)
         self.vertices, self.indices = Model.load_obj(self, body_path)
         self.model_matrix = glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
-        self.update_model_matrix()
+        self.update_player_model_matrix()
         self.is_grounded = False
         self.is_jumping = False
         self.displacement = self.position - self.previous_position
@@ -47,7 +47,7 @@ class Player(Model):
         self.position += self.velocity * delta_time
         self.update_camera_position()
         self.right_hand = self.set_hand_position()
-        self.update_model_matrix()
+        self.update_player_model_matrix()
         self.displacement = self.position - self.previous_position
         # Reset the is_jumping flag if the player has landed
         if self.is_grounded:
@@ -111,7 +111,7 @@ class Player(Model):
         if direction == 'JUMP' and self.is_grounded:
             self.thrust.y += up.y * self.jump_force
 
-    def update_model_matrix(self):
+    def update_player_model_matrix(self):
         # Rotate around the yaw axis (Y-axis)
         model_rotation = glm.rotate(glm.mat4(1.0), glm.radians(-self.yaw), glm.vec3(0.0, 1.0, 0.0))
 
@@ -137,7 +137,7 @@ class Player(Model):
 
     def set_position(self, position):
         self.position = position
-        self.update_model_matrix()
+        self.update_player_model_matrix()
 
     def draw(self, camera: Camera):
         if not camera.first_person:
@@ -173,21 +173,3 @@ class Player(Model):
         # Transform the local hand position to world coordinates using the right arm's model matrix
         world_hand_position = glm.vec3(self.right_arm.model_matrix * glm.vec4(-local_hand_position.x, local_hand_position.y, local_hand_position.z, 1.0))
 
-
-        # """xxx"""
-        # model_rotation = glm.rotate(glm.mat4(1.0), glm.radians(-self.yaw), glm.vec3(0.0, 1.0, 0.0))
-        #
-        # # Additional rotations if necessary
-        # model_rotation *= glm.rotate(glm.mat4(1.0), glm.radians(90), glm.vec3(0.0, 1.0, 0.0))
-        # model_rotation *= glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
-        #
-        # # Apply translation after rotations
-        # translation = glm.translate(glm.mat4(1.0), self.position)
-        # final_model_matrix = translation * model_rotation
-        #
-        # # Update model matrices for torso and right_arm
-        # # Assuming torso and right_arm are at specific offsets from the main model
-        # self.right_hand_model_matrix = final_model_matrix
-        # """xxx"""
-
-        #return final_model_matrix

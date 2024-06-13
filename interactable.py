@@ -50,14 +50,10 @@ class InteractableObject:
                                 shift_to_centroid=True
                                 )
         self.use_composite = use_composite
-        #self.scale = scale
-        #self.position = translation
-        #self.orientation = rotation
         self.interactable = interactable
-        self.interaction_threshold = 2000
-        #self.name = filepath
+        self.interaction_threshold = 1000
         self.velocity = velocity
-        self.bounce_amplitude = 5.5
+        self.bounce_amplitude = 10
         self.bounce_frequency = 2.0  # in cycles per second
         self.rotation_speed = glm.vec3(0, 45, 0)  # degrees per second
         self.picked_up = False
@@ -77,11 +73,20 @@ class InteractableObject:
         except AttributeError:
             raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
 
-    def add_sub_model(self, sub_model, relative_position, relative_rotation):
+    def add_sub_model(self, sub_model, relative_position, relative_rotation, scale):
         if self.use_composite:
-            self._model.add_model(sub_model, relative_position, relative_rotation)
+            self.models.append([sub_model, relative_position, relative_rotation])
+            self._model.set_scale(scale)
+            self._model.set_position(relative_position)
+            self._model.set_orientation(relative_rotation)
+            self._model.update_model_matrix(parent_matrix=self.model_matrix)
         else:
             self.model.add_model(sub_model, relative_position, relative_rotation)
+            self.models.add_model(sub_model, relative_position, relative_rotation)
+            self.model.set_scale(scale)
+            self.model.set_position(relative_position)
+            self.model.set_orientation(relative_rotation)
+            self.model.update_player_model_matrix(parent_matrix=self.model_matrix)
 
     def interact(self, player):
         if self.interactable:
@@ -95,15 +100,18 @@ class InteractableObject:
         if self.interactable:
             self._model.position = glm.vec3(-0.4,-0.1,1)#player.position
             self._model.orientation = glm.vec3(0,0,0)#glm.vec3(player.camera.pitch,player.camera.yaw,0.0)
+            #self._model.set_scale(self.scale)
         print("Reset orientation:", self.orientation)
         player.inventory.append(self)
         self.interactable = False
         self.picked_up = True
         # Update model matrix after changing orientation
-        self.update_model_matrix(player.torso.model_matrix)
+        self.update_interactable_model_matrix(player.torso.model_matrix)
 
-    def update_model_matrix(self, parent_matrix=None):
+    def update_interactable_model_matrix(self, parent_matrix=None):
         # Create translation matrix for the object's position
+        self.model_matrices.clear()
+        #super().set_scale(self.scale)
         translation_matrix = glm.translate(glm.mat4(1.0), self._model.position)
 
         # Create rotation matrices for the object's orientation
@@ -119,9 +127,10 @@ class InteractableObject:
 
         # Handle case where there is no parent matrix
         if parent_matrix is None:
-            self.model_matrix = local_model_matrix
+            self.model_matrix = local_model_matrix#glm.scale(local_model_matrix, glm.vec3(self.scale, self.scale, self.scale))
         else:
             self.model_matrix = parent_matrix * local_model_matrix
+            #self.model_matrix = local_model_matrix#glm.scale(local_model_matrix, glm.vec3(self.scale, self.scale, self.scale))
 
         # Update the composite model's model matrix
         if self.use_composite:
@@ -131,9 +140,9 @@ class InteractableObject:
         if self.interactable:
             self.check_interactions(player, delta_time)
         if self.picked_up:
-            self.update_model_matrix(player.right_arm.model_matrix)
+            self.update_interactable_model_matrix(player.right_arm.model_matrix)
         else:
-            self.update_model_matrix()  # Ensure the model matrix is updated for non-picked objects
+            self.update_interactable_model_matrix()  # Ensure the model matrix is updated for non-picked objects
 
     def check_interactions(self, player, delta_time):
         if glm.distance(player.position, self.position) < self.interaction_threshold:
@@ -141,7 +150,7 @@ class InteractableObject:
             if player.interact:
                 self.interact(player)
                 player.pick_up(self)
-                self.update_model_matrix()
+                self.update_interactable_model_matrix()
 
     def highlight(self, delta_time):
         # Rotate around the y-axis
@@ -160,7 +169,7 @@ class InteractableObject:
         self.position.y += bounce_offset * delta_time
 
         # Update the model matrix with the new position
-        self.update_model_matrix()
+        self.update_interactable_model_matrix()
 
     def update_position_and_orientation_with_centroid(self, centroid, rotation_angle, delta_time):
         # Translate to centroid
@@ -182,5 +191,5 @@ class InteractableObject:
 
         # Update position and orientation
         self.position = new_position
-        self.update_model_matrix()
+        self.update_interactable_model_matrix()
 

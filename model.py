@@ -29,11 +29,10 @@ class Model:
                  kd_override=None,
                  ks_override=None,
                  ns_override=None,
-                 scale=None,
+                 scale=1,
                  is_collidable=True,
                  shift_to_centroid=False):
 
-        #self.set_orientation(rotation_angles)
         self.orientation = rotation_angles
         self.model_matrix = self.init_model_matrix(translation, rotation_angles)
         self.position = translation
@@ -185,18 +184,21 @@ class Model:
         return vao, vbo, ebo
 
     def draw(self):
-        #print(f'drawing {self.name} at box {self.aabb}')
         glBindVertexArray(self.vao)
         glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, None)
         glBindVertexArray(0)
 
     def set_scale(self, scale):
-        if scale is not None:
-            if isinstance(scale, (int, float)):
-                self.model_matrix = glm.scale(self.model_matrix, glm.vec3(scale, scale, scale))
-            elif isinstance(scale, glm.vec3):
-                self.model_matrix = glm.scale(self.model_matrix, scale)
-            print("scale set")
+        if self.model_matrix is None:
+            raise ValueError("model_matrix is not initialized")
+
+        if not isinstance(scale, (int, float)):
+            raise ValueError("scale must be a numeric value")
+
+        try:
+            self.model_matrix = glm.scale(self.model_matrix, glm.vec3(scale, scale, scale))
+        except Exception as e:
+            raise RuntimeError(f"Failed to scale model_matrix: {e}")
 
     def set_orientation(self, rotation_angles):
         # Apply rotations around x, y, z axes respectively
@@ -270,7 +272,7 @@ class Model:
     #     return getattr(self._model, name)
     def update_model_matrix(self, parent_matrix=None):
         # Create translation matrix for the object's position
-        translation_matrix = glm.translate(glm.mat4(1.0), self.position)
+        translation_matrix = glm.translate(glm.mat4(1.0), glm.vec3(self.position[0], self.position[1], self.position[2]))
 
         # Create rotation matrices for the object's orientation
         rotation_x = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[0]), glm.vec3(1.0, 0.0, 0.0))

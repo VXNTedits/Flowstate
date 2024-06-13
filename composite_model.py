@@ -45,12 +45,15 @@ class CompositeModel(Model):
                          shift_to_centroid=shift_to_centroid
                          )
 
-    def add_model(self, model, relative_position=glm.vec3(0.0, 0.0, 0.0), relative_rotation=glm.vec3(0.0, 0.0, 0.0)):
+    def add_model(self, model, scale, relative_position=glm.vec3(0.0, 0.0, 0.0), relative_rotation=glm.vec3(0.0, 0.0, 0.0)):
+        model.set_scale(scale)
         self.models.append((model, relative_position, relative_rotation))
-        self.update_model_matrix(glm.mat4(1.0))  # Ensure initial update with identity matrix
+        model.init_model_matrix(relative_position, relative_rotation)
+        #self.update_composite_model_matrix(glm.mat4(1.0))  # Ensure initial update with identity matrix
 
-    def update_model_matrix(self, parent_matrix=glm.mat4(1.0)):
-        self.model_matrices.clear()
+    def update_composite_model_matrix(self, parent_matrix=glm.mat4(1.0)):
+        #self.model_matrices.clear()
+        #self.set_scale(self.scale)
         for model, rel_pos, rel_rot in self.models:
             # Create the translation matrix for the relative position
             translation_matrix = glm.translate(glm.mat4(1.0), rel_pos)
@@ -69,10 +72,10 @@ class CompositeModel(Model):
             # Update the sub-model's model matrix
             model.model_matrix = model_matrix
 
-    def draw(self):
-        for model, _, _ in self.models:
-            super().draw()
-            model.draw()
+    # def draw(self):
+    #     for model, _, _ in self.models:
+    #         super().draw()
+    #         model.draw()
 
     # def __getattr__(self, name):
     #     return getattr(self._model, name)

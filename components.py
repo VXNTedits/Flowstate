@@ -13,7 +13,7 @@ from interactable import InteractableObject
 
 
 class ObjectAttributes:
-    def __init__(self, filepath, mtl_filepath, rotation, translation, material_override, scale=None):
+    def __init__(self, filepath, mtl_filepath, rotation, translation, material_override, scale=1):
         self.scale = scale
         self.filepath = filepath
         self.mtl_filepath = mtl_filepath
@@ -31,7 +31,7 @@ class Components:
         object_attributes = [
             ObjectAttributes(
                 'obj/world_test.obj', 'obj/world_test.mtl',
-                (-90.0, 0.0, 0.0), (-70.0, -50.0, 50.0),
+                (-90.0, -5.0, 0.0), (-70.0, -50.0, 50.0),
                 MaterialOverride(None, glm.vec3(0, 1, 0), 1000)
             ),
             ObjectAttributes(
@@ -64,7 +64,7 @@ class Components:
             mtl_filepath='obj/deagle_main.mtl',
             translation=glm.vec3(0.0, 1.0, 0.0),
             rotation=glm.vec3(-90, 0, 0),
-            scale=1,
+            scale=20,
             is_collidable=False,
             material_overrides=MaterialOverride(None, glm.vec3(1, 1, 1), 500),
             use_composite=True
@@ -72,9 +72,10 @@ class Components:
         deagle_slide = Model(
             filepath='obj/deagle_slide.obj',
             mtl_filepath='obj/deagle_slide.mtl',
-            shift_to_centroid=True
+            shift_to_centroid=True,
+            scale=20
         )
-        deagle.add_sub_model(deagle_slide, relative_position=glm.vec3(1, 0, 0), relative_rotation=glm.vec3(0, 0, 0))
+        deagle.add_sub_model(sub_model=deagle_slide, relative_position=glm.vec3(0, 0, 0), relative_rotation=glm.vec3(0, 0, 0),scale=20)
 
         self.interactables = [
             deagle
