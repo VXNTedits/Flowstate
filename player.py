@@ -3,6 +3,7 @@ import glm
 import numpy as np
 
 from camera import Camera
+from interactable import InteractableObject
 from model import Model
 
 
@@ -19,6 +20,7 @@ class Player(Model):
         self.torso = Model(body_path, mtl_path, player=True, translation=(0, 1, 0))
         self.head = Model(head_path, mtl_path, player=True, translation=(0, 1, 0))
         self.right_arm = Model(right_arm_path, mtl_path, player=True, translation=(0, 1, 0))
+        self.right_hand = self.set_hand_position()
         self.position = glm.vec3(10.0, 10.2, -10.0)
         self.previous_position = glm.vec3(10.0, 10.2, -10.0)
         self.front = glm.vec3(0.0, 0.0, -1.0)
@@ -36,7 +38,9 @@ class Player(Model):
         self.is_grounded = False
         self.is_jumping = False
         self.displacement = self.position - self.previous_position
-
+        self.inventory = []
+        self.interact = False
+        self.name = 'ego'
 
     def update(self, delta_time: float):
         if delta_time <= 0:
@@ -46,13 +50,12 @@ class Player(Model):
         self.previous_position = glm.vec3(self.position)  # Update previous position before changing current position
         self.position += self.velocity * delta_time
         self.update_camera_position()
+        self.right_hand = self.set_hand_position()
         self.update_model_matrix()
         self.displacement = self.position - self.previous_position
         # Reset the is_jumping flag if the player has landed
         if self.is_grounded:
             self.is_jumping = False
-        if self.is_jumping:
-            print('true')
 
     def apply_forces(self, delta_time: float):
         # Apply vertical thrust if jumping
@@ -149,7 +152,6 @@ class Player(Model):
             self.torso.draw()
             self.right_arm.draw()
 
-
     def process_mouse_movement(self, xoffset, yoffset):
         self.camera.process_mouse_movement(xoffset, yoffset)
         self.yaw = self.camera.yaw
@@ -162,3 +164,16 @@ class Player(Model):
             self.camera.set_first_person(self.position, self.get_rotation_matrix())
         else:
             self.camera.set_third_person(self.position, self.get_rotation_matrix())
+
+    def pick_up(self, interactable_object):
+        if isinstance(interactable_object, InteractableObject):
+            interactable_object.interact(self)
+
+    def set_hand_position(self):
+        # Define the local position of the hand relative to the right arm
+        local_hand_position = glm.vec3(0.2, 0.2, 0.2)  # Example position at the end of the arm
+
+        # Transform the local hand position to world coordinates using the right arm's model matrix
+        world_hand_position = glm.vec3(self.right_arm.model_matrix * glm.vec4(local_hand_position, 1.0))
+
+        return world_hand_position

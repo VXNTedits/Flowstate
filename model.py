@@ -26,7 +26,10 @@ class Model:
                  kd_override=None,
                  ks_override=None,
                  ns_override=None,
-                 scale=None):
+                 scale=None,
+                 is_collidable=True
+                 ):
+        self.is_collidable = is_collidable
         self.default_material = self.default_material
         print(f"Initializing Model with filepath: {filepath}")
         self.name = filepath
@@ -53,14 +56,15 @@ class Model:
         self.set_scale(scale)
         self.draw_convex_only = draw_convex_only
         if self.is_player:
-            pass
+            self.aabb = None
             #self.bounding_box = self.calculate_bounding_box()
         else:
             #self.convex_components = self.decompose_model()
-            self.bounding_box = self.calculate_bounding_box()
-            self.aabb = self.calculate_aabb()
-            self.voxels = None  #self.decompose_to_voxels(self.vertices, 5)
-            self.voxel_size = 5
+            if self.is_collidable:
+                self.bounding_box = self.calculate_bounding_box()
+                self.aabb = self.calculate_aabb()
+                self.voxels = None  #self.decompose_to_voxels(self.vertices, 5)
+                self.voxel_size = 5
         print(f"{self.name}'s Materials: {self.materials} ")
         print()
         if kd_override is not None:
@@ -69,7 +73,25 @@ class Model:
             self.materials['specular'] = ks_override
         if ns_override is not None:
             self.materials['shininess'] = ns_override
+        self.centroid = self.calculate_centroid()
 
+    def calculate_centroid(self):
+        # Ensure vertices are transformed by the model matrix to get world coordinates
+        transformed_vertices = []
+        for i in range(0, len(self.vertices), 6):
+            local_vertex = glm.vec3(self.vertices[i], self.vertices[i + 1], self.vertices[i + 2])
+            world_vertex = glm.vec3(self.model_matrix * glm.vec4(local_vertex, 1.0))
+            transformed_vertices.append(world_vertex)
+
+        # Extract x and z coordinates in world space
+        x_coords = [vertex.x for vertex in transformed_vertices]
+        z_coords = [vertex.z for vertex in transformed_vertices]
+
+        # Calculate the average of x and z coordinates
+        centroid_x = np.mean(x_coords)
+        centroid_z = np.mean(z_coords)
+
+        return glm.vec3(centroid_x, 0, centroid_z)
 
     def load_obj(self, filepath: str) -> Tuple[np.ndarray, np.ndarray]:
         vertices = []
@@ -145,16 +167,10 @@ class Model:
         return vao, vbo, ebo
 
     def draw(self):
-        if self.draw_convex_only:
-            if not self.is_player:
-                for component in self.convex_components:
-                    glBindVertexArray(component.vao)
-                    glDrawElements(GL_TRIANGLES, len(component.indices), GL_UNSIGNED_INT, None)
-                    glBindVertexArray(0)
-        else:
-            glBindVertexArray(self.vao)
-            glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, None)
-            glBindVertexArray(0)
+        #print(f'drawing {self.name} at box {self.aabb}')
+        glBindVertexArray(self.vao)
+        glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, None)
+        glBindVertexArray(0)
 
     def decompose_to_voxels(self, vertices: np.ndarray, voxel_size: float) -> List[glm.vec3]:
         # Reshape vertices from flat array to list of vec3

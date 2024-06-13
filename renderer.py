@@ -28,6 +28,13 @@ class Renderer:
         self.update_uniforms(model_matrix, view_matrix, projection_matrix, world)
         world.draw()
 
+    def render_interactables(self, interactables: list, view_matrix, projection_matrix):
+        self.shader.use()
+        for item in interactables:
+            model_matrix = item.model_matrix
+            self.update_uniforms(model_matrix, view_matrix, projection_matrix, item)
+            item.draw()
+
     def render_aabb(self, list_of_objects_in_world: list, player_pos: glm.vec3, view_matrix, projection_matrix):
         self.shader.use()
         for obj in list_of_objects_in_world:

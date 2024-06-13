@@ -9,7 +9,8 @@ class InputHandler:
             glfw.KEY_A: False,
             glfw.KEY_S: False,
             glfw.KEY_D: False,
-            glfw.KEY_SPACE: False,  # Add spacebar key
+            glfw.KEY_SPACE: False,
+            glfw.KEY_F: False
         }
 
     def key_callback(self, window, key, scancode, action, mods):
@@ -55,4 +56,7 @@ class InputHandler:
                 self.player.jump_key_previous = True
         else:
             self.player.jump_key_previous = False
-
+        if self.keys[glfw.KEY_F]:
+            self.player.interact = True
+        else:
+            self.player.interact = False

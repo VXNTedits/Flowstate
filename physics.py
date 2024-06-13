@@ -3,25 +3,26 @@ from collections import defaultdict
 from typing import Tuple, List, Set
 import glfw
 import glm
-import numpy as np
 
-import player
-import world
 from model import Model
 
 
 class Physics:
     EPSILON = 1e-6
 
-    def __init__(self, world, player):
+    def __init__(self, world, player, interactables: list):
         self.world = world
         self.player = player
         self.gravity = glm.vec3(0, -10, 0)
+        self.interactables = interactables
 
     def apply_gravity(self, delta_time: float):
         if not self.player.is_grounded:
             self.player.velocity += self.gravity * delta_time
             self.player.position += self.player.velocity * delta_time + 0.5 * self.gravity * delta_time ** 2
+        #for item in self.interactables:
+        #    item.velocity += self.gravity * delta_time
+        #    item.position += item.velocity * delta_time + 0.5 * self.gravity * delta_time ** 2
 
     def is_player_below_world(self, player: glm.vec3):
         if player.y <= self.world.height:

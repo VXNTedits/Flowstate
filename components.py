@@ -9,6 +9,7 @@ from physics import Physics
 from text_renderer import TextRenderer
 import glm
 from world import World, MaterialOverride
+from interactable import InteractableObject
 
 
 class ObjectAttributes:
@@ -32,11 +33,6 @@ class Components:
                 'obj/world_test.obj', 'obj/world_test.mtl',
                 (-90.0, 0.0, 0.0), (-70.0, -100.0, 50.0),
                 MaterialOverride(None, glm.vec3(0, 1, 0), 1000)
-            ),
-            ObjectAttributes(
-                'obj/donut.obj', 'obj/donut.mtl',
-                (45.0, 45.0, 45.0), (-30.0, 0.5, -40.0),
-                MaterialOverride(glm.vec3(0.4, 0.1, 0.7), glm.vec3(1, 0.1, 1), 1000)
             ),
             ObjectAttributes(
                 'obj/cube.obj', 'obj/cube.mtl',
@@ -63,22 +59,38 @@ class Components:
         material_overrides = [attr.material_override for attr in object_attributes]
         scales = [attr.scale for attr in object_attributes]
 
+        self.interactables = [
+            InteractableObject(
+                filepath='obj/deagle_main.obj',
+                mtl_filepath='obj/deagle_main.mtl',
+                translation=glm.vec3(20.0, 1.0, -40.0),
+                rotation=glm.vec3(-90,0,0),
+                scale=1.5,
+                is_collidable=False
+            )]
+
         self.world = World(filepaths, mtl_filepaths, rotations, translations, material_overrides, scales)
         print('World initialized')
         self.player = Player('obj/body.obj', 'obj/head.obj', 'obj/arm_right.obj', mtl_path='obj/body.mtl',
                              camera=self.camera, default_material=Model.default_material)
         print('Player initialized')
+
         self.models = [self.player.torso, self.player.right_arm]
-        self.models += self.world.objects  #[self.world] +
+        self.models += self.world.objects
+        self.models += self.interactables
+
         for model in self.models:
             print("models in components.models: ", model.name)
         print('Models initialized')
+
         self.renderer = Renderer(self.shader, self.camera)
         print('Renderer initialized')
+
         self.input_handler = InputHandler(self.camera, self.player)
         print('Input handler initialized')
+
         self.text_renderer = TextRenderer(window.width, window.height)
-        self.physics = Physics(self.world, self.player)
+        self.physics = Physics(self.world, self.player, self.interactables)
 
     def set_input_callbacks(self, window):
         window.set_callbacks(self.input_handler.key_callback, self.input_handler.mouse_callback)
@@ -87,3 +99,9 @@ class Components:
         self.camera.update(delta_time)
         self.player.update(delta_time)
         self.world.update(delta_time)
+        for item in self.interactables:
+            item.update(self.player, delta_time)
+
+    def add_interactable(self, interactable_object):
+        self.interactables.append(interactable_object)
+        self.models.append(interactable_object)

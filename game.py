@@ -7,6 +7,7 @@ from components import Components
 import glfw
 import time
 
+
 class Game:
     def __init__(self, fullscreen=False):
         self.window = Window(800, 600, "3D Game", fullscreen)
@@ -15,7 +16,8 @@ class Game:
         print('Components initialized')
         self.components.set_input_callbacks(self.window)
         print('Inputs initialized')
-        self.projection_matrix = glm.perspective(glm.radians(90.0), self.window.width / self.window.height, 0.001, 1000.0)
+        self.projection_matrix = glm.perspective(glm.radians(90.0), self.window.width / self.window.height, 0.001,
+                                                 1000.0)
         self.tick_rate = 1.0 / 100.0
 
     def run(self):
@@ -35,13 +37,13 @@ class Game:
                 self.components.input_handler.update(self.tick_rate)
                 self.components.player.update(self.tick_rate)
                 self.components.physics.update(self.tick_rate)
+                for item in self.components.interactables:
+                    item.update(player=self.components.player, delta_time=self.tick_rate)
                 accumulator -= self.tick_rate
 
             # Rendering
             view_matrix = self.components.camera.get_view_matrix()
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)  # Clear the screen
-
-
 
             # Render the player
             self.components.renderer.render_player(self.components.player, view_matrix, self.projection_matrix)
@@ -51,8 +53,10 @@ class Game:
 
             self.components.renderer.render_aabb(self.components.world.get_objects(), self.components.player.position,
                                                  view_matrix, self.projection_matrix)
+            # Render interactables
+            self.components.renderer.render_interactables(self.components.interactables, view_matrix,
+                                                          self.projection_matrix)
 
             self.window.swap_buffers()
 
         glfw.terminate()
-
