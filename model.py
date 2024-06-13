@@ -125,6 +125,7 @@ class Model:
                     faces.append(face)
 
         if shift_to_centroid:
+            print(f"shifting {self.name} to centroid")
             x_coords = [vertex[0] for vertex in vertices]
             z_coords = [vertex[2] for vertex in vertices]
             centroid_x = sum(x_coords) / len(x_coords)
@@ -299,3 +300,4 @@ class Model:
 
         # Combine the translation and rotation matrices
         return translation_matrix * rotation_matrix
+

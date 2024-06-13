@@ -19,7 +19,7 @@ class CompositeModel(Model):
                  is_collidable=False,
                  shift_to_centroid=True
                  ):
-        self.shift_to_centroid = self.shift_to_centroid()
+        self.shift_to_centroid = shift_to_centroid
         self.is_collidable = is_collidable
         self.scale = scale
         self.ns_override = ns_override

@@ -1,5 +1,6 @@
 import glfw
 
+
 class InputHandler:
     def __init__(self, camera, player):
         self.camera = camera
@@ -12,6 +13,7 @@ class InputHandler:
             glfw.KEY_SPACE: False,
             glfw.KEY_F: False
         }
+        self.left_mouse_button_pressed = False
 
     def key_callback(self, window, key, scancode, action, mods):
         if action == glfw.PRESS:
@@ -39,6 +41,14 @@ class InputHandler:
         self.last_x = xpos
         self.last_y = ypos
         self.player.process_mouse_movement(xoffset, yoffset)
+
+    def mouse_button_callback(self, window, button, action, mods):
+        if button == glfw.MOUSE_BUTTON_LEFT:
+            if action == glfw.PRESS:
+                self.left_mouse_button_pressed = True
+                self.player.handle_left_click()
+            elif action == glfw.RELEASE:
+                self.left_mouse_button_pressed = False
 
     def update(self, delta_time):
         self.player.reset_thrust()  # Reset thrust before updating based on keys

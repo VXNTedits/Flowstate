@@ -67,23 +67,14 @@ class Components:
             scale=1,
             is_collidable=False,
             material_overrides=MaterialOverride(None, glm.vec3(1, 1, 1), 500),
-            use_composite=False
+            use_composite=True
         )
-        # deagle_slide = InteractableObject(
-        #     filepath='obj/deagle_slide.obj',
-        #     mtl_filepath='obj/deagle_slide.mtl',
-        #     translation=glm.vec3(0.0, 1.0, 0.0),
-        #     rotation=glm.vec3(-90, 0, 0),
-        #     scale=1,
-        #     is_collidable=False,
-        #     material_overrides=MaterialOverride(None, glm.vec3(1, 1, 1), 500),
-        #     use_composite=True
-        # )
         deagle_slide = Model(
             filepath='obj/deagle_slide.obj',
-            mtl_filepath='obj/deagle_slide.mtl'
+            mtl_filepath='obj/deagle_slide.mtl',
+            shift_to_centroid=True
         )
-        deagle.add_sub_model(deagle_slide,relative_position=glm.vec3(1,0,0),relative_rotation=glm.vec3(0,0,0))
+        deagle.add_sub_model(deagle_slide, relative_position=glm.vec3(1, 0, 0), relative_rotation=glm.vec3(0, 0, 0))
 
         self.interactables = [
             deagle
@@ -92,7 +83,8 @@ class Components:
         self.world = World(filepaths, mtl_filepaths, rotations, translations, material_overrides, scales)
         print('World initialized')
         self.player = Player('obj/body.obj', 'obj/head.obj', 'obj/arm_right.obj', mtl_path='obj/body.mtl',
-                             camera=self.camera, default_material=Model.default_material,filepath='obj/body.obj',mtl_filepath='obj/body.mtl')
+                             camera=self.camera, default_material=Model.default_material, filepath='obj/body.obj',
+                             mtl_filepath='obj/body.mtl')
         print('Player initialized')
 
         self.models = [self.player.torso, self.player.right_arm]

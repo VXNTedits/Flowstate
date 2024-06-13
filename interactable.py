@@ -7,6 +7,7 @@ from model import Model
 from OpenGL.GL import *
 
 
+
 class InteractableObject:
     def __init__(self,
                  filepath,
@@ -79,6 +80,8 @@ class InteractableObject:
     def add_sub_model(self, sub_model, relative_position, relative_rotation):
         if self.use_composite:
             self._model.add_model(sub_model, relative_position, relative_rotation)
+        else:
+            self.model.add_model(sub_model, relative_position, relative_rotation)
 
     def interact(self, player):
         if self.interactable:
@@ -89,22 +92,24 @@ class InteractableObject:
         # Define what happens when the player picks up this object
         print(f"{self.name} picked up by {player.name}")
         print("Initial orientation:", self.orientation)
-
+        if self.interactable:
+            self._model.position = glm.vec3(-0.4,-0.1,1)#player.position
+            self._model.orientation = glm.vec3(0,0,0)#glm.vec3(player.camera.pitch,player.camera.yaw,0.0)
+        print("Reset orientation:", self.orientation)
         player.inventory.append(self)
         self.interactable = False
         self.picked_up = True
-
         # Update model matrix after changing orientation
-        self.update_model_matrix()
+        self.update_model_matrix(player.torso.model_matrix)
 
     def update_model_matrix(self, parent_matrix=None):
         # Create translation matrix for the object's position
-        translation_matrix = glm.translate(glm.mat4(1.0), self.position)
+        translation_matrix = glm.translate(glm.mat4(1.0), self._model.position)
 
         # Create rotation matrices for the object's orientation
-        rotation_x = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[0]), glm.vec3(1.0, 0.0, 0.0))
-        rotation_y = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[1]), glm.vec3(0.0, 1.0, 0.0))
-        rotation_z = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[2]), glm.vec3(0.0, 0.0, 1.0))
+        rotation_x = glm.rotate(glm.mat4(1.0), glm.radians(self._model.orientation[0]), glm.vec3(1.0, 0.0, 0.0))
+        rotation_y = glm.rotate(glm.mat4(1.0), glm.radians(self._model.orientation[1]), glm.vec3(0.0, 1.0, 0.0))
+        rotation_z = glm.rotate(glm.mat4(1.0), glm.radians(self._model.orientation[2]), glm.vec3(0.0, 0.0, 1.0))
 
         # Combine rotations to form the object's rotation matrix
         rotation_matrix = rotation_z * rotation_y * rotation_x
