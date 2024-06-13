@@ -1,12 +1,13 @@
 import glm
 import glfw
 
+import composite_model
 from composite_model import CompositeModel
 from model import Model
 from OpenGL.GL import *
 
 
-class InteractableObject(Model):
+class InteractableObject:
     def __init__(self,
                  filepath,
                  mtl_filepath,
@@ -16,22 +17,44 @@ class InteractableObject(Model):
                  rotation=glm.vec3(0, 0, 0),
                  velocity=glm.vec3(0, 0, 0),
                  is_collidable=False,
-                 material_overrides=None):
-        super().__init__(
-            filepath=filepath,
-            mtl_filepath=mtl_filepath,
-            scale=scale,
-            translation=translation,
-            rotation_angles=rotation,
-            is_collidable=is_collidable,
-            shift_to_centroid=True
-        )
-        self.position = translation
-        self.orientation = rotation
+                 material_overrides=None,
+                 use_composite=False
+                 ):
+        if use_composite:
+            self._model = CompositeModel(filepath,
+                                mtl_filepath,
+                                player=False,
+                                draw_convex_only=False,
+                                rotation_angles=rotation,
+                                translation=translation,
+                                kd_override=None,
+                                ks_override=None,
+                                ns_override=None,
+                                scale=scale,
+                                is_collidable=is_collidable,
+                                shift_to_centroid=True
+                                )
+        else:
+            self._model = Model(filepath,
+                                mtl_filepath,
+                                player=False,
+                                draw_convex_only=False,
+                                rotation_angles=rotation,
+                                translation=translation,
+                                kd_override=None,
+                                ks_override=None,
+                                ns_override=None,
+                                scale=scale,
+                                is_collidable=is_collidable,
+                                shift_to_centroid=True
+                                )
+        self.use_composite = use_composite
+        #self.scale = scale
+        #self.position = translation
+        #self.orientation = rotation
         self.interactable = interactable
-        self.interaction_threshold = 200
-        self.name = filepath
-        self.scale = scale
+        self.interaction_threshold = 2000
+        #self.name = filepath
         self.velocity = velocity
         self.bounce_amplitude = 5.5
         self.bounce_frequency = 2.0  # in cycles per second
@@ -39,7 +62,7 @@ class InteractableObject(Model):
         self.picked_up = False
 
         # Create a CompositeModel to manage multiple sub-models
-        self.composite_model = CompositeModel()
+        #self.composite_model = CompositeModel()
 
         if material_overrides:
             self.material_overrides = material_overrides
@@ -47,8 +70,15 @@ class InteractableObject(Model):
         print("centroid = ", self.centroid)
         print(f"Interactable {self.name} initialized at {self.position}")
 
+    def __getattr__(self, name):
+        try:
+            return getattr(self._model, name)
+        except AttributeError:
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+
     def add_sub_model(self, sub_model, relative_position, relative_rotation):
-        self.composite_model.add_model(sub_model, relative_position, relative_rotation)
+        if self.use_composite:
+            self._model.add_model(sub_model, relative_position, relative_rotation)
 
     def interact(self, player):
         if self.interactable:
@@ -72,15 +102,15 @@ class InteractableObject(Model):
         translation_matrix = glm.translate(glm.mat4(1.0), self.position)
 
         # Create rotation matrices for the object's orientation
-        rotation_x = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation.x), glm.vec3(1.0, 0.0, 0.0))
-        rotation_y = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation.y), glm.vec3(0.0, 1.0, 0.0))
-        rotation_z = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation.z), glm.vec3(0.0, 0.0, 1.0))
+        rotation_x = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[0]), glm.vec3(1.0, 0.0, 0.0))
+        rotation_y = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[1]), glm.vec3(0.0, 1.0, 0.0))
+        rotation_z = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[2]), glm.vec3(0.0, 0.0, 1.0))
 
         # Combine rotations to form the object's rotation matrix
         rotation_matrix = rotation_z * rotation_y * rotation_x
 
         # Combine translation and rotation to form the local model matrix
-        local_model_matrix = translation_matrix * rotation_matrix
+        local_model_matrix = translation_matrix * rotation_matrix# * glm.translate(glm.mat4(1.0), glm.vec3(-1,1,1))
 
         # Handle case where there is no parent matrix
         if parent_matrix is None:
@@ -89,13 +119,16 @@ class InteractableObject(Model):
             self.model_matrix = parent_matrix * local_model_matrix
 
         # Update the composite model's model matrix
-        self.composite_model.update_model_matrix(self.model_matrix)
+        if self.use_composite:
+            self._model.update_model_matrix()  #(self.model_matrix)
 
     def update(self, player, delta_time):
         if self.interactable:
             self.check_interactions(player, delta_time)
         if self.picked_up:
             self.update_model_matrix(player.right_arm.model_matrix)
+        else:
+            self.update_model_matrix()  # Ensure the model matrix is updated for non-picked objects
 
     def check_interactions(self, player, delta_time):
         if glm.distance(player.position, self.position) < self.interaction_threshold:
@@ -108,8 +141,8 @@ class InteractableObject(Model):
     def highlight(self, delta_time):
         # Rotate around the y-axis
         rotation_angle = self.rotation_speed.y * delta_time
-        self.orientation.y += rotation_angle
-        self.orientation.y %= 360  # Keep the angle within [0, 360)
+        self._model.orientation[1] += rotation_angle
+        self._model.orientation[1] %= 360  # Keep the angle within [0, 360)
 
         # Use the precomputed centroid
         centroid = self.centroid
@@ -146,8 +179,3 @@ class InteractableObject(Model):
         self.position = new_position
         self.update_model_matrix()
 
-    def draw(self):
-        # Draw the parent model
-        super().draw()
-        # Draw the composite sub-models
-        self.composite_model.draw()

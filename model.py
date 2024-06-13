@@ -4,11 +4,13 @@ import glm
 from typing import List, Tuple
 from OpenGL.GL import *
 
+
 @dataclass
 class MaterialOverride:
     kd_override: glm.vec3
     ks_override: glm.vec3
     ns_override: float
+
 
 class Model:
     default_material = {
@@ -22,8 +24,8 @@ class Model:
                  mtl_filepath: str,
                  player=False,
                  draw_convex_only=False,
-                 rotation_angles=(0.0, 0.0, 0.0),
-                 translation=(0.0, 0.0, 0.0),
+                 rotation_angles=[0.0, 0.0, 0.0],
+                 translation=[0.0, 0.0, 0.0],
                  kd_override=None,
                  ks_override=None,
                  ns_override=None,
@@ -31,6 +33,11 @@ class Model:
                  is_collidable=True,
                  shift_to_centroid=False):
 
+        #self.set_orientation(rotation_angles)
+        self.orientation = rotation_angles
+        self.model_matrix = self.init_model_matrix(translation, rotation_angles)
+        self.position = translation
+        self.update_model_matrix()  #glm.mat4(1.0)  # Initialize model matrix
         self.shift_to_centroid = shift_to_centroid
         self.is_collidable = is_collidable
         print(f"Initializing Model with filepath: {filepath}")
@@ -51,10 +58,8 @@ class Model:
 
         self.default_material = self.materials[first_material_key]
         self.vao, self.vbo, self.ebo = self.setup_buffers()
-        self.model_matrix = glm.mat4(1.0)  # Initialize model matrix
         self.is_player = player
         self.set_scale(scale)
-        self.set_orientation(rotation_angles)
         self.set_position(translation)
         self.draw_convex_only = draw_convex_only
         if self.is_player:
@@ -198,6 +203,7 @@ class Model:
         rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_angles[0]), glm.vec3(1.0, 0.0, 0.0))
         rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_angles[1]), glm.vec3(0.0, 1.0, 0.0))
         rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_angles[2]), glm.vec3(0.0, 0.0, 1.0))
+        self.orientation = glm.vec3(rotation_angles)
         self.model_matrix = rotation_matrix * self.model_matrix
 
     def set_position(self, translation):
@@ -209,6 +215,7 @@ class Model:
 
         # Multiply the translation matrix with the current model matrix
         # Note the order of multiplication may need to be reversed depending on the use case
+        self.position = translation
         self.model_matrix = translation_matrix * self.model_matrix
         # If you want to set an absolute position, you might need to reset or reinitialize the model matrix
         # self.model_matrix = translation_matrix  # Uncomment this line for absolute positioning
@@ -257,3 +264,38 @@ class Model:
         min_z = min(self.bounding_box, key=lambda v: v.z).z
         max_z = max(self.bounding_box, key=lambda v: v.z).z
         return (min_x, min_y, min_z), (max_x, max_y, max_z)
+
+    # def __getattr__(self, name):
+    #     return getattr(self._model, name)
+    def update_model_matrix(self, parent_matrix=None):
+        # Create translation matrix for the object's position
+        translation_matrix = glm.translate(glm.mat4(1.0), self.position)
+
+        # Create rotation matrices for the object's orientation
+        rotation_x = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[0]), glm.vec3(1.0, 0.0, 0.0))
+        rotation_y = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[1]), glm.vec3(0.0, 1.0, 0.0))
+        rotation_z = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[2]), glm.vec3(0.0, 0.0, 1.0))
+
+        # Combine rotations to form the object's rotation matrix
+        rotation_matrix = rotation_z * rotation_y * rotation_x
+
+        # Combine translation and rotation to form the local model matrix
+        local_model_matrix = translation_matrix * rotation_matrix
+
+        # Handle case where there is no parent matrix
+        if parent_matrix is None:
+            self.model_matrix = local_model_matrix
+        else:
+            self.model_matrix = parent_matrix * local_model_matrix
+
+    def init_model_matrix(self, translation, rotation_angles):
+        # Create the translation matrix for the relative position
+        translation_matrix = glm.translate(glm.mat4(1.0), translation)
+
+        # Create rotation matrices for the relative rotation
+        rotation_matrix = glm.rotate(glm.mat4(1.0), glm.radians(rotation_angles[0]), glm.vec3(1.0, 0.0, 0.0))
+        rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_angles[1]), glm.vec3(0.0, 1.0, 0.0))
+        rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_angles[2]), glm.vec3(0.0, 0.0, 1.0))
+
+        # Combine the translation and rotation matrices
+        return translation_matrix * rotation_matrix

@@ -1,15 +1,53 @@
 import glm
 from OpenGL.GL import *
 
-class CompositeModel:
-    def __init__(self):
+from model import Model
+
+
+class CompositeModel(Model):
+    def __init__(self,
+                 filepath,
+                 mtl_filepath,
+                 player=False,
+                 draw_convex_only=False,
+                 rotation_angles=glm.vec3(0, 0, 0),
+                 translation=glm.vec3(0, 0, 0),
+                 kd_override=None,
+                 ks_override=None,
+                 ns_override=None,
+                 scale=1,
+                 is_collidable=False,
+                 shift_to_centroid=True
+                 ):
+        self.shift_to_centroid = self.shift_to_centroid()
+        self.is_collidable = is_collidable
+        self.scale = scale
+        self.ns_override = ns_override
+        self.ks_override = ks_override
+        self.kd_override = kd_override
+        self.translation = translation
+        self.rotation_angles = rotation_angles
+        self.draw_convex_only = draw_convex_only
+        self.player = player
         self.models = []
         self.model_matrices = []
+        super().__init__(
+                         filepath,
+                         mtl_filepath,
+                         draw_convex_only=draw_convex_only,
+                         rotation_angles=rotation_angles,
+                         translation=translation,
+                         kd_override=kd_override,
+                         ks_override=ks_override,
+                         ns_override=ns_override,
+                         scale=scale,
+                         is_collidable=is_collidable,
+                         shift_to_centroid=shift_to_centroid
+                         )
 
     def add_model(self, model, relative_position=glm.vec3(0.0, 0.0, 0.0), relative_rotation=glm.vec3(0.0, 0.0, 0.0)):
         self.models.append((model, relative_position, relative_rotation))
-        self.update_model_matrix()  # Update model matrices whenever a new sub-model is added
-
+        self.update_model_matrix(glm.mat4(1.0))  # Ensure initial update with identity matrix
 
     def update_model_matrix(self, parent_matrix=glm.mat4(1.0)):
         self.model_matrices.clear()
@@ -31,7 +69,10 @@ class CompositeModel:
             # Update the sub-model's model matrix
             model.model_matrix = model_matrix
 
-
     def draw(self):
         for model, _, _ in self.models:
+            super().draw()
             model.draw()
+
+    # def __getattr__(self, name):
+    #     return getattr(self._model, name)
