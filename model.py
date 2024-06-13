@@ -34,6 +34,7 @@ class Model:
                  shift_to_centroid=False):
 
         self.orientation = rotation_angles
+        self.scale = scale
         self.model_matrix = self.init_model_matrix(translation, rotation_angles)
         self.position = translation
         self.update_model_matrix()  #glm.mat4(1.0)  # Initialize model matrix
@@ -271,35 +272,32 @@ class Model:
     # def __getattr__(self, name):
     #     return getattr(self._model, name)
     def update_model_matrix(self, parent_matrix=None):
-        # Create translation matrix for the object's position
-        translation_matrix = glm.translate(glm.mat4(1.0), glm.vec3(self.position[0], self.position[1], self.position[2]))
+        translation_matrix = glm.translate(glm.mat4(1.0),
+                                           glm.vec3(self.position[0], self.position[1], self.position[2]))
 
-        # Create rotation matrices for the object's orientation
         rotation_x = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[0]), glm.vec3(1.0, 0.0, 0.0))
         rotation_y = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[1]), glm.vec3(0.0, 1.0, 0.0))
         rotation_z = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[2]), glm.vec3(0.0, 0.0, 1.0))
 
-        # Combine rotations to form the object's rotation matrix
         rotation_matrix = rotation_z * rotation_y * rotation_x
 
-        # Combine translation and rotation to form the local model matrix
-        local_model_matrix = translation_matrix * rotation_matrix
+        scale_matrix = glm.scale(glm.mat4(1.0), glm.vec3(self.scale, self.scale, self.scale))
 
-        # Handle case where there is no parent matrix
+        local_model_matrix = translation_matrix * rotation_matrix * scale_matrix
+
         if parent_matrix is None:
             self.model_matrix = local_model_matrix
         else:
             self.model_matrix = parent_matrix * local_model_matrix
 
     def init_model_matrix(self, translation, rotation_angles):
-        # Create the translation matrix for the relative position
         translation_matrix = glm.translate(glm.mat4(1.0), translation)
 
-        # Create rotation matrices for the relative rotation
         rotation_matrix = glm.rotate(glm.mat4(1.0), glm.radians(rotation_angles[0]), glm.vec3(1.0, 0.0, 0.0))
         rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_angles[1]), glm.vec3(0.0, 1.0, 0.0))
         rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_angles[2]), glm.vec3(0.0, 0.0, 1.0))
 
-        # Combine the translation and rotation matrices
-        return translation_matrix * rotation_matrix
+        scale_matrix = glm.scale(glm.mat4(1.0), glm.vec3(self.scale, self.scale, self.scale))
+
+        self.model_matrix = translation_matrix * rotation_matrix * scale_matrix
 

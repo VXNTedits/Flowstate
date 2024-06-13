@@ -109,9 +109,9 @@ class InteractableObject:
         self.update_interactable_model_matrix(player.torso.model_matrix)
 
     def update_interactable_model_matrix(self, parent_matrix=None):
-        # Create translation matrix for the object's position
         self.model_matrices.clear()
-        #super().set_scale(self.scale)
+
+        # Create translation matrix for the object's position
         translation_matrix = glm.translate(glm.mat4(1.0), self._model.position)
 
         # Create rotation matrices for the object's orientation
@@ -122,19 +122,21 @@ class InteractableObject:
         # Combine rotations to form the object's rotation matrix
         rotation_matrix = rotation_z * rotation_y * rotation_x
 
-        # Combine translation and rotation to form the local model matrix
-        local_model_matrix = translation_matrix * rotation_matrix# * glm.translate(glm.mat4(1.0), glm.vec3(-1,1,1))
+        # Create scaling matrix for the object's scale
+        scale_matrix = glm.scale(glm.mat4(1.0), glm.vec3(self._model.scale, self._model.scale, self._model.scale))
+
+        # Combine translation, rotation, and scale to form the local model matrix
+        local_model_matrix = translation_matrix * rotation_matrix * scale_matrix
 
         # Handle case where there is no parent matrix
         if parent_matrix is None:
-            self.model_matrix = local_model_matrix#glm.scale(local_model_matrix, glm.vec3(self.scale, self.scale, self.scale))
+            self.model_matrix = local_model_matrix
         else:
             self.model_matrix = parent_matrix * local_model_matrix
-            #self.model_matrix = local_model_matrix#glm.scale(local_model_matrix, glm.vec3(self.scale, self.scale, self.scale))
 
         # Update the composite model's model matrix
         if self.use_composite:
-            self._model.update_model_matrix()  #(self.model_matrix)
+            self._model.update_model_matrix()
 
     def update(self, player, delta_time):
         if self.interactable:

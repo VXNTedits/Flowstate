@@ -45,15 +45,14 @@ class CompositeModel(Model):
                          shift_to_centroid=shift_to_centroid
                          )
 
-    def add_model(self, model, scale, relative_position=glm.vec3(0.0, 0.0, 0.0), relative_rotation=glm.vec3(0.0, 0.0, 0.0)):
+    def add_model(self, model, scale, relative_position=glm.vec3(0.0, 0.0, 0.0),
+                  relative_rotation=glm.vec3(0.0, 0.0, 0.0)):
         model.set_scale(scale)
         self.models.append((model, relative_position, relative_rotation))
         model.init_model_matrix(relative_position, relative_rotation)
-        #self.update_composite_model_matrix(glm.mat4(1.0))  # Ensure initial update with identity matrix
+        self.update_composite_model_matrix(glm.mat4(1.0))  # Ensure initial update with identity matrix
 
     def update_composite_model_matrix(self, parent_matrix=glm.mat4(1.0)):
-        #self.model_matrices.clear()
-        #self.set_scale(self.scale)
         for model, rel_pos, rel_rot in self.models:
             # Create the translation matrix for the relative position
             translation_matrix = glm.translate(glm.mat4(1.0), rel_pos)
@@ -63,19 +62,16 @@ class CompositeModel(Model):
             rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rel_rot.y), glm.vec3(0.0, 1.0, 0.0))
             rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rel_rot.z), glm.vec3(0.0, 0.0, 1.0))
 
-            # Combine the translation and rotation matrices
-            model_matrix = parent_matrix * translation_matrix * rotation_matrix
+            # Create scaling matrix for the model's scale
+            scale_matrix = glm.scale(glm.mat4(1.0), glm.vec3(model.scale, model.scale, model.scale))
+
+            # Combine the translation, rotation, and scaling matrices
+            model_matrix = parent_matrix * translation_matrix * rotation_matrix * scale_matrix
 
             # Store the calculated model matrix
             self.model_matrices.append(model_matrix)
-
             # Update the sub-model's model matrix
             model.model_matrix = model_matrix
 
-    # def draw(self):
-    #     for model, _, _ in self.models:
-    #         super().draw()
-    #         model.draw()
-
-    # def __getattr__(self, name):
-    #     return getattr(self._model, name)
+    def __getattr__(self, name):
+        return getattr(self._model, name)

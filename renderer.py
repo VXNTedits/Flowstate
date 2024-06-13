@@ -29,11 +29,16 @@ class Renderer:
         world.draw()
 
     def render_interactables(self, interactables: list, view_matrix, projection_matrix):
-        self.shader.use()
-        for item in interactables:
-            model_matrix = item.model_matrix
-            self.update_uniforms(model_matrix, view_matrix, projection_matrix, item)
-            item.draw()
+        for interactable in interactables:
+            self.shader.use()
+            model_matrix = interactable.model_matrix
+            self.update_uniforms(model_matrix, view_matrix, projection_matrix, interactable)
+            interactable.draw()
+            for mod, pos, dir in interactable._model.models:
+                self.shader.use()
+                model_matrix = mod.model_matrix
+                self.update_uniforms(model_matrix, view_matrix, projection_matrix, mod)
+                mod.draw()
 
     def render_aabb(self, list_of_objects_in_world: list, player_pos: glm.vec3, view_matrix, projection_matrix):
         self.shader.use()
@@ -119,7 +124,7 @@ class Renderer:
         glDeleteBuffers(1, [VBO])
         glDeleteVertexArrays(1, [VAO])
 
-    def update_uniforms(self, model_matrix, view_matrix, projection_matrix, model):
+    def update_uniforms(self, model_matrix, view_matrix, projection_matrix, model: Model):
         self.shader.set_uniform_matrix4fv("model", model_matrix)
         self.shader.set_uniform_matrix4fv("view", view_matrix)
         self.shader.set_uniform_matrix4fv("projection", projection_matrix)
@@ -138,13 +143,13 @@ class Renderer:
         base_colors = [
             glm.vec3(1.0, 0.08, 0.58),  # Pink
             glm.vec3(0.08, 0.08, 1.0),  # Blue
-            glm.vec3(0.08, 1.0, 0.08)   # Green
+            glm.vec3(0.08, 1.0, 0.08)  # Green
         ]
 
         # Animate colors
         animated_colors = [
             glm.vec3(oscillate(1.0), oscillate(0.1, 2), oscillate(0.1, 4)),  # Example frequency for Pink
-            glm.vec3(oscillate(0.1, 2), oscillate(0.1, 4), oscillate(0.1, 6)), # Example frequency for Blue
+            glm.vec3(oscillate(0.1, 2), oscillate(0.1, 4), oscillate(0.1, 6)),  # Example frequency for Blue
             glm.vec3(oscillate(0.1, 4), oscillate(0.2, 6), oscillate(0.1, 8))  # Example frequency for Green
         ]
 

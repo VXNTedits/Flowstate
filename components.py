@@ -62,9 +62,9 @@ class Components:
         deagle = InteractableObject(
             filepath='obj/deagle_main.obj',
             mtl_filepath='obj/deagle_main.mtl',
-            translation=glm.vec3(0.0, 1.0, 0.0),
+            translation=glm.vec3(0.0, 0.0, 0.0),
             rotation=glm.vec3(-90, 0, 0),
-            scale=20,
+            scale=1.5,
             is_collidable=False,
             material_overrides=MaterialOverride(None, glm.vec3(1, 1, 1), 500),
             use_composite=True
@@ -73,9 +73,9 @@ class Components:
             filepath='obj/deagle_slide.obj',
             mtl_filepath='obj/deagle_slide.mtl',
             shift_to_centroid=True,
-            scale=20
+            scale=1.5
         )
-        deagle.add_sub_model(sub_model=deagle_slide, relative_position=glm.vec3(0, 0, 0), relative_rotation=glm.vec3(0, 0, 0),scale=20)
+        deagle.add_sub_model(sub_model=deagle_slide, relative_position=glm.vec3(1, 0, 0), relative_rotation=glm.vec3(0, 0, 0),scale=1.5)
 
         self.interactables = [
             deagle
