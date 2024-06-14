@@ -34,6 +34,7 @@ class Renderer:
             model_matrix = interactable.model_matrix
             self.update_uniforms(model_matrix, view_matrix, projection_matrix, interactable)
             interactable.draw()
+            interactable._model.update_composite_model_matrix(model_matrix)  # Ensure sub-model matrices are updated
             for mod, pos, dir in interactable._model.models:
                 self.shader.use()
                 model_matrix = mod.model_matrix

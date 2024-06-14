@@ -7,7 +7,6 @@ from model import Model
 from OpenGL.GL import *
 
 
-
 class InteractableObject:
     def __init__(self,
                  filepath,
@@ -23,18 +22,18 @@ class InteractableObject:
                  ):
         if use_composite:
             self._model = CompositeModel(filepath,
-                                mtl_filepath,
-                                player=False,
-                                draw_convex_only=False,
-                                rotation_angles=rotation,
-                                translation=translation,
-                                kd_override=None,
-                                ks_override=None,
-                                ns_override=None,
-                                scale=scale,
-                                is_collidable=is_collidable,
-                                shift_to_centroid=True
-                                )
+                                         mtl_filepath,
+                                         player=False,
+                                         draw_convex_only=False,
+                                         rotation_angles=rotation,
+                                         translation=translation,
+                                         kd_override=None,
+                                         ks_override=None,
+                                         ns_override=None,
+                                         scale=scale,
+                                         is_collidable=is_collidable,
+                                         shift_to_centroid=True
+                                         )
         else:
             self._model = Model(filepath,
                                 mtl_filepath,
@@ -98,8 +97,8 @@ class InteractableObject:
         print(f"{self.name} picked up by {player.name}")
         print("Initial orientation:", self.orientation)
         if self.interactable:
-            self._model.position = glm.vec3(-0.4,-0.1,1)#player.position
-            self._model.orientation = glm.vec3(0,0,0)#glm.vec3(player.camera.pitch,player.camera.yaw,0.0)
+            self._model.position = glm.vec3(-0.4, -0.1, 1)  #player.position
+            self._model.orientation = glm.vec3(0, 0, 0)  #glm.vec3(player.camera.pitch,player.camera.yaw,0.0)
             #self._model.set_scale(self.scale)
         print("Reset orientation:", self.orientation)
         player.inventory.append(self)
@@ -194,4 +193,3 @@ class InteractableObject:
         # Update position and orientation
         self.position = new_position
         self.update_interactable_model_matrix()
-

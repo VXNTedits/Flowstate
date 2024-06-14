@@ -35,8 +35,8 @@ class Model:
 
         self.orientation = rotation_angles
         self.scale = scale
-        self.model_matrix = self.init_model_matrix(translation, rotation_angles)
         self.position = translation
+        self.model_matrix = self.init_model_matrix(translation, rotation_angles)
         self.update_model_matrix()  #glm.mat4(1.0)  # Initialize model matrix
         self.shift_to_centroid = shift_to_centroid
         self.is_collidable = is_collidable

@@ -31,7 +31,7 @@ class Components:
         object_attributes = [
             ObjectAttributes(
                 'obj/world_test.obj', 'obj/world_test.mtl',
-                (-90.0, -5.0, 0.0), (-70.0, -50.0, 50.0),
+                (-90.0, -10.0, 0.0), (-70.0, -50.0, 50.0),
                 MaterialOverride(None, glm.vec3(0, 1, 0), 1000)
             ),
             ObjectAttributes(
@@ -43,7 +43,7 @@ class Components:
                 'obj/roof_low_poly.obj', 'obj/roof_low_poly.mtl',
                 (-90.0, 0.0, 0.0), (-10.0, -10.0, -10.0),
                 MaterialOverride(None, None, None),
-                10
+                100
             ),
             ObjectAttributes(
                 'obj/cube.obj', 'obj/cube.mtl',
@@ -62,9 +62,9 @@ class Components:
         deagle = InteractableObject(
             filepath='obj/deagle_main.obj',
             mtl_filepath='obj/deagle_main.mtl',
-            translation=glm.vec3(0.0, 0.0, 0.0),
-            rotation=glm.vec3(-90, 0, 0),
-            scale=1.5,
+            translation=glm.vec3(0.0, 5.0, 0.0),
+            rotation=glm.vec3(90, 0, 0),
+            scale=1,
             is_collidable=False,
             material_overrides=MaterialOverride(None, glm.vec3(1, 1, 1), 500),
             use_composite=True
@@ -73,9 +73,9 @@ class Components:
             filepath='obj/deagle_slide.obj',
             mtl_filepath='obj/deagle_slide.mtl',
             shift_to_centroid=True,
-            scale=1.5
+            scale=1
         )
-        deagle.add_sub_model(sub_model=deagle_slide, relative_position=glm.vec3(1, 0, 0), relative_rotation=glm.vec3(0, 0, 0),scale=1.5)
+        deagle.add_sub_model(sub_model=deagle_slide, relative_position=glm.vec3(0, 0, 0.1), relative_rotation=glm.vec3(0, 0, 0),scale=1)
 
         self.interactables = [
             deagle

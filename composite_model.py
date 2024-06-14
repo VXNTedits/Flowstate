@@ -25,8 +25,8 @@ class CompositeModel(Model):
         self.ns_override = ns_override
         self.ks_override = ks_override
         self.kd_override = kd_override
-        self.translation = translation
-        self.rotation_angles = rotation_angles
+        #self.translation = translation
+        #self.rotation_angles = rotation_angles
         self.draw_convex_only = draw_convex_only
         self.player = player
         self.models = []
@@ -50,9 +50,10 @@ class CompositeModel(Model):
         model.set_scale(scale)
         self.models.append((model, relative_position, relative_rotation))
         model.init_model_matrix(relative_position, relative_rotation)
-        self.update_composite_model_matrix(glm.mat4(1.0))  # Ensure initial update with identity matrix
+        self.update_composite_model_matrix()  # Ensure initial update without explicitly passing identity matrix
 
     def update_composite_model_matrix(self, parent_matrix=glm.mat4(1.0)):
+        self.model_matrices.clear()  # Clear old matrices
         for model, rel_pos, rel_rot in self.models:
             # Create the translation matrix for the relative position
             translation_matrix = glm.translate(glm.mat4(1.0), rel_pos)
@@ -71,7 +72,7 @@ class CompositeModel(Model):
             # Store the calculated model matrix
             self.model_matrices.append(model_matrix)
             # Update the sub-model's model matrix
-            model.model_matrix = model_matrix
+            model.update_model_matrix(model_matrix)
 
     def __getattr__(self, name):
         return getattr(self._model, name)
