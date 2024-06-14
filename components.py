@@ -8,12 +8,15 @@ from input_handler import InputHandler
 from physics import Physics
 from text_renderer import TextRenderer
 import glm
-from world import World, MaterialOverride
+
+from world import World
+from world_objects import WorldObjects, MaterialOverride
 from interactable import InteractableObject
 
 
 class ObjectAttributes:
-    def __init__(self, filepath, mtl_filepath, rotation, translation, material_override, scale=1):
+    def __init__(self, filepath, mtl_filepath, rotation=[0, 0, 0], translation=[0, 0, 0], material_override=None,
+                 scale=1):
         self.scale = scale
         self.filepath = filepath
         self.mtl_filepath = mtl_filepath
@@ -28,23 +31,23 @@ class Components:
         self.shader = Shader('vertex_shader.glsl', 'fragment_shader.glsl')
 
         # Define object attributes for multiple objects
-        object_attributes = [
-            ObjectAttributes(
-                'obj/world_test.obj', 'obj/world_test.mtl',
-                (-90.0, -10.0, 0.0), (-70.0, -50.0, 50.0),
-                MaterialOverride(None, glm.vec3(0, 1, 0), 1000)
-            ),
+        world_objects = [
+            # ObjectAttributes(
+            #     'obj/world_test.obj', 'obj/world_test.mtl',
+            #     (-90.0, -10.0, 0.0), (-70.0, -50.0, 50.0),
+            #     MaterialOverride(None, glm.vec3(0, 1, 0), 1000)
+            # ),
             ObjectAttributes(
                 'obj/cube.obj', 'obj/cube.mtl',
                 (-45.0, 45.0, 45.0), (-70.0, 0.0, 50.0),
                 MaterialOverride(None, glm.vec3(1, 1, 0), 1000.0)
             ),
-            ObjectAttributes(
-                'obj/roof_low_poly.obj', 'obj/roof_low_poly.mtl',
-                (-90.0, 0.0, 0.0), (-10.0, -10.0, -10.0),
-                MaterialOverride(None, None, None),
-                100
-            ),
+            # ObjectAttributes(
+            #     'obj/roof_low_poly.obj', 'obj/roof_low_poly.mtl',
+            #     (-90.0, 0.0, 0.0), (-10.0, -10.0, -10.0),
+            #     MaterialOverride(None, None, None),
+            #     100
+            # ),
             ObjectAttributes(
                 'obj/cube.obj', 'obj/cube.mtl',
                 (-45.0, 45.0, 45.0), (20.0, 0.0, -50.0),
@@ -52,12 +55,12 @@ class Components:
             )
         ]
 
-        filepaths = [attr.filepath for attr in object_attributes]
-        mtl_filepaths = [attr.mtl_filepath for attr in object_attributes]
-        rotations = [attr.rotation for attr in object_attributes]
-        translations = [attr.translation for attr in object_attributes]
-        material_overrides = [attr.material_override for attr in object_attributes]
-        scales = [attr.scale for attr in object_attributes]
+        filepaths = [attr.filepath for attr in world_objects]
+        mtl_filepaths = [attr.mtl_filepath for attr in world_objects]
+        rotations = [attr.rotation for attr in world_objects]
+        translations = [attr.translation for attr in world_objects]
+        material_overrides = [attr.material_override for attr in world_objects]
+        scales = [attr.scale for attr in world_objects]
 
         deagle = InteractableObject(
             filepath='obj/deagle_main.obj',
@@ -75,13 +78,14 @@ class Components:
             shift_to_centroid=True,
             scale=1
         )
-        deagle.add_sub_model(sub_model=deagle_slide, relative_position=glm.vec3(0, 0, 0.1), relative_rotation=glm.vec3(0, 0, 0),scale=1)
+        deagle.add_sub_model(sub_model=deagle_slide, relative_position=glm.vec3(0, 0, 0.1),
+                             relative_rotation=glm.vec3(0, 0, 0), scale=1)
 
         self.interactables = [
             deagle
         ]
-
-        self.world = World(filepaths, mtl_filepaths, rotations, translations, material_overrides, scales)
+        self.world = World('world2')
+        self.world_objects = WorldObjects(filepaths, mtl_filepaths, rotations, translations, material_overrides, scales)
         print('World initialized')
         self.player = Player('obj/body.obj', 'obj/head.obj', 'obj/arm_right.obj', mtl_path='obj/body.mtl',
                              camera=self.camera, default_material=Model.default_material, filepath='obj/body.obj',
@@ -89,7 +93,8 @@ class Components:
         print('Player initialized')
 
         self.models = [self.player.torso, self.player.right_arm]
-        self.models += self.world.objects
+        self.models += self.world.get_objects()
+        self.models += self.world_objects.objects
         self.models += self.interactables
 
         for model in self.models:
@@ -102,8 +107,7 @@ class Components:
         self.input_handler = InputHandler(self.camera, self.player)
         print('Input handler initialized')
 
-        self.text_renderer = TextRenderer(window.width, window.height)
-        self.physics = Physics(self.world, self.player, self.interactables)
+        self.physics = Physics(self.world_objects, self.player, self.interactables, self.world)
 
     def set_input_callbacks(self, window):
         window.set_callbacks(self.input_handler.key_callback, self.input_handler.mouse_callback)
@@ -111,7 +115,7 @@ class Components:
     def update_components(self, delta_time: float):
         self.camera.update(delta_time)
         self.player.update(delta_time)
-        self.world.update(delta_time)
+        self.world_objects.update(delta_time)
         for item in self.interactables:
             item.update(self.player, delta_time)
 

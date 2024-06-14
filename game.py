@@ -48,8 +48,12 @@ class Game:
 
             # Render the player
             self.components.renderer.render_player(self.components.player, view_matrix, self.projection_matrix)
+            # Render the world components
+            for model in self.components.world_objects.models:
+                self.components.renderer.render_world(model, view_matrix, self.projection_matrix)
+
             # Render the world
-            for model in self.components.world.models:
+            for model in self.components.world.get_objects():
                 self.components.renderer.render_world(model, view_matrix, self.projection_matrix)
 
             #self.components.renderer.render_aabb(self.components.world.get_objects(), self.components.player.position,

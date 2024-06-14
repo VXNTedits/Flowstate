@@ -10,7 +10,8 @@ from model import Model
 class Physics:
     EPSILON = 1e-6
 
-    def __init__(self, world, player, interactables: list):
+    def __init__(self, world_objects, player, interactables: list, world):
+        self.world = world_objects
         self.world = world
         self.player = player
         self.gravity = glm.vec3(0, -10, 0)
@@ -82,9 +83,12 @@ class Physics:
         return float('inf')
 
     def resolve_collision(self, obstacle_aabb):
+        print('resolving collision')
         (min_x, min_y, min_z), (max_x, max_y, max_z) = obstacle_aabb
         player_pos = self.player.position
         player_velocity = self.player.velocity
+
+        #print(f"initial player pos {self.player.position}, object aabb {obstacle_aabb}")
 
         # Calculate overlap on each axis
         overlap_x = min(max_x - player_pos.x, player_pos.x - min_x)
@@ -98,15 +102,18 @@ class Physics:
             # Resolve along x-axis
             if player_pos.x > (max_x + min_x) / 2:
                 # Player is to the right of the obstacle
+                print('Player is to the right of the obstacle')
                 self.player.position.x += overlap_x
             else:
                 # Player is to the left of the obstacle
+                print('Player is to the left of the obstacle')
                 self.player.position.x -= overlap_x
             self.player.velocity.x = 0
         elif min_overlap == overlap_y:
             # Resolve along y-axis
             if player_pos.y > (max_y + min_y) / 2:
                 # Player is above the obstacle
+                print('Player is above the obstacle')
                 if self.player.velocity.y < 0: # Player is falling
                     self.player.position.y += overlap_y
                     self.player.velocity.y = 0 # Stop player from falling
@@ -115,6 +122,7 @@ class Physics:
                     pass#self.player.is_grounded = False
             else:
                 # Player is below the obstacle
+                print('Player is below the obstacle')
                 self.player.position.y -= overlap_y
                 self.player.velocity.y = 0
         else:
@@ -127,10 +135,11 @@ class Physics:
                 self.player.position.z -= overlap_z
             self.player.velocity.z = 0
 
+
     def handle_collisions(self, delta_time):
-        for obj in self.world.objects:
+        for obj in self.world.get_objects():
             if self.check_linear_collision():
-                #print('collision')
+                print('collision')
                 self.resolve_collision(obj.aabb)
                 break  # Stop checking further objects if a collision is detected
 

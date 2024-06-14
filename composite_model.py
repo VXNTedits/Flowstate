@@ -19,14 +19,14 @@ class CompositeModel(Model):
                  is_collidable=False,
                  shift_to_centroid=True
                  ):
+        self.position = translation
+        self.rotation = rotation_angles
         self.shift_to_centroid = shift_to_centroid
         self.is_collidable = is_collidable
         self.scale = scale
         self.ns_override = ns_override
         self.ks_override = ks_override
         self.kd_override = kd_override
-        #self.translation = translation
-        #self.rotation_angles = rotation_angles
         self.draw_convex_only = draw_convex_only
         self.player = player
         self.models = []
@@ -44,6 +44,7 @@ class CompositeModel(Model):
                          is_collidable=is_collidable,
                          shift_to_centroid=shift_to_centroid
                          )
+        self.models.append((self, self.position, self.rotation))
 
     def add_model(self, model, scale, relative_position=glm.vec3(0.0, 0.0, 0.0),
                   relative_rotation=glm.vec3(0.0, 0.0, 0.0)):
@@ -51,6 +52,10 @@ class CompositeModel(Model):
         self.models.append((model, relative_position, relative_rotation))
         model.init_model_matrix(relative_position, relative_rotation)
         self.update_composite_model_matrix()  # Ensure initial update without explicitly passing identity matrix
+
+    def get_objects(self):
+        # Return all models contained in this composite model
+        return [model for model, _, _ in self.models]
 
     def update_composite_model_matrix(self, parent_matrix=glm.mat4(1.0)):
         self.model_matrices.clear()  # Clear old matrices
@@ -74,5 +79,5 @@ class CompositeModel(Model):
             # Update the sub-model's model matrix
             model.update_model_matrix(model_matrix)
 
-    def __getattr__(self, name):
-        return getattr(self._model, name)
+    # def __getattr__(self, name):
+    #     return getattr(self._model, name)
