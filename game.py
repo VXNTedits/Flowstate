@@ -34,7 +34,7 @@ class Game:
 
             # Update game logic at fixed intervals
             while accumulator >= self.tick_rate:
-                self.components.input_handler.update_inputs(self.tick_rate)
+                self.components.input_handler.process_input(self.components.player, self.tick_rate)
                 self.components.player.update_player(self.tick_rate)
                 self.components.physics.update_physics(self.tick_rate)
                 self.components.update_components(self.tick_rate)

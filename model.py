@@ -63,6 +63,8 @@ class Model:
         self.set_position(translation)
         self.draw_convex_only = draw_convex_only
         if self.is_player:
+            #self.player_width = 0.5
+            #self.player_height = 2
             self.bounding_box = self.calculate_bounding_box()
             self.aabb = self.calculate_aabb()
             #
@@ -316,4 +318,7 @@ class Model:
         scale_matrix = glm.scale(glm.mat4(1.0), glm.vec3(self.scale, self.scale, self.scale))
 
         self.model_matrix = translation_matrix * rotation_matrix * scale_matrix
+
+
+
 

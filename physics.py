@@ -108,25 +108,34 @@ class Physics:
         self.player.position = player_pos
         print(f"Final player position after resolving collision: {self.player.position}")
 
-    def resolve_player_collision(self, obstacle_face, delta_time, penetration_threshold=1, correction_velocity=0.5):
+    def resolve_player_collision(self, obstacle_face, delta_time, penetration_threshold=1.0, correction_velocity=0.5):
         # Define player's bounding box corners
-        player_height = 2
-        player_width = 0.5
+        player_height = self.player.player_height
+        player_width = self.player.player_width
         player_position = self.player.position
+        bounding_margin = 0.1
 
         corners = [
-            glm.vec3(player_position.x - player_width / 2, player_position.y, player_position.z - player_width / 2),
-            glm.vec3(player_position.x + player_width / 2, player_position.y, player_position.z - player_width / 2),
-            glm.vec3(player_position.x - player_width / 2, player_position.y, player_position.z + player_width / 2),
-            glm.vec3(player_position.x + player_width / 2, player_position.y, player_position.z + player_width / 2),
-            glm.vec3(player_position.x - player_width / 2, player_position.y + player_height,
-                     player_position.z - player_width / 2),
-            glm.vec3(player_position.x + player_width / 2, player_position.y + player_height,
-                     player_position.z - player_width / 2),
-            glm.vec3(player_position.x - player_width / 2, player_position.y + player_height,
-                     player_position.z + player_width / 2),
-            glm.vec3(player_position.x + player_width / 2, player_position.y + player_height,
-                     player_position.z + player_width / 2)
+            glm.vec3(player_position.x - player_width / 2 - bounding_margin, player_position.y,
+                     player_position.z - player_width / 2 - bounding_margin),
+            glm.vec3(player_position.x + player_width / 2 + bounding_margin, player_position.y,
+                     player_position.z - player_width / 2 - bounding_margin),
+            glm.vec3(player_position.x - player_width / 2 - bounding_margin, player_position.y,
+                     player_position.z + player_width / 2 + bounding_margin),
+            glm.vec3(player_position.x + player_width / 2 + bounding_margin, player_position.y,
+                     player_position.z + player_width / 2 + bounding_margin),
+            glm.vec3(player_position.x - player_width / 2 - bounding_margin,
+                     player_position.y + player_height + bounding_margin,
+                     player_position.z - player_width / 2 - bounding_margin),
+            glm.vec3(player_position.x + player_width / 2 + bounding_margin,
+                     player_position.y + player_height + bounding_margin,
+                     player_position.z - player_width / 2 - bounding_margin),
+            glm.vec3(player_position.x - player_width / 2 - bounding_margin,
+                     player_position.y + player_height + bounding_margin,
+                     player_position.z + player_width / 2 + bounding_margin),
+            glm.vec3(player_position.x + player_width / 2 + bounding_margin,
+                     player_position.y + player_height + bounding_margin,
+                     player_position.z + player_width / 2 + bounding_margin)
         ]
 
         # Calculate plane normal
@@ -151,8 +160,6 @@ class Physics:
             # Verify the intersection point lies within the obstacle face bounds
             if not self.is_point_in_triangle(intersection_point, plane_point, plane_point + edge1, plane_point + edge2):
                 continue
-            else:
-                print('Intersection point out of bounds')
 
             # Determine penetration depth and correction
             penetration_depth = glm.distance(ray_origin, intersection_point)
@@ -184,23 +191,23 @@ class Physics:
 
             if is_horizontal_collision:
                 print('Horizontal collision')
-                # Adjust plane normal if necessary based on player velocity
-                if (plane_normal.x > 0 > self.player.velocity.x) or (plane_normal.x < 0 < self.player.velocity.x):
-                    plane_normal.x = -plane_normal.x
-                if (plane_normal.z > 0 > self.player.velocity.z) or (plane_normal.z < 0 < self.player.velocity.z):
-                    plane_normal.z = -plane_normal.z
+
+                # Project the player's velocity onto the collision normal
+                velocity_normal_component = glm.dot(self.player.velocity, plane_normal) * plane_normal
+
+                # If the velocity component is directed towards the obstacle, negate it
+                if glm.dot(velocity_normal_component, plane_normal) > 0:
+                    self.player.velocity -= velocity_normal_component
 
                 # Apply less correction for horizontal collisions, clamped to a max value
-                horizontal_correction = min(correction, max_correction)
+                horizontal_correction = correction  #min(correction, max_correction)
                 self.player.position -= plane_normal * horizontal_correction
 
-            # Apply corrections based on collision type
             elif is_vertical_collision:
                 print('Vertical collision')
                 self.player.position += plane_normal * correction
                 if not self.player.is_jumping:
                     self.player.velocity.y = 0  # Reset vertical velocity when grounded
-
 
         # Final debug position
         print(f'Final Player Position: {self.player.position}')
@@ -220,7 +227,6 @@ class Physics:
         v = (dot00 * dot12 - dot01 * dot02) * invDenom
         return (u >= 0) and (v >= 0) and (u + v < 1)
 
-
     def check_linear_collision(self):
         """
         Checks if the player's movement intersects with any object in the world.
@@ -228,11 +234,13 @@ class Physics:
         """
         start_pos = self.player.previous_position
         end_pos = self.player.position
+        player_bb = self.player.bounding_box
+        #print('extracted player_bb = ', self.player.bounding_box)
 
         for obj in self.world.get_objects():
             aabb = obj.aabb
-            if self.is_line_segment_intersecting_aabb(start_pos, end_pos, aabb):
-                nearest_face = self.get_nearest_intersecting_face(start_pos, end_pos, aabb)
+            if self.is_bounding_box_intersecting_aabb(player_bb, aabb):
+                nearest_face = self.get_nearest_intersecting_face(player_bb, aabb)
                 if nearest_face:
                     return nearest_face
         return None
@@ -276,11 +284,13 @@ class Physics:
 
         return True
 
-    def get_nearest_intersecting_face(self, start, end, aabb):
+    def get_nearest_intersecting_face(self, player_bb, aabb):
         """
-        Given that a line segment intersects an AABB, determines the nearest intersecting face.
+        Given that a bounding box intersects an AABB, determines the nearest intersecting face.
         Returns the coordinates of the nearest face as ((x1, y1, z1), (x2, y2, z2), (x3, y3, z3)).
         """
+        (min_px, min_py, min_pz) = player_bb[0]
+        (max_px, max_py, max_pz) = player_bb[1]
         (min_x, min_y, min_z), (max_x, max_y, max_z) = aabb
         faces = {
             "left": ((min_x, min_y, min_z), (min_x, max_y, min_z), (min_x, min_y, max_z)),
@@ -299,20 +309,23 @@ class Physics:
             edge2 = glm.vec3(vertices[2]) - glm.vec3(vertices[0])
             plane_normal = glm.normalize(glm.cross(edge1, edge2))
 
-            ray_direction = glm.normalize(end - start)
-            ndotu = glm.dot(plane_normal, ray_direction)
-            if abs(ndotu) < 1e-6:
-                continue
+            for corner in [(min_px, min_py, min_pz), (max_px, min_py, min_pz), (min_px, max_py, min_pz),
+                           (min_px, min_py, max_pz), (max_px, max_py, max_pz), (max_px, min_py, max_pz),
+                           (min_px, max_py, max_pz), (max_px, max_py, min_pz)]:
+                ray_direction = glm.normalize(corner - glm.vec3(vertices[0]))
+                ndotu = glm.dot(plane_normal, ray_direction)
+                if abs(ndotu) < 1e-6:
+                    continue
 
-            w = start - plane_point
-            si = -glm.dot(plane_normal, w) / ndotu
-            intersection_point = start + si * ray_direction
+                w = glm.vec3(corner) - plane_point
+                si = -glm.dot(plane_normal, w) / ndotu
+                intersection_point = glm.vec3(corner) + si * ray_direction
 
-            if (min_x <= intersection_point.x <= max_x and
-                    min_y <= intersection_point.y <= max_y and
-                    min_z <= intersection_point.z <= max_z):
-                distance = glm.distance(start, intersection_point)
-                intersection_distances[face] = (distance, vertices)
+                if (min_x <= intersection_point.x <= max_x and
+                        min_y <= intersection_point.y <= max_y and
+                        min_z <= intersection_point.z <= max_z):
+                    distance = glm.distance(glm.vec3(corner), intersection_point)
+                    intersection_distances[face] = (distance, vertices)
 
         if not intersection_distances:
             return None
@@ -320,12 +333,93 @@ class Physics:
         nearest_face = min(intersection_distances, key=lambda k: intersection_distances[k][0])
         return intersection_distances[nearest_face][1]
 
+    def is_bounding_box_intersecting_aabb(self, player_bb, aabb):
+        """
+        Checks if a bounding box intersects with an AABB (Axis-Aligned Bounding Box).
+        Returns True if there is an intersection, otherwise False.
+        """
+        #print('is_bounding_box_intersecting_aabb? player_bb = ', player_bb)
+        (min_px, min_py, min_pz) = player_bb[0]
+        (max_px, max_py, max_pz) = player_bb[1]
+        (min_x, min_y, min_z), (max_x, max_y, max_z) = aabb
+
+        # Check for overlap on each axis
+        return (min_px <= max_x and max_px >= min_x and
+                min_py <= max_y and max_py >= min_y and
+                min_pz <= max_z and max_pz >= min_z)
+
+    def apply_forces(self, delta_time: float):
+        # Apply lateral thrust for movement
+        if self.player.thrust.x != 0.0 or self.player.thrust.z != 0.0:
+            # Calculate desired lateral velocity
+            desired_velocity = glm.normalize(glm.vec3(self.player.thrust.x, 0.0, self.player.thrust.z)) * self.player.max_speed
+            # Use a lerp function to smoothly interpolate towards the target velocity
+            lerp_factor = 1 - glm.exp(-self.player.accelerator * delta_time)
+            self.player.velocity.x = self.player.velocity.x * (1 - lerp_factor) + desired_velocity.x * lerp_factor
+            self.player.velocity.z = self.player.velocity.z * (1 - lerp_factor) + desired_velocity.z * lerp_factor
+        else:
+            # Apply braking force to lateral movement
+            deceleration = glm.exp(-self.player.accelerator * delta_time)
+            self.player.velocity.x *= deceleration
+            self.player.velocity.z *= deceleration
+            # Ensure that the lateral velocity does not invert due to overshooting the deceleration
+            if glm.length(glm.vec3(self.player.velocity.x, 0.0, self.player.velocity.z)) ** 2 < 0.01:
+                self.player.velocity.x = 0.0
+                self.player.velocity.z = 0.0
+
+        # Ensure vertical velocity does not invert due to overshooting the deceleration
+        if abs(self.player.velocity.y) < 0.01:
+            self.player.velocity.y = 0.0
+
+        #print(f"Updated Velocity: {self.player.velocity}")
+
+    def adjust_thrust_to_avoid_collision(self, proposed_thrust, delta_time):
+        # Check each axis independently to adjust thrust
+        adjusted_thrust = proposed_thrust
+        if self.check_collision_with_proposed_movement(delta_time):
+            print('adjusted thrust to x = 0')
+            adjusted_thrust.x = 0
+        if self.check_collision_with_proposed_movement(delta_time):
+            adjusted_thrust.y = 0
+            print('adjusted thrust to y = 0')
+        if self.check_collision_with_proposed_movement(delta_time):
+            adjusted_thrust.z = 0
+            print('adjusted thrust to z = 0')
+        return adjusted_thrust
+
+    def validate_proposed_position(self):
+        player_bb = self.player.calculate_player_bounding_box(self.player.position, self.player.proposed_thrust)
+        if not player_bb or len(player_bb) != 2:
+            print('Invalid bounding box:', player_bb)
+            return False
+        for obj in self.world.get_objects():
+            if self.is_bounding_box_intersecting_aabb(player_bb, obj.aabb):
+                print('Collision detected, rejecting proposed position')
+                return False
+        print('No collision, allowing proposed position')
+        return True
+
+    def check_collision_with_proposed_movement(self, delta_time):
+        # Create a temporary position based on the proposed thrust
+        temp_position = self.player.position + self.player.proposed_thrust * delta_time
+        # Create a bounding box for the new position
+        #print('temp_position',temp_position)
+        player_bb = self.player.calculate_player_bounding_box(self.player.position, temp_position)
+        #print('check collision with proposed movement: player_bb = ', player_bb)
+        for obj in self.world.get_objects():
+            if self.is_bounding_box_intersecting_aabb(player_bb, obj.aabb):
+                return True
+        return False
+
     def update_physics(self, delta_time: float):
         """
         Updates the game state, applying gravity if no collision is detected, and resolving collisions if detected.
         """
+        self.player.velocity = self.adjust_thrust_to_avoid_collision(self.player.proposed_thrust, delta_time)
+        self.apply_forces(delta_time)
         obstacle_face = self.check_linear_collision()
         if obstacle_face:
             self.resolve_player_collision(obstacle_face, delta_time)
         else:
             self.apply_gravity(delta_time)
+            #pass

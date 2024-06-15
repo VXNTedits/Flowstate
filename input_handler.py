@@ -2,8 +2,9 @@ import glfw
 
 
 class InputHandler:
-    def __init__(self, camera, player):
+    def __init__(self, camera, player, physics):
         self.camera = camera
+        self.physics = physics
         self.player = player
         self.keys = {
             glfw.KEY_W: False,
@@ -50,23 +51,27 @@ class InputHandler:
             elif action == glfw.RELEASE:
                 self.left_mouse_button_pressed = False
 
-    def update_inputs(self, delta_time):
-        self.player.reset_thrust()  # Reset thrust before updating based on keys
-        if self.keys[glfw.KEY_W]:
-            self.player.update_position('FORWARD', delta_time)
-        if self.keys[glfw.KEY_S]:
-            self.player.update_position('BACKWARD', delta_time)
-        if self.keys[glfw.KEY_A]:
-            self.player.update_position('LEFT', delta_time)
-        if self.keys[glfw.KEY_D]:
-            self.player.update_position('RIGHT', delta_time)
-        if self.keys.get(glfw.KEY_SPACE, False):
-            if not self.player.jump_key_previous:
-                self.player.update_position('JUMP', delta_time)
-                self.player.jump_key_previous = True
-        else:
-            self.player.jump_key_previous = False
-        if self.keys[glfw.KEY_F]:
-            self.player.interact = True
-        else:
-            self.player.interact = False
+    def process_input(self, player, delta_time):
+        if self.keys.get(glfw.KEY_W):
+            #print('w')
+            self.handle_input('FORWARD', delta_time)
+
+        if self.keys.get(glfw.KEY_S):
+            #print('s')
+            self.handle_input('BACKWARD', delta_time)
+
+        if self.keys.get(glfw.KEY_A):
+            #print('a')
+            self.handle_input('LEFT', delta_time)
+
+        if self.keys.get(glfw.KEY_D):
+            #print('d')
+            self.handle_input('RIGHT', delta_time)
+
+        if self.keys.get(glfw.KEY_SPACE):
+            #print('space')
+            self.handle_input('JUMP', delta_time)
+
+    def handle_input(self, direction, delta_time):
+        #print(direction)
+        self.player.propose_updated_thrust(direction, delta_time)

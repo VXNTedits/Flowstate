@@ -9,14 +9,24 @@ from interactable import InteractableObject
 
 
 class Player(Model):
-    def __init__(self, body_path: str, head_path: str, right_arm_path: str, mtl_path: str, camera, default_material,
-                 filepath: str, mtl_filepath: str):
+    def __init__(self,
+                 body_path: str,
+                 head_path: str,
+                 right_arm_path:
+                 str, mtl_path: str,
+                 camera,
+                 default_material,
+                 filepath: str,
+                 mtl_filepath: str):
+        self.is_player = True
+        self.player_height = 2
+        self.player_width = 1
         self.default_material = default_material
         self.camera = camera
         self.torso = Model(body_path, mtl_path, player=True, translation=(0, 1, 0))
         self.head = Model(head_path, mtl_path, player=True, translation=(0, 1, 0))
         self.right_arm = Model(right_arm_path, mtl_path, player=True, translation=(0, 1, 0))
-        self.right_hand_model_matrix = self.set_hand_position()
+        self.set_hand_position()
         self.position = glm.vec3(10.0, 10.2, -10.0)
         self.previous_position = glm.vec3(10.0, 10.2, -10.0)
         self.front = glm.vec3(0.0, 0.0, -1.0)
@@ -40,9 +50,11 @@ class Player(Model):
         self.name = 'ego'
         self.jump_cooldown_limit = 1
         self.jump_cooldown = self.jump_cooldown_limit
+        self.proposed_thrust = self.thrust
+        self.bounding_box = self.calculate_player_bounding_box(self.previous_position, self.position)
 
     def update_player(self, delta_time: float):
-        self.apply_forces(delta_time)
+        #self.apply_forces(delta_time)
         self.previous_position = glm.vec3(self.position)  # Update previous position before changing current position
         self.position += self.velocity * delta_time
         self.update_camera_position()
@@ -51,36 +63,12 @@ class Player(Model):
         self.trajectory = glm.normalize(self.position - self.previous_position)
         if self.velocity.y < 0:
             self.is_jumping = False
-
-    def apply_forces(self, delta_time: float):
-        # Apply lateral thrust for movement
-        if self.thrust.x != 0.0 or self.thrust.z != 0.0:
-            # Calculate desired lateral velocity
-            desired_velocity = glm.normalize(glm.vec3(self.thrust.x, 0.0, self.thrust.z)) * self.max_speed
-            # Use a lerp function to smoothly interpolate towards the target velocity
-            lerp_factor = 1 - np.exp(-self.accelerator * delta_time)
-            self.velocity.x = self.velocity.x * (1 - lerp_factor) + desired_velocity.x * lerp_factor
-            self.velocity.z = self.velocity.z * (1 - lerp_factor) + desired_velocity.z * lerp_factor
-        else:
-            # Apply braking force to lateral movement
-            deceleration = np.exp(-self.accelerator * delta_time)
-            self.velocity.x *= deceleration
-            self.velocity.z *= deceleration
-            # Ensure that the lateral velocity does not invert due to overshooting the deceleration
-            if glm.length(glm.vec3(self.velocity.x, 0.0, self.velocity.z)) ** 2 < 0.01:
-                self.velocity.x = 0.0
-                self.velocity.z = 0.0
-
-        # Ensure vertical velocity does not invert due to overshooting the deceleration
-        if abs(self.velocity.y) < 0.01:
-            self.velocity.y = 0.0
-
-        #print(f"Updated Velocity: {self.velocity}")
+        self.calculate_player_bounding_box(self.previous_position, self.position)
 
     def reset_thrust(self):
         self.thrust = glm.vec3(0.0, 0.0, 0.0)
 
-    def update_position(self, direction: str, delta_time: float):
+    def handle_input(self, direction: str, delta_time: float):
         front = glm.vec3(glm.cos(glm.radians(self.yaw)), 0, glm.sin(glm.radians(self.yaw)))
         right = glm.normalize(glm.cross(front, self.up))
         up = self.up
@@ -97,11 +85,34 @@ class Player(Model):
         if direction == 'RIGHT':
             self.thrust.x += right.x * self.accelerator
             self.thrust.z += right.z * self.accelerator
-        if direction == 'JUMP' and self.is_grounded:  #and self.is_grounded:
+        if direction == 'JUMP' and self.is_grounded:
             self.is_jumping = True
             self.velocity.y = self.jump_force
+            self.is_grounded = False
             print('jump: updated velocity to', self.velocity)
-            self.is_grounded = False  # Set is_grounded to False immediately after jumping
+
+    def propose_updated_thrust(self, direction: str, delta_time: float):
+        front = glm.vec3(glm.cos(glm.radians(self.yaw)), 0, glm.sin(glm.radians(self.yaw)))
+        right = glm.normalize(glm.cross(front, self.up))
+        proposed_thrust = glm.vec3(0, 0, 0)
+
+        if direction == 'FORWARD':
+            proposed_thrust += front * self.accelerator
+        if direction == 'BACKWARD':
+            proposed_thrust -= front * self.accelerator
+        if direction == 'LEFT':
+            proposed_thrust -= right * self.accelerator
+        if direction == 'RIGHT':
+            proposed_thrust += right * self.accelerator
+        if direction == 'JUMP' and self.is_grounded:
+            self.is_jumping = True
+            self.velocity.y = self.jump_force
+            self.is_grounded = False
+            print('jump: updated velocity to', self.velocity)
+
+        # Propose the new position based on thrust
+        self.proposed_thrust = proposed_thrust# * delta_time
+
 
     def update_player_model_matrix(self):
         # Rotate around the yaw axis (Y-axis)
@@ -166,3 +177,13 @@ class Player(Model):
         world_hand_position = glm.vec3(
             self.right_arm.model_matrix * glm.vec4(-local_hand_position.x, local_hand_position.y, local_hand_position.z,
                                                    1.0))
+
+    def calculate_player_bounding_box(self, start_pos: glm.vec3, end_pos: glm.vec3, bounding_margin=0.1):
+        min_x = min(start_pos.x, end_pos.x) - self.player_width / 2 - bounding_margin
+        max_x = max(start_pos.x, end_pos.x) + self.player_width / 2 + bounding_margin
+        min_y = min(start_pos.y, end_pos.y) - bounding_margin
+        max_y = max(start_pos.y, end_pos.y) + self.player_height + bounding_margin
+        min_z = min(start_pos.z, end_pos.z) - self.player_width / 2 - bounding_margin
+        max_z = max(start_pos.z, end_pos.z) + self.player_width / 2 + bounding_margin
+        #print('calculated player bounding box = ', [(min_x, min_y, min_z), (max_x, max_y, max_z)])
+        return [(min_x, min_y, min_z), (max_x, max_y, max_z)]

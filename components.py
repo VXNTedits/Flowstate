@@ -104,10 +104,11 @@ class Components:
         self.renderer = Renderer(self.shader, self.camera)
         print('Renderer initialized')
 
-        self.input_handler = InputHandler(self.camera, self.player)
-        print('Input handler initialized')
-
         self.physics = Physics(self.world_objects, self.player, self.interactables, self.world)
+        print('Physics initialized')
+
+        self.input_handler = InputHandler(self.camera, self.player, self.physics)
+        print('Input handler initialized')
 
     def set_input_callbacks(self, window):
         window.set_callbacks(self.input_handler.key_callback, self.input_handler.mouse_callback)
