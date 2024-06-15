@@ -178,12 +178,24 @@ class Player(Model):
             self.right_arm.model_matrix * glm.vec4(-local_hand_position.x, local_hand_position.y, local_hand_position.z,
                                                    1.0))
 
-    def calculate_player_bounding_box(self, start_pos: glm.vec3, end_pos: glm.vec3, bounding_margin=0.1):
+    # def calculate_player_bounding_box(self, start_pos: glm.vec3, end_pos: glm.vec3, bounding_margin=0.1):
+    #     min_x = min(start_pos.x, end_pos.x) - self.player_width / 2 - bounding_margin
+    #     max_x = max(start_pos.x, end_pos.x) + self.player_width / 2 + bounding_margin
+    #     min_y = min(start_pos.y, end_pos.y) - bounding_margin
+    #     max_y = max(start_pos.y, end_pos.y) + self.player_height + bounding_margin
+    #     min_z = min(start_pos.z, end_pos.z) - self.player_width / 2 - bounding_margin
+    #     max_z = max(start_pos.z, end_pos.z) + self.player_width / 2 + bounding_margin
+    #     #print('calculated player bounding box = ', [(min_x, min_y, min_z), (max_x, max_y, max_z)])
+    #     return [(min_x, min_y, min_z), (max_x, max_y, max_z)]
+
+    def calculate_player_bounding_box(self, start_pos, end_pos, bounding_margin=0.1):
         min_x = min(start_pos.x, end_pos.x) - self.player_width / 2 - bounding_margin
         max_x = max(start_pos.x, end_pos.x) + self.player_width / 2 + bounding_margin
         min_y = min(start_pos.y, end_pos.y) - bounding_margin
         max_y = max(start_pos.y, end_pos.y) + self.player_height + bounding_margin
         min_z = min(start_pos.z, end_pos.z) - self.player_width / 2 - bounding_margin
         max_z = max(start_pos.z, end_pos.z) + self.player_width / 2 + bounding_margin
-        #print('calculated player bounding box = ', [(min_x, min_y, min_z), (max_x, max_y, max_z)])
-        return [(min_x, min_y, min_z), (max_x, max_y, max_z)]
+
+        bounding_box = [(min_x, min_y, min_z), (max_x, max_y, max_z)]
+        #print('calculated player bounding box = ', bounding_box)
+        return bounding_box
