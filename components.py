@@ -113,11 +113,12 @@ class Components:
         window.set_callbacks(self.input_handler.key_callback, self.input_handler.mouse_callback)
 
     def update_components(self, delta_time: float):
-        self.camera.update(delta_time)
-        self.player.update(delta_time)
+        #self.camera.update(delta_time)
+        #self.player.update(delta_time)
         self.world_objects.update(delta_time)
         for item in self.interactables:
             item.update(self.player, delta_time)
+        #self.physics.update_physics(delta_time)
 
     def add_interactable(self, interactable_object):
         self.interactables.append(interactable_object)

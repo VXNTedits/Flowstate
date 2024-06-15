@@ -33,36 +33,37 @@ class Player(Model):
         self.update_player_model_matrix()
         self.is_grounded = False
         self.is_jumping = False
-        self.displacement = self.position - self.previous_position
+        self.trajectory = self.position - self.previous_position
         self.inventory = []
         self.interact = False
         self.name = 'ego'
 
-    def update(self, delta_time: float):
+    def update_player(self, delta_time: float):
         if delta_time <= 0:
             print("Delta time is zero or negative!")
             return
+
         self.apply_forces(delta_time)
         self.previous_position = glm.vec3(self.position)  # Update previous position before changing current position
         self.position += self.velocity * delta_time
         self.update_camera_position()
-        self.right_hand = self.set_hand_position()
+        self.set_hand_position()
         self.update_player_model_matrix()
-        self.displacement = self.position - self.previous_position
-        # Reset the is_jumping flag if the player has landed
-        if self.is_grounded:
+        self.trajectory = glm.normalize(self.position - self.previous_position)
+
+        # Manage jumping and grounded states
+        if self.is_grounded and self.velocity.y < 0.0:
             self.is_jumping = False
+
+        # if self.velocity.y < 0.0 and not self.is_grounded:
+        #     self.is_jumping = False
 
     def apply_forces(self, delta_time: float):
-        # Apply vertical thrust if jumping
-        if self.thrust.y > 0 and self.is_grounded:
+        # # Apply vertical thrust if jumping
+        if self.is_jumping:
             self.velocity.y = self.thrust.y
             self.is_grounded = False
-            self.is_jumping = True
-
-        # Toggle off the is_jumping flag if the player is falling downwards
-        if self.velocity.y < 0.0:
-            self.is_jumping = False
+            self.is_jumping = False  # Reset is_jumping after applying jump force
 
         # Apply lateral thrust for movement
         if self.thrust.x != 0.0 or self.thrust.z != 0.0:
@@ -109,7 +110,10 @@ class Player(Model):
             self.thrust.x += right.x * self.accelerator
             self.thrust.z += right.z * self.accelerator
         if direction == 'JUMP' and self.is_grounded:
-            self.thrust.y += up.y * self.jump_force
+            self.is_jumping = True
+            self.is_grounded = False
+            self.velocity.y += self.jump_force  # Directly modify the velocity for the jump
+            print('jump')
 
     def update_player_model_matrix(self):
         # Rotate around the yaw axis (Y-axis)

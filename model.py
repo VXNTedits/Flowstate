@@ -258,16 +258,24 @@ class Model:
                 transformed_vertex = glm.vec3(self.model_matrix * vec4_vertex)
                 transformed_bounding_box.append(transformed_vertex)
 
+            print("Calculated bounding box:", transformed_bounding_box)
             return transformed_bounding_box
 
     def calculate_aabb(self):
-        min_x = min(self.bounding_box, key=lambda v: v.x).x
-        max_x = max(self.bounding_box, key=lambda v: v.x).x
-        min_y = min(self.bounding_box, key=lambda v: v.y).y
-        max_y = max(self.bounding_box, key=lambda v: v.y).y
-        min_z = min(self.bounding_box, key=lambda v: v.z).z
-        max_z = max(self.bounding_box, key=lambda v: v.z).z
-        return (min_x, min_y, min_z), (max_x, max_y, max_z)
+        bounding_box = self.calculate_bounding_box()
+        if not bounding_box:
+            return (0, 0, 0), (0, 0, 0)  # Return a default AABB if the bounding box is empty
+
+        min_x = min(bounding_box, key=lambda v: v.x).x
+        max_x = max(bounding_box, key=lambda v: v.x).x
+        min_y = min(bounding_box, key=lambda v: v.y).y
+        max_y = max(bounding_box, key=lambda v: v.y).y
+        min_z = min(bounding_box, key=lambda v: v.z).z
+        max_z = max(bounding_box, key=lambda v: v.z).z
+
+        aabb = (min_x, min_y, min_z), (max_x, max_y, max_z)
+        print("Calculated AABB:", aabb)
+        return aabb
 
     # def __getattr__(self, name):
     #     return getattr(self._model, name)

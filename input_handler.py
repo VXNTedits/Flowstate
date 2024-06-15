@@ -50,7 +50,7 @@ class InputHandler:
             elif action == glfw.RELEASE:
                 self.left_mouse_button_pressed = False
 
-    def update(self, delta_time):
+    def update_inputs(self, delta_time):
         self.player.reset_thrust()  # Reset thrust before updating based on keys
         if self.keys[glfw.KEY_W]:
             self.player.update_position('FORWARD', delta_time)
