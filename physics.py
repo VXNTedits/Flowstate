@@ -17,24 +17,18 @@ class Physics:
         self.player = player
         self.gravity = glm.vec3(0, -10, 0)
         self.interactables = interactables
-        self.pid_controller = PIDController(kp=10, ki=0.0, kd=0.0)
+        self.pid_controller = PIDController(kp=1, ki=0.0, kd=0.0)
         self.offset = 0.1
-        self.gravity = True
+        self.set_gravity = True
 
     def apply_gravity(self, delta_time: float):
         #print("applying gravity")
         if not self.player.is_grounded:
             self.player.velocity += self.gravity * delta_time
             self.player.position += self.player.velocity * delta_time + 0.5 * self.gravity * delta_time ** 2
-            self.gravity = True
+            self.set_gravity = True
         elif self.player.is_grounded:
-            self.gravity = False
-        #print(self.player.position)
-        #else:
-        #    self.gravity = False
-        #for item in self.interactables:
-        #    item.velocity += self.gravity * delta_time
-        #    item.position += item.velocity * delta_time + 0.5 * self.gravity * delta_time ** 2
+            self.set_gravity = False
 
     def is_point_inside_convex_polyhedron(self, point: glm.vec3, convex_shape: List[glm.vec3]) -> bool:
         indices = range(0, len(convex_shape), 3)  # Assuming the convex_shape is a flattened list of triangles
@@ -114,54 +108,118 @@ class Physics:
         self.player.position = player_pos
         print(f"Final player position after resolving collision: {self.player.position}")
 
-    def resolve_player_collision(self, obstacle_face, delta_time, penetration_threshold=1.0, correction_velocity=0.5):
-        plane_point = glm.vec3(obstacle_face[0])
+    def resolve_player_collision(self, obstacle_face, delta_time, penetration_threshold=1, correction_velocity=0.5):
+        # Define player's bounding box corners
+        player_height = 2
+        player_width = 0.5
+        player_position = self.player.position
 
+        corners = [
+            glm.vec3(player_position.x - player_width / 2, player_position.y, player_position.z - player_width / 2),
+            glm.vec3(player_position.x + player_width / 2, player_position.y, player_position.z - player_width / 2),
+            glm.vec3(player_position.x - player_width / 2, player_position.y, player_position.z + player_width / 2),
+            glm.vec3(player_position.x + player_width / 2, player_position.y, player_position.z + player_width / 2),
+            glm.vec3(player_position.x - player_width / 2, player_position.y + player_height,
+                     player_position.z - player_width / 2),
+            glm.vec3(player_position.x + player_width / 2, player_position.y + player_height,
+                     player_position.z - player_width / 2),
+            glm.vec3(player_position.x - player_width / 2, player_position.y + player_height,
+                     player_position.z + player_width / 2),
+            glm.vec3(player_position.x + player_width / 2, player_position.y + player_height,
+                     player_position.z + player_width / 2)
+        ]
+
+        # Calculate plane normal
+        plane_point = glm.vec3(obstacle_face[0])
         edge1 = glm.vec3(obstacle_face[1]) - glm.vec3(obstacle_face[0])
         edge2 = glm.vec3(obstacle_face[2]) - glm.vec3(obstacle_face[0])
-        plane_normal = glm.normalize(glm.cross(edge1, edge2))
+        plane_normal = glm.normalize(glm.cross(edge2, edge1))
 
-        ray_origin = self.player.position
-        ray_direction = glm.normalize(self.player.trajectory)
+        # Check each corner for collisions
+        for corner in corners:
+            ray_origin = corner
+            ray_direction = glm.normalize(self.player.trajectory)
+            ndotu = glm.dot(plane_normal, ray_direction)
 
-        ndotu = glm.dot(plane_normal, ray_direction)
-        if abs(ndotu) < 1e-6:
-            print('No intersection, ray is parallel to the plane.')
-            return
+            if abs(ndotu) < 1e-9:
+                continue
 
-        w = ray_origin - plane_point
-        si = -glm.dot(plane_normal, w) / ndotu
-        intersection_point = ray_origin + si * ray_direction
+            w = ray_origin - plane_point
+            si = -glm.dot(plane_normal, w) / ndotu
+            intersection_point = ray_origin + si * ray_direction
 
-        penetration_depth = glm.distance(ray_origin, intersection_point)
-        is_downwards_collision = plane_normal.y < 0  # Corrected logic for downward collision
+            # Verify the intersection point lies within the obstacle face bounds
+            if not self.is_point_in_triangle(intersection_point, plane_point, plane_point + edge1, plane_point + edge2):
+                continue
+            else:
+                print('Intersection point out of bounds')
 
-        error = penetration_depth + penetration_threshold
-        correction = self.pid_controller.calculate(error, delta_time)
-        print(f"is grounded = {self.player.is_grounded} is jumping = {self.player.is_jumping} gravity = {self.gravity}")
+            # Determine penetration depth and correction
+            penetration_depth = glm.distance(ray_origin, intersection_point)
+            if penetration_depth > penetration_threshold:
+                continue
 
-        max_velocity = 100.0  # Define the maximum allowable velocity
+            error = penetration_depth
+            correction = self.pid_controller.calculate(error, delta_time)
 
-        if is_downwards_collision and not self.player.is_jumping:
-            self.player.position -= plane_normal * correction
-            self.player.is_grounded = True
-        else:
-            new_velocity = self.player.velocity - plane_normal * correction
+            # Clamp correction to avoid large jumps
+            max_correction = 1.0
+            correction = min(correction, max_correction)
 
-            # Preserve horizontal velocity if above or below the obstacle
-            if is_downwards_collision or plane_normal.y != 0:
-                new_velocity.x = self.player.velocity.x
-                new_velocity.z = self.player.velocity.z
+            # Debug information
+            print(f'Plane Normal: {plane_normal}')
+            print(f'Intersection Point: {intersection_point}')
+            print(f'Penetration Depth: {penetration_depth}')
+            print(f'Correction: {correction}')
 
-            # Preserve vertical velocity if to the left, right, in front, or behind the obstacle
-            if plane_normal.x != 0 or plane_normal.z != 0:
-                new_velocity.y = self.player.velocity.y
+            # Check collision type
+            is_vertical_collision = plane_normal.y > 0.5
+            is_horizontal_collision = abs(plane_normal.x) > 0.5 or abs(plane_normal.z) > 0.5
 
-            # Clamp the new velocity to the maximum allowable value
-            if glm.length(new_velocity) > max_velocity:
-                new_velocity = glm.normalize(new_velocity) * max_velocity
+            # Further filter horizontal collisions
+            is_horizontal_collision = is_horizontal_collision and not is_vertical_collision
 
-            self.player.velocity = new_velocity
+            # Determine if player is grounded
+            self.player.is_grounded = is_vertical_collision and self.player.velocity.y <= 0.01
+
+            if is_horizontal_collision:
+                print('Horizontal collision')
+                # Adjust plane normal if necessary based on player velocity
+                if (plane_normal.x > 0 > self.player.velocity.x) or (plane_normal.x < 0 < self.player.velocity.x):
+                    plane_normal.x = -plane_normal.x
+                if (plane_normal.z > 0 > self.player.velocity.z) or (plane_normal.z < 0 < self.player.velocity.z):
+                    plane_normal.z = -plane_normal.z
+
+                # Apply less correction for horizontal collisions, clamped to a max value
+                horizontal_correction = min(correction, max_correction)
+                self.player.position -= plane_normal * horizontal_correction
+
+            # Apply corrections based on collision type
+            elif is_vertical_collision:
+                print('Vertical collision')
+                self.player.position += plane_normal * correction
+                if not self.player.is_jumping:
+                    self.player.velocity.y = 0  # Reset vertical velocity when grounded
+
+
+        # Final debug position
+        print(f'Final Player Position: {self.player.position}')
+        print('_____')
+
+    def is_point_in_triangle(self, p, a, b, c):
+        v0 = c - a
+        v1 = b - a
+        v2 = p - a
+        dot00 = glm.dot(v0, v0)
+        dot01 = glm.dot(v0, v1)
+        dot02 = glm.dot(v0, v2)
+        dot11 = glm.dot(v1, v1)
+        dot12 = glm.dot(v1, v2)
+        invDenom = 1 / (dot00 * dot11 - dot01 * dot01)
+        u = (dot11 * dot02 - dot01 * dot12) * invDenom
+        v = (dot00 * dot12 - dot01 * dot02) * invDenom
+        return (u >= 0) and (v >= 0) and (u + v < 1)
+
 
     def check_linear_collision(self):
         """
@@ -176,7 +234,6 @@ class Physics:
             if self.is_line_segment_intersecting_aabb(start_pos, end_pos, aabb):
                 nearest_face = self.get_nearest_intersecting_face(start_pos, end_pos, aabb)
                 if nearest_face:
-                    print('found collision')
                     return nearest_face
         return None
 
@@ -267,9 +324,8 @@ class Physics:
         """
         Updates the game state, applying gravity if no collision is detected, and resolving collisions if detected.
         """
-        self.apply_gravity(delta_time)
         obstacle_face = self.check_linear_collision()
         if obstacle_face:
             self.resolve_player_collision(obstacle_face, delta_time)
-        #elif not self.player.is_grounded:
-
+        else:
+            self.apply_gravity(delta_time)

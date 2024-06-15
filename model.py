@@ -225,7 +225,7 @@ class Model:
         # self.model_matrix = translation_matrix  # Uncomment this line for absolute positioning
 
     # Implement other methods as required
-    def calculate_bounding_box(self) -> list:
+    def calculate_bounding_box(self, bounding_margin=0.1) -> list:
         if self.is_player:
             # Return a point at the bottom center of the player model: the player's feet
             return [glm.vec3(0, 0, 0)]  # Assuming the player's feet are at the origin
@@ -239,6 +239,14 @@ class Model:
 
             min_x, min_y, min_z = np.min(positions, axis=0)
             max_x, max_y, max_z = np.max(positions, axis=0)
+
+            # Add margin to the bounding box dimensions
+            min_x -= bounding_margin
+            min_y -= bounding_margin
+            min_z -= bounding_margin
+            max_x += bounding_margin
+            max_y += bounding_margin
+            max_z += bounding_margin
 
             bounding_box = [
                 glm.vec3(min_x, min_y, min_z),

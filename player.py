@@ -7,6 +7,7 @@ from camera import Camera
 from model import Model
 from interactable import InteractableObject
 
+
 class Player(Model):
     def __init__(self, body_path: str, head_path: str, right_arm_path: str, mtl_path: str, camera, default_material,
                  filepath: str, mtl_filepath: str):
@@ -37,12 +38,10 @@ class Player(Model):
         self.inventory = []
         self.interact = False
         self.name = 'ego'
+        self.jump_cooldown_limit = 1
+        self.jump_cooldown = self.jump_cooldown_limit
 
     def update_player(self, delta_time: float):
-        if delta_time <= 0:
-            print("Delta time is zero or negative!")
-            return
-
         self.apply_forces(delta_time)
         self.previous_position = glm.vec3(self.position)  # Update previous position before changing current position
         self.position += self.velocity * delta_time
@@ -50,21 +49,10 @@ class Player(Model):
         self.set_hand_position()
         self.update_player_model_matrix()
         self.trajectory = glm.normalize(self.position - self.previous_position)
-
-        # Manage jumping and grounded states
-        if self.is_grounded and self.velocity.y < 0.0:
+        if self.velocity.y < 0:
             self.is_jumping = False
 
-        # if self.velocity.y < 0.0 and not self.is_grounded:
-        #     self.is_jumping = False
-
     def apply_forces(self, delta_time: float):
-        # # Apply vertical thrust if jumping
-        if self.is_jumping:
-            self.velocity.y = self.thrust.y
-            self.is_grounded = False
-            self.is_jumping = False  # Reset is_jumping after applying jump force
-
         # Apply lateral thrust for movement
         if self.thrust.x != 0.0 or self.thrust.z != 0.0:
             # Calculate desired lateral velocity
@@ -109,11 +97,11 @@ class Player(Model):
         if direction == 'RIGHT':
             self.thrust.x += right.x * self.accelerator
             self.thrust.z += right.z * self.accelerator
-        if direction == 'JUMP' and self.is_grounded:
+        if direction == 'JUMP' and self.is_grounded:  #and self.is_grounded:
             self.is_jumping = True
-            self.is_grounded = False
-            self.velocity.y += self.jump_force  # Directly modify the velocity for the jump
-            print('jump')
+            self.velocity.y = self.jump_force
+            print('jump: updated velocity to', self.velocity)
+            self.is_grounded = False  # Set is_grounded to False immediately after jumping
 
     def update_player_model_matrix(self):
         # Rotate around the yaw axis (Y-axis)
@@ -173,7 +161,8 @@ class Player(Model):
 
     def set_hand_position(self):
         # Define the local position of the hand relative to the right arm
-        local_hand_position = glm.vec3(0, -0.5,1)#glm.vec3(0, -0.5, 1)  # Example position at the end of the arm
+        local_hand_position = glm.vec3(0, -0.5, 1)  #glm.vec3(0, -0.5, 1)  # Example position at the end of the arm
         # Transform the local hand position to world coordinates using the right arm's model matrix
-        world_hand_position = glm.vec3(self.right_arm.model_matrix * glm.vec4(-local_hand_position.x, local_hand_position.y, local_hand_position.z, 1.0))
-
+        world_hand_position = glm.vec3(
+            self.right_arm.model_matrix * glm.vec4(-local_hand_position.x, local_hand_position.y, local_hand_position.z,
+                                                   1.0))
