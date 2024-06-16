@@ -68,29 +68,6 @@ class Player(Model):
     def reset_thrust(self):
         self.thrust = glm.vec3(0.0, 0.0, 0.0)
 
-    def handle_input(self, direction: str, delta_time: float):
-        front = glm.vec3(glm.cos(glm.radians(self.yaw)), 0, glm.sin(glm.radians(self.yaw)))
-        right = glm.normalize(glm.cross(front, self.up))
-        up = self.up
-
-        if direction == 'FORWARD':
-            self.thrust.x += front.x * self.accelerator
-            self.thrust.z += front.z * self.accelerator
-        if direction == 'BACKWARD':
-            self.thrust.x -= front.x * self.accelerator
-            self.thrust.z -= front.z * self.accelerator
-        if direction == 'LEFT':
-            self.thrust.x -= right.x * self.accelerator
-            self.thrust.z -= right.z * self.accelerator
-        if direction == 'RIGHT':
-            self.thrust.x += right.x * self.accelerator
-            self.thrust.z += right.z * self.accelerator
-        if direction == 'JUMP' and self.is_grounded:
-            self.is_jumping = True
-            self.velocity.y = self.jump_force
-            self.is_grounded = False
-            print('jump: updated velocity to', self.velocity)
-
     def propose_updated_thrust(self, direction: str, delta_time: float):
         front = glm.vec3(glm.cos(glm.radians(self.yaw)), 0, glm.sin(glm.radians(self.yaw)))
         right = glm.normalize(glm.cross(front, self.up))
@@ -177,16 +154,6 @@ class Player(Model):
         world_hand_position = glm.vec3(
             self.right_arm.model_matrix * glm.vec4(-local_hand_position.x, local_hand_position.y, local_hand_position.z,
                                                    1.0))
-
-    # def calculate_player_bounding_box(self, start_pos: glm.vec3, end_pos: glm.vec3, bounding_margin=0.1):
-    #     min_x = min(start_pos.x, end_pos.x) - self.player_width / 2 - bounding_margin
-    #     max_x = max(start_pos.x, end_pos.x) + self.player_width / 2 + bounding_margin
-    #     min_y = min(start_pos.y, end_pos.y) - bounding_margin
-    #     max_y = max(start_pos.y, end_pos.y) + self.player_height + bounding_margin
-    #     min_z = min(start_pos.z, end_pos.z) - self.player_width / 2 - bounding_margin
-    #     max_z = max(start_pos.z, end_pos.z) + self.player_width / 2 + bounding_margin
-    #     #print('calculated player bounding box = ', [(min_x, min_y, min_z), (max_x, max_y, max_z)])
-    #     return [(min_x, min_y, min_z), (max_x, max_y, max_z)]
 
     def calculate_player_bounding_box(self, start_pos, end_pos, bounding_margin=0.1):
         min_x = min(start_pos.x, end_pos.x) - self.player_width / 2 - bounding_margin

@@ -23,8 +23,8 @@ class Physics:
 
     def apply_gravity(self, delta_time: float):
         if not self.player.is_grounded:
-            self.player.velocity += self.gravity * delta_time
-            self.player.position += self.player.velocity * delta_time + 0.5 * self.gravity * delta_time ** 2
+            self.player.proposed_thrust += self.gravity * delta_time
+            self.player.position += self.player.proposed_thrust * delta_time + 0.5 * self.gravity * delta_time ** 2
             self.set_gravity = True
         elif self.player.is_grounded:
             self.set_gravity = False
@@ -259,29 +259,30 @@ class Physics:
 
     def apply_forces(self, delta_time: float):
         # Apply lateral thrust for movement
-        if self.player.thrust.x != 0.0 or self.player.thrust.z != 0.0:
+        if self.player.proposed_thrust.x != 0.0 or self.player.proposed_thrust.z != 0.0:
             # Calculate desired lateral velocity
             desired_velocity = glm.normalize(
-                glm.vec3(self.player.thrust.x, 0.0, self.player.thrust.z)) * self.player.max_speed
+                glm.vec3(self.player.proposed_thrust.x, 0.0, self.player.proposed_thrust.z)) * self.player.max_speed
             # Use a lerp function to smoothly interpolate towards the target velocity
             lerp_factor = 1 - glm.exp(-self.player.accelerator * delta_time)
-            self.player.velocity.x = self.player.velocity.x * (1 - lerp_factor) + desired_velocity.x * lerp_factor
-            self.player.velocity.z = self.player.velocity.z * (1 - lerp_factor) + desired_velocity.z * lerp_factor
+            self.player.proposed_thrust.x = self.player.velocity.x * (1 - lerp_factor) + desired_velocity.x * lerp_factor
+            self.player.proposed_thrust.z = self.player.velocity.z * (1 - lerp_factor) + desired_velocity.z * lerp_factor
         else:
             # Apply braking force to lateral movement
             deceleration = glm.exp(-self.player.accelerator * delta_time)
-            self.player.velocity.x *= deceleration
-            self.player.velocity.z *= deceleration
+            self.player.proposed_thrust.x *= deceleration
+            self.player.proposed_thrust.z *= deceleration
             # Ensure that the lateral velocity does not invert due to overshooting the deceleration
             if glm.length(glm.vec3(self.player.velocity.x, 0.0, self.player.velocity.z)) ** 2 < 0.01:
-                self.player.velocity.x = 0.0
-                self.player.velocity.z = 0.0
+                self.player.proposed_thrust.x = 0.0
+                self.player.proposed_thrust.z = 0.0
 
         # Ensure vertical velocity does not invert due to overshooting the deceleration
         if abs(self.player.velocity.y) < 0.01:
-            self.player.velocity.y = 0.0
-        self.apply_gravity(delta_time)
-        #print(f"Updated Velocity: {self.player.velocity}")
+            self.player.proposed_thrust.y = 0.0
+
+        #self.apply_gravity(delta_time)
+
 
     def adjust_thrust_to_avoid_collision(self, proposed_thrust, delta_time):
         # Start with the proposed thrust
@@ -350,22 +351,47 @@ class Physics:
         print('No collision, allowing proposed position')
         return True
 
+    def simple_resolve_collision(self, collision_face):
+        # Extract vertices from the collision face
+        v0, v1, v2 = map(glm.vec3, collision_face)
+
+        # Calculate the normal of the collision face
+        normal = glm.normalize(glm.cross(v1 - v0, v2 - v0))
+
+        # Project player position onto the plane of the collision face
+        point_on_face = v0  # or any point on the face
+        player_to_face = self.player.position - point_on_face
+        distance_to_plane = glm.dot(player_to_face, normal)
+        projected_position = self.player.position - distance_to_plane * normal
+
+        # Update player's position
+        self.player.position = projected_position
+
+        # Make player's velocity in-plane with the collision face
+        velocity_projection = self.player.velocity - glm.dot(self.player.velocity, normal) * normal
+        self.player.velocity = velocity_projection
+
+
     def update_physics(self, delta_time: float):
         # Apply forces to the player
         self.apply_forces(delta_time)
 
         # Propose new position based on current velocity
-        proposed_thrust = self.player.velocity * delta_time
+        proposed_thrust = self.player.proposed_thrust#self.player.velocity * delta_time
         proposed_position = self.player.position + proposed_thrust
 
         # Adjust thrust to avoid collisions
         adjusted_thrust = self.adjust_thrust_to_avoid_collision(proposed_thrust, delta_time)
 
         # Update the player's velocity based on the adjusted thrust
-        self.player.velocity = adjusted_thrust / delta_time
+        self.player.velocity = adjusted_thrust #/ delta_time
 
         # Update the player's position based on the adjusted thrust
-        self.player.position += adjusted_thrust * delta_time
+        #self.player.position = proposed_position#adjusted_thrust * delta_time
+
+        collision_face = self.check_linear_collision()
+        if collision_face:
+            self.simple_resolve_collision(collision_face)
 
         # Reset thrust after applying forces
         self.player.reset_thrust()
