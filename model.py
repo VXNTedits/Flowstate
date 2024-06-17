@@ -164,8 +164,8 @@ class Model:
             for line in file:
                 if line.startswith('newmtl'):
                     current_material = line.split()[1]
-                    materials[current_material] = {'diffuse': [1.0, 0.0, 0.0], 'specular': [0.0, 1.0, 0.0],
-                                                   'shininess': 500.0, 'roughness':0.91, 'bumpScale':0.5}
+                    materials[current_material] = {'diffuse': [1.0, 0.0, 0.0], 'specular': [0.1, 0.5, 1.0],
+                                                   'shininess': 10.0, 'roughness':0.2, 'bumpScale':1.0}
                 elif current_material:
                     if line.startswith('Kd '):
                         parts = line.split()

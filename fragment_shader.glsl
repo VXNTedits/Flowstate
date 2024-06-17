@@ -19,7 +19,7 @@ uniform vec3 objectColor;
 uniform vec3 specularColor;
 uniform float shininess;
 uniform float roughness;
-uniform float bumpScale;  // Add this line to declare bumpScale
+uniform float bumpScale;
 uniform sampler2D shadowMap;
 
 float hash(float n) { return fract(sin(n) * 43758.5453); }
@@ -50,14 +50,26 @@ vec3 getPerturbedNormal(vec3 pos, vec3 norm) {
     return normalize(norm + bumpNormal);
 }
 
-float shadowCalculation(vec4 fragPosLightSpace)
+float shadowCalculation(vec4 fragPosLightSpace, vec3 norm, vec3 lightDir)
 {
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
-    float closestDepth = texture(shadowMap, projCoords.xy).r;
     float currentDepth = projCoords.z;
-    float bias = 0.005;
-    float shadow = currentDepth - bias > closestDepth ? 1.0 : 0.0;
+    float bias = max(0.005 * (1.0 - dot(norm, lightDir)), 0.005);
+
+    // PCF (Percentage Closer Filtering)
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    for (int x = -1; x <= 1; ++x)
+    {
+        for (int y = -1; y <= 1; ++y)
+        {
+            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+        }
+    }
+    shadow /= 9.0;
+
     return shadow;
 }
 
@@ -82,7 +94,7 @@ void main()
         float spec = pow(max(dot(perturbedNormal, halfwayDir), 0.0), shininess * (1.0 - roughness));
         vec3 specular = spec * lights[i].color * specularColor;
 
-        float shadow = shadowCalculation(FragPosLightSpace);
+        float shadow = shadowCalculation(FragPosLightSpace, perturbedNormal, lightDir);
         result += (diffuse + specular) * (1.0 - shadow);
     }
 
