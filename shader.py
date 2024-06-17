@@ -43,7 +43,22 @@ class Shader:
 
     def set_uniform3f(self, name: str, vector: glm.vec3):
         location = glGetUniformLocation(self.id, name)
-        glUniform3fv(location, 1, glm.value_ptr(vector))
+        if location != -1:
+            glUniform3fv(location, 1, glm.value_ptr(vector))
+        else:
+            print(f"Uniform '{name}' not found in shader program.")
+
+    def set_uniform1f(self, name: str, value: float):
+        location = glGetUniformLocation(self.id, name)
+        if location != -1:
+            glUniform1f(location, value)
+        else:
+            print(f"Uniform '{name}' not found in shader program.")
+
+    def set_light_uniforms(self, lights):
+        for i, light in enumerate(lights):
+            self.set_uniform3f(f"lights[{i}].position", light['position'])
+            self.set_uniform3f(f"lights[{i}].color", light['color'])
 
     def read_shader_source(self, path: str) -> str:
         with open(path, 'r') as file:
@@ -56,10 +71,3 @@ class Shader:
         if glGetShaderiv(shader, GL_COMPILE_STATUS) != GL_TRUE:
             raise RuntimeError(glGetShaderInfoLog(shader))
         return shader
-
-    def set_uniform1f(self, name, value):
-        location = glGetUniformLocation(self.id, name)
-        if location != -1:
-            glUniform1f(location, value)
-        else:
-            print(f"Uniform '{name}' not found in shader program.")
