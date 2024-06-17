@@ -17,7 +17,7 @@ class Physics:
         self.player = player
         self.gravity = glm.vec3(0, -10, 0)
         self.interactables = interactables
-        self.pid_controller = PIDController(kp=1, ki=0.0, kd=0.0)
+        self.pid_controller = PIDController(kp=0.8, ki=0.0, kd=0.0)
         self.offset = 0.1
         self.set_gravity = True
 
@@ -151,20 +151,64 @@ class Physics:
     def check_linear_collision(self):
         """
         Checks if the player's movement intersects with any object in the world.
-        Returns the face on which the intersection occurred, or None if no collision is detected.
+        Returns all intersecting faces and their vectors.
         """
         start_pos = self.player.previous_position
         end_pos = self.player.position
         player_bb = self.player.calculate_player_bounding_box(start_pos, end_pos)
 
+        collisions = []
         for obj in self.world.get_objects():
             aabb = obj.aabb
             is_intersecting, nearest_face_name, nearest_face_vectors = (
                 self.is_bounding_box_intersecting_aabb(player_bb, aabb))
 
             if is_intersecting:
-                return nearest_face_name, nearest_face_vectors
-        return None, None
+                collisions.append((nearest_face_name, nearest_face_vectors))
+
+        return collisions
+
+    def handle_collisions(self, player_thrust, delta_time):
+        collisions = self.check_linear_collision()
+
+        if collisions:
+            # Resolve primary collision
+            nearest_face_name, nearest_face_vectors = collisions[0]
+            self.simple_resolve_collision(nearest_face_vectors, player_thrust, delta_time, nearest_face_name)
+
+            # Check and resolve secondary collisions
+            for face_name, face_vectors in collisions[1:]:
+                if self.is_secondary_collision(face_vectors):
+                    self.adjust_velocity_based_on_wall_collision(self.player.velocity, delta_time)
+                    #self.simple_resolve_collision(face_vectors, player_thrust, delta_time, face_name)
+
+    def is_secondary_collision(self, face_vectors):
+        """
+        Check if there is still a collision after resolving the primary collision.
+        """
+        p0, p1, p2 = face_vectors
+
+        p0 = glm.vec3(p0)
+        p1 = glm.vec3(p1)
+        p2 = glm.vec3(p2)
+
+        # Use p0 as the reference point on the plane
+        P = p0
+        N = glm.cross(p1 - p0, p2 - p0)
+
+        # Normalize the normal vector
+        N_normalized = glm.normalize(N)
+
+        V = self.player.position
+
+        # Compute the vector from the player's position to the reference point on the plane
+        W = V - P
+
+        # Compute the dot product of W and the normalized normal vector
+        dot_product = glm.dot(W, N_normalized)
+
+        # If the dot product is close to zero, there's no collision
+        return abs(dot_product) > 1e-5
 
     def is_line_segment_intersecting_aabb(self, start, end, aabb):
         """
@@ -258,75 +302,6 @@ class Physics:
 
         return False, None, None
 
-    # def get_nearest_intersecting_face(self, start_pos, end_pos, aabb):
-    #     (min_x, min_y, min_z), (max_x, max_y, max_z) = aabb
-    #     faces = {
-    #         "left": ((min_x, min_y, min_z), (min_x, max_y, min_z), (min_x, min_y, max_z)),
-    #         "right": ((max_x, min_y, min_z), (max_x, max_y, min_z), (max_x, min_y, max_z)),
-    #         "bottom": ((min_x, min_y, min_z), (max_x, min_y, min_z), (min_x, min_y, max_z)),
-    #         "top": ((min_x, max_y, min_z), (max_x, max_y, min_z), (min_x, max_y, max_z)),
-    #         "front": ((min_x, min_y, min_z), (max_x, min_y, min_z), (min_x, max_y, min_z)),
-    #         "back": ((min_x, min_y, max_z), (max_x, min_y, max_z), (min_x, max_y, max_z))
-    #     }
-    #
-    #     def ray_intersect_plane(plane_point, plane_normal, ray_origin, ray_dir):
-    #         ndotu = glm.dot(plane_normal, ray_dir)
-    #         if abs(ndotu) < 1e-6:
-    #             return None  # No intersection or line is parallel to plane
-    #         w = ray_origin - plane_point
-    #         si = -glm.dot(plane_normal, w) / ndotu
-    #         if si < 0:
-    #             return None  # Intersection behind the ray origin
-    #         return ray_origin + si * ray_dir
-    #
-    #     intersection_distances = {}
-    #
-    #     for face, vertices in faces.items():
-    #         plane_point = glm.vec3(vertices[0])
-    #         edge1 = glm.vec3(vertices[1]) - glm.vec3(vertices[0])
-    #         edge2 = glm.vec3(vertices[2]) - glm.vec3(vertices[0])
-    #         plane_normal = glm.normalize(glm.cross(edge1, edge2))
-    #
-    #         print(f"Checking face: {face}")
-    #         print(f"Plane point: {plane_point}, Plane normal: {plane_normal}")
-    #
-    #         intersection_point = ray_intersect_plane(plane_point, plane_normal, glm.vec3(start_pos),
-    #                                                  glm.normalize(glm.vec3(end_pos) - glm.vec3(start_pos)))
-    #
-    #         if intersection_point is not None:
-    #             print(f"Intersection point: {intersection_point}")
-    #
-    #             if face == "left" or face == "right":
-    #                 if min_y <= intersection_point.y <= max_y and min_z <= intersection_point.z <= max_z:
-    #                     distance = glm.distance(glm.vec3(start_pos), intersection_point)
-    #                     intersection_distances[face] = (distance, vertices)
-    #             elif face == "bottom" or face == "top":
-    #                 if min_x <= intersection_point.x <= max_x and min_z <= intersection_point.z <= max_z:
-    #                     distance = glm.distance(glm.vec3(start_pos), intersection_point)
-    #                     intersection_distances[face] = (distance, vertices)
-    #             elif face == "front" or face == "back":
-    #                 if min_x <= intersection_point.x <= max_x and min_y <= intersection_point.y <= max_y:
-    #                     distance = glm.distance(glm.vec3(start_pos), intersection_point)
-    #                     intersection_distances[face] = (distance, vertices)
-    #
-    #     if not intersection_distances:
-    #         print("No intersections found.")
-    #         return None
-    #
-    #     nearest_face = min(intersection_distances, key=lambda k: intersection_distances[k][0])
-    #     print("NEAREST FACE: ", nearest_face)
-    #     return intersection_distances[nearest_face][1]
-
-    # def is_bounding_box_intersecting_aabb(self, player_bb, aabb):
-    #     (min_px, min_py, min_pz) = player_bb[0]
-    #     (max_px, max_py, max_pz) = player_bb[1]
-    #     (min_x, min_y, min_z), (max_x, max_y, max_z) = aabb
-    #
-    #     # Check for overlap on each axis
-    #     return (min_px <= max_x and max_px >= min_x and
-    #             min_py <= max_y and max_py >= min_y and
-    #             min_pz <= max_z and max_pz >= min_z)
-
     def apply_forces(self, delta_time: float):
         # Apply lateral thrust for movement
         if self.player.proposed_thrust.x != 0.0 or self.player.proposed_thrust.z != 0.0:
@@ -364,7 +339,6 @@ class Physics:
         if abs(self.player.thrust.y) < 0.01:
             self.player.thrust.y = 0.0
 
-
     def adjust_thrust_to_avoid_collision(self, proposed_thrust, delta_time):
         # Start with the proposed thrust
         adjusted_thrust = glm.vec3(proposed_thrust)
@@ -376,39 +350,33 @@ class Physics:
         if proposed_thrust.x != 0 and self.check_collision_with_proposed_movement(self.player.position,
                                                                                   temp_position_x):
             if abs(proposed_thrust.x) > tolerance:
-                #print('adjusted thrust to reduce x')
+                print('adjusted thrust to reduce x')
                 adjusted_thrust.x *= adjustment_factor
             else:
-                #print('adjusted thrust to x = 0')
-                obstacle_face = self.check_linear_collision()
-                if obstacle_face:
-                    self.resolve_player_collision(obstacle_face, delta_time)
+                print('adjusted thrust to x = 0')
+                adjusted_thrust.x = 0
 
         # Check and adjust y-axis collision
         temp_position_y = self.player.position + glm.vec3(0, proposed_thrust.y, 0) * delta_time
         if proposed_thrust.y != 0 and self.check_collision_with_proposed_movement(self.player.position,
                                                                                   temp_position_y):
             if abs(proposed_thrust.y) > tolerance:
-                #print('adjusted thrust to reduce y')
+                print('adjusted thrust to reduce y')
                 adjusted_thrust.y *= adjustment_factor
             else:
-                #print('adjusted thrust to y = 0')
-                obstacle_face = self.check_linear_collision()
-                if obstacle_face:
-                    self.resolve_player_collision(obstacle_face, delta_time)
+                print('adjusted thrust to y = 0')
+                adjusted_thrust.y = 0
 
         # Check and adjust z-axis collision
         temp_position_z = self.player.position + glm.vec3(0, 0, proposed_thrust.z) * delta_time
         if proposed_thrust.z != 0 and self.check_collision_with_proposed_movement(self.player.position,
                                                                                   temp_position_z):
             if abs(proposed_thrust.z) > tolerance:
-                #print('adjusted thrust to reduce z')
+                print('adjusted thrust to reduce z')
                 adjusted_thrust.z *= adjustment_factor
             else:
-                #print('adjusted thrust to z = 0')
-                obstacle_face = self.check_linear_collision()
-                if obstacle_face:
-                    self.resolve_player_collision(obstacle_face, delta_time)
+                print('adjusted thrust to z = 0')
+                adjusted_thrust.z = 0
 
         return adjusted_thrust
 
@@ -433,7 +401,7 @@ class Physics:
         return True
 
     def simple_resolve_collision(self, collision_face, proposed_thrust, delta_time, nearest_face_name):
-        #print('nearest face:', nearest_face_name)
+        # print('nearest face:', nearest_face_name)
 
         p0, p1, p2 = collision_face
 
@@ -462,7 +430,7 @@ class Physics:
         # Calculate the new position by correcting only the normal component
         V_corrected = V - projection_onto_normal
 
-        #PID_correction = self.pid_controller.calculate(dot_product, delta_time)
+        # PID_correction = self.pid_controller.calculate(dot_product, delta_time)
 
         # The player's velocity is in the collision direction
         if (
@@ -470,11 +438,17 @@ class Physics:
                 or (glm.dot(proposed_thrust, N_normalized) >= 0 and not self.player.is_jumping)
         ):
             # Correct the player's position component that is normal to the plane
-            #print(self.player.is_jumping, self.player.velocity, proposed_thrust)
-            self.player.position = V_corrected  #* PID_correction
-        # The player's velocity is already moving the player in a direction away from the collision surface
+            self.player.position = V_corrected  # * PID_correction
+
+            # Project the player's velocity onto the normal vector
+            velocity_projection_onto_normal = glm.dot(self.player.velocity, N_normalized) * N_normalized
+
+            # Subtract the projection from the player's velocity
+            self.player.velocity -= velocity_projection_onto_normal
+            proposed_thrust -= velocity_projection_onto_normal
         else:
-            #print("out")
+            # The player's velocity is already moving the player in a direction away from the collision surface
+            # print("out")
             pass
 
         if nearest_face_name == 'top':
@@ -490,23 +464,95 @@ class Physics:
         if glm.length(self.player.velocity) > max_speed:
             self.player.velocity = max_speed * glm.normalize(self.player.velocity)
 
+    def adjust_velocity_based_on_wall_collision(self, thrust_direction, delta_time, deceleration_multiplier=2.0):
+        start_pos = self.player.position
+        max_distance = glm.length(thrust_direction) * delta_time + 0.5
+        closest_distance = float('inf')
+        closest_face = None
+        closest_face_name = None
+        direction_normalized = glm.normalize(thrust_direction)
+
+        for obj in self.world.get_objects():
+            aabb = obj.aabb
+            (min_x, min_y, min_z), (max_x, max_y, max_z) = aabb
+
+            tmin, tmax = 0.0, max_distance
+
+            for i in range(3):
+                if direction_normalized[i] != 0:
+                    t1 = (aabb[0][i] - start_pos[i]) / direction_normalized[i]
+                    t2 = (aabb[1][i] - start_pos[i]) / direction_normalized[i]
+
+                    tmin = max(tmin, min(t1, t2))
+                    tmax = min(tmax, max(t1, t2))
+
+                    if tmin > tmax:
+                        continue
+
+            if tmin > max_distance:
+                continue
+
+            intersection_point = start_pos + direction_normalized * tmin
+            intersecting_face = None
+            face_vectors = None
+
+            if abs(intersection_point.x - min_x) < 1e-5:
+                intersecting_face = "left"
+                face_vectors = ((min_x, min_y, min_z), (min_x, max_y, min_z), (min_x, min_y, max_z))
+            elif abs(intersection_point.x - max_x) < 1e-5:
+                intersecting_face = "right"
+                face_vectors = ((max_x, min_y, min_z), (max_x, max_y, min_z), (max_x, min_y, max_z))
+            elif abs(intersection_point.z - min_z) < 1e-5:
+                intersecting_face = "front"
+                face_vectors = ((min_x, min_y, min_z), (max_x, min_y, min_z), (min_x, max_y, min_z))
+            elif abs(intersection_point.z - max_z) < 1e-5:
+                intersecting_face = "back"
+                face_vectors = ((min_x, min_y, max_z), (max_x, min_y, max_z), (min_x, max_y, max_z))
+
+            if intersecting_face and tmin < closest_distance:
+                closest_distance = tmin
+                closest_face = face_vectors
+                closest_face_name = intersecting_face
+
+        if closest_face is not None:
+            wall_normal = glm.normalize(glm.cross(glm.vec3(closest_face[1]) - glm.vec3(closest_face[0]),
+                                                  glm.vec3(closest_face[2]) - glm.vec3(closest_face[0])))
+            deceleration_factor = self.calculate_deceleration_factor(closest_distance, max_distance,
+                                                                     deceleration_multiplier)
+            self.apply_deceleration(deceleration_factor, thrust_direction, wall_normal, delta_time)
+
+    def calculate_deceleration_factor(self, distance, max_distance, deceleration_multiplier=1.0):
+        if distance <= 0:
+            return 1000.0  # Maximum deceleration
+        normalized_distance = distance / max_distance
+        deceleration = 1.0 - glm.exp(-normalized_distance * deceleration_multiplier)
+        return min(1.0, max(0.0, deceleration))
+
+    def apply_deceleration(self, deceleration_factor, thrust_direction, wall_normal, delta_time):
+        normal_component = glm.dot(thrust_direction, wall_normal) * wall_normal
+        normal_component *= (1.0 - deceleration_factor)
+        thrust_direction -= normal_component
+        self.player.proposed_thrust += thrust_direction
+        self.player.thrust += thrust_direction
+        self.player.velocity += thrust_direction
+        print("applying decleration", thrust_direction)
+
     def update_physics(self, delta_time: float):
         # Apply forces to the player
         self.apply_forces(delta_time)
 
-        # Propose new position based on current velocity
-        player_thrust = self.player.thrust  #self.player.player_thrust + self.player.thrust
-
         # Manage collisions
-        nearest_face_name, nearest_face_vectors = self.check_linear_collision()
+        #self.adjust_velocity_based_on_wall_collision(self.player.velocity, delta_time)
+
+        nearest_face_vectors = self.check_linear_collision()
 
         if nearest_face_vectors:
             # Collision: Resolve by projecting player onto collision face.
             #            Reject proposed thrust: Restrict entry velocity, but allow player to have exit velocity.
-            self.simple_resolve_collision(nearest_face_vectors, player_thrust, delta_time, nearest_face_name)
+            self.handle_collisions(self.player.thrust, delta_time)
         else:
             # No collision: Accept the proposed thrust
-            self.player.velocity += player_thrust
+            self.player.velocity += self.player.thrust
             self.apply_gravity(delta_time)
 
         # Apply speed limiter
