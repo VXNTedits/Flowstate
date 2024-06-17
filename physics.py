@@ -470,11 +470,11 @@ class Physics:
                 or (glm.dot(proposed_thrust, N_normalized) >= 0 and not self.player.is_jumping)
         ):
             # Correct the player's position component that is normal to the plane
-            print(self.player.is_jumping, self.player.velocity, proposed_thrust)
+            #print(self.player.is_jumping, self.player.velocity, proposed_thrust)
             self.player.position = V_corrected  #* PID_correction
         # The player's velocity is already moving the player in a direction away from the collision surface
         else:
-            print("out")
+            #print("out")
             pass
 
         if nearest_face_name == 'top':
