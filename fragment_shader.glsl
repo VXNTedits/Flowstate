@@ -21,6 +21,8 @@ uniform float shininess;
 uniform float roughness;
 uniform float bumpScale;
 uniform sampler2D shadowMap;
+uniform bool useTexture;
+uniform sampler2D texture1;
 
 float hash(float n) { return fract(sin(n) * 43758.5453); }
 
@@ -83,7 +85,12 @@ void main()
 
     vec3 result = ambient;
 
-    vec3 color = objectColor * noise(FragPos * 0.1);
+    vec3 color = objectColor;
+    if (useTexture) {
+        color *= texture(texture1, FragPos.xy).rgb;
+    } else {
+        color *= noise(FragPos * 0.1);
+    }
 
     for (int i = 0; i < NUM_LIGHTS; i++) {
         vec3 lightDir = normalize(lights[i].position - FragPos);

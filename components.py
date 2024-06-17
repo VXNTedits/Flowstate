@@ -101,7 +101,7 @@ class Components:
             print("models in components.models: ", model.name)
         print('Models initialized')
 
-        self.renderer = Renderer(self.shader, self.camera, self.world)
+        self.renderer = Renderer(self.shader, self.camera)
         print('Renderer initialized')
 
         self.physics = Physics(self.world_objects, self.player, self.interactables, self.world)
