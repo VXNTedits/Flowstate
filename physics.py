@@ -29,7 +29,6 @@ class Physics:
         elif self.player.is_grounded:
             self.set_gravity = False
 
-
     def resolve_player_collision(self, obstacle_face, delta_time, penetration_threshold=0.1, correction_velocity=0.5):
         # Define player's bounding box corners
         player_height = self.player.player_height
@@ -359,9 +358,12 @@ class Physics:
                 self.player.thrust.x = 0.0
                 self.player.thrust.z = 0.0
 
+        self.player.thrust.y = self.player.proposed_thrust.y
+
         # Ensure vertical velocity does not invert due to overshooting the deceleration
         if abs(self.player.thrust.y) < 0.01:
             self.player.thrust.y = 0.0
+
 
     def adjust_thrust_to_avoid_collision(self, proposed_thrust, delta_time):
         # Start with the proposed thrust
@@ -431,7 +433,7 @@ class Physics:
         return True
 
     def simple_resolve_collision(self, collision_face, proposed_thrust, delta_time, nearest_face_name):
-        print('nearest face:', nearest_face_name)
+        #print('nearest face:', nearest_face_name)
 
         p0, p1, p2 = collision_face
 
@@ -463,20 +465,25 @@ class Physics:
         #PID_correction = self.pid_controller.calculate(dot_product, delta_time)
 
         # The player's velocity is in the collision direction
-        if (glm.dot(self.player.velocity, N_normalized) >= 0) or (glm.dot(proposed_thrust, N_normalized) >= 0):
+        if (
+                (glm.dot(self.player.velocity, N_normalized) >= 0 and not self.player.is_jumping)
+                or (glm.dot(proposed_thrust, N_normalized) >= 0 and not self.player.is_jumping)
+        ):
             # Correct the player's position component that is normal to the plane
-            self.player.position = V_corrected #* PID_correction
+            print(self.player.is_jumping, self.player.velocity, proposed_thrust)
+            self.player.position = V_corrected  #* PID_correction
         # The player's velocity is already moving the player in a direction away from the collision surface
         else:
+            print("out")
             pass
 
         if nearest_face_name == 'top':
             self.player.is_grounded = True
+            self.player.velocity.y = 0.0
         else:
             self.player.is_grounded = False
 
         self.player.velocity += proposed_thrust
-
 
     def limit_speed(self):
         max_speed = self.player.max_speed
@@ -488,7 +495,7 @@ class Physics:
         self.apply_forces(delta_time)
 
         # Propose new position based on current velocity
-        player_thrust = self.player.thrust#self.player.player_thrust + self.player.thrust
+        player_thrust = self.player.thrust  #self.player.player_thrust + self.player.thrust
 
         # Manage collisions
         nearest_face_name, nearest_face_vectors = self.check_linear_collision()
@@ -507,12 +514,10 @@ class Physics:
 
         # Reset inputs
         if self.player.is_jumping:
-            print("grounded=",self.player.is_grounded," jumping=", self.player.is_jumping,"\n",
+            print("grounded=", self.player.is_grounded, " jumping=", self.player.is_jumping, "\n",
                   "thrust=", self.player.thrust, "\n",
                   "proposed=", self.player.proposed_thrust, "\n",
                   "velocity=", self.player.velocity, "\n")
 
         self.player.reset_thrust()
-        self.player.thrust = glm.vec3(0,0,0)
-
-
+        self.player.thrust = glm.vec3(0, 0, 0)

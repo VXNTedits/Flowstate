@@ -32,7 +32,7 @@ class Player(Model):
         self.front = glm.vec3(0.0, 0.0, -1.0)
         self.up = glm.vec3(0.0, 1.0, 0.0)
         self.accelerator = 10
-        self.jump_force = glm.vec3(0,15,0)
+        self.jump_force = glm.vec3(0,5,0)
         self.max_speed = 10.0
         self.thrust = glm.vec3(0.0, 0.0, 0.0)
         self.velocity = glm.vec3(0, 0, 0)
@@ -89,7 +89,7 @@ class Player(Model):
             self.is_jumping = True
             proposed_thrust += self.jump_force
             self.is_grounded = False
-            print('jump: updated proposed_thrust to', proposed_thrust)
+            print('jump: updated proposed_thrust to', proposed_thrust, "is jumping=", self.is_jumping)
 
         self.proposed_thrust = proposed_thrust
 
