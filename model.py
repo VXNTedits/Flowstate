@@ -196,7 +196,7 @@ class Model:
         glBindVertexArray(0)
         return vao, vbo, ebo
 
-    def draw(self):
+    def draw(self, camera=None):
         glBindVertexArray(self.vao)
         glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, None)
         glBindVertexArray(0)

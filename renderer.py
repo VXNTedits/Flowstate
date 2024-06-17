@@ -18,6 +18,7 @@ class Renderer:
 
         # Shadow mapping setup
         self.shadow_shader = Shader('shadow_vertex.glsl', 'shadow_fragment.glsl')
+        self.emissive_shader = Shader('emissive_vertex.glsl', 'emissive_fragment.glsl')
         self.depth_map_fbo = glGenFramebuffers(1)
         self.depth_map = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D, self.depth_map)
@@ -66,11 +67,13 @@ class Renderer:
         glBindFramebuffer(GL_FRAMEBUFFER, self.depth_map_fbo)
         glClear(GL_DEPTH_BUFFER_BIT)
 
+        light_space_matrices = []
         for pos in light_positions:
             light_space_matrix = self.calculate_light_space_matrix(pos)
+            light_space_matrices.append(light_space_matrix)
             self.shadow_shader.use()
             self.shadow_shader.set_uniform_matrix4fv("lightSpaceMatrix", light_space_matrix)
-            self.render_scene(self.shadow_shader, world, light_space_matrix)
+            self.render_scene(self.shadow_shader, player_object, world, interactables, light_space_matrix)
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
@@ -81,8 +84,7 @@ class Renderer:
         self.shader.set_uniform_matrix4fv("projection", projection_matrix)
 
         for i, (pos, color) in enumerate(zip(light_positions, light_colors)):
-            light_space_matrix = self.calculate_light_space_matrix(pos)
-            self.shader.set_uniform_matrix4fv(f"lights[{i}].lightSpaceMatrix", light_space_matrix)
+            self.shader.set_uniform_matrix4fv(f"lightSpaceMatrix[{i}]", light_space_matrices[i])
             self.shader.set_uniform3f(f"lights[{i}].position", pos)
             self.shader.set_uniform3f(f"lights[{i}].color", color)
 
@@ -93,9 +95,8 @@ class Renderer:
         self.shader.set_bump_scale(1.0)
         self.shader.set_roughness(0.5)
 
-        self.render_world(world, view_matrix, projection_matrix)
-        self.render_player(player_object, view_matrix, projection_matrix)
-        self.render_interactables(interactables, view_matrix, projection_matrix)
+        self.render_scene(self.shader, player_object, world, interactables, light_space_matrix, view_matrix,
+                          projection_matrix)
 
         self.render_lights(light_positions, light_colors, view_matrix, projection_matrix)
 
@@ -166,13 +167,12 @@ class Renderer:
         self.shader.set_uniform_matrix4fv("view", view_matrix)
         self.shader.set_uniform_matrix4fv("projection", projection_matrix)
 
-        # Set other uniforms like objectColor, specularColor, shininess, roughness, etc.
         if model:
             kd = model.default_material['diffuse']
             ks = model.default_material['specular']
             ns = model.default_material['shininess']
-            roughness = model.default_material.get('roughness', 0.5)  # Default to 0.5 if not found
-            bump_scale = model.default_material.get('bumpScale', 1.0)  # Default to 1.0 if not found
+            roughness = model.default_material.get('roughness', 0.5)
+            bump_scale = model.default_material.get('bumpScale', 1.0)
 
             self.shader.set_uniform3f("objectColor", glm.vec3(*kd))
             self.shader.set_uniform3f("specularColor", glm.vec3(*ks))
@@ -180,45 +180,64 @@ class Renderer:
             self.shader.set_roughness(roughness)
             self.shader.set_bump_scale(bump_scale)
 
-    def render_scene(self, shader, world, light_space_matrix):
+    def render_scene(self, shader, player_object, world, interactables, light_space_matrix, view_matrix=None, projection_matrix=None):
         shader.use()
         shader.set_uniform_matrix4fv("lightSpaceMatrix", light_space_matrix)
+
+        # Render world objects
         for obj in world.get_objects():
             model_matrix = obj.model_matrix
+            if view_matrix and projection_matrix:
+                self.update_uniforms(model_matrix, view_matrix, projection_matrix, obj)
             shader.set_uniform_matrix4fv("model", model_matrix)
             obj.draw()
 
+        # Render player
+        model_matrix = player_object.model_matrix
+        if view_matrix and projection_matrix:
+            self.update_uniforms(model_matrix, view_matrix, projection_matrix, player_object)
+        shader.set_uniform_matrix4fv("model", model_matrix)
+        player_object.draw(self.camera)
+
+        # Render interactables
+        for interactable in interactables:
+            model_matrix = interactable.model_matrix
+            if view_matrix and projection_matrix:
+                self.update_uniforms(model_matrix, view_matrix, projection_matrix, interactable)
+            shader.set_uniform_matrix4fv("model", model_matrix)
+            interactable.draw()
+            interactable._model.update_composite_model_matrix(model_matrix)
+            for mod, pos, dir in interactable._model.models:
+                model_matrix = mod.model_matrix
+                if view_matrix and projection_matrix:
+                    self.update_uniforms(model_matrix, view_matrix, projection_matrix, mod)
+                shader.set_uniform_matrix4fv("model", model_matrix)
+                mod.draw()
+
+
     def render_lights(self, light_positions, light_colors, view_matrix, projection_matrix):
-        light_shader = Shader('light_vertex.glsl', 'light_fragment.glsl')
-        light_shader.use()
+        self.emissive_shader.use()
+        self.emissive_shader.set_uniform_matrix4fv("view", view_matrix)
+        self.emissive_shader.set_uniform_matrix4fv("projection", projection_matrix)
 
-        # Set the view and projection matrices
-        light_shader.set_uniform_matrix4fv("view", view_matrix)
-        light_shader.set_uniform_matrix4fv("projection", projection_matrix)
-
-        # Render each light as a small sphere or cube
         for pos, color in zip(light_positions, light_colors):
             model_matrix = glm.mat4(1.0)
             model_matrix = glm.translate(model_matrix, pos)
-            model_matrix = glm.scale(model_matrix, glm.vec3(0.1))  # Adjust the scale to make the light visible
+            self.emissive_shader.set_uniform_matrix4fv("model", model_matrix)
+            self.emissive_shader.set_uniform3f("lightColor", color)
+            self.render_light_object(size=1)
 
-            light_shader.set_uniform_matrix4fv("model", model_matrix)
-            light_shader.set_uniform3f("lightColor", color)
-
-            self.render_light_object()
-
-    def render_light_object(self, size=10):
-        # Define vertices for a cube with the given size
+    def render_light_object(self, size):
         half_size = size / 2.0
         vertices = [
             -half_size, -half_size, -half_size,
-            half_size, -half_size, -half_size,
-            half_size, half_size, -half_size,
-            -half_size, half_size, -half_size,
-            -half_size, -half_size, half_size,
-            half_size, -half_size, half_size,
-            half_size, half_size, half_size,
-            -half_size, half_size, half_size,
+             half_size, -half_size, -half_size,
+             half_size,  half_size, -half_size,
+            -half_size,  half_size, -half_size,
+            -half_size, -half_size,  half_size,
+             half_size, -half_size,  half_size,
+             half_size,  half_size,  half_size,
+            -half_size,  half_size,  half_size,
         ]
 
         indices = [
