@@ -44,8 +44,8 @@ class Renderer:
             print("Framebuffer is complete.")
 
     def calculate_light_space_matrix(self, light_position):
-        near_plane = 1.0
-        far_plane = 100.0
+        near_plane = 0.1
+        far_plane = 1000.0
         light_proj = glm.ortho(-20.0, 20.0, -20.0, 20.0, near_plane, far_plane)
         light_view = glm.lookAt(light_position, glm.vec3(0.0, 0.0, 0.0), glm.vec3(0.0, 1.0, 0.0))
         return light_proj * light_view
@@ -92,9 +92,9 @@ class Renderer:
             glm.vec3(0.0, 20.0, -20.0)
         ]
         light_colors = [
-            glm.vec3(1, 0.0, 0),
-            glm.vec3(0.0, 1, 0.0),
-            glm.vec3(0.0, 0.0, 1)
+            glm.vec3(1.0, 0.07, 0.58),  # Neon Pink
+            glm.vec3(0.0, 1.0, 0.38),  # Neon Green
+            glm.vec3(0.07, 0.55, 0.8)  # Neon Blue
         ]
 
         glViewport(0, 0, self.shadow_width, self.shadow_height)
@@ -126,8 +126,8 @@ class Renderer:
         glBindTexture(GL_TEXTURE_2D, self.depth_map)
         self.shader.set_uniform1i("shadowMap", 1)
 
-        self.shader.set_bump_scale(1.0)
-        self.shader.set_roughness(0.5)
+        self.shader.set_bump_scale(5.0)
+        self.shader.set_roughness(0.1)
 
         self.render_scene(self.shader, player_object, world, interactables, light_space_matrix, view_matrix,
                           projection_matrix)
@@ -144,7 +144,7 @@ class Renderer:
             model_matrix = glm.translate(model_matrix, pos)
             self.emissive_shader.set_uniform_matrix4fv("model", model_matrix)
             self.emissive_shader.set_uniform3f("lightColor", color)
-            self.render_light_object(size=0.2)
+            self.render_light_object(size=3)
 
     def render_light_object(self, size):
         half_size = size / 2.0

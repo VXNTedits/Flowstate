@@ -77,7 +77,7 @@ float shadowCalculation(vec4 fragPosLightSpace, vec3 norm, vec3 lightDir)
 
 void main()
 {
-    vec3 ambient = 0.1 * objectColor;
+    vec3 ambient = 0.01 * objectColor;
 
     vec3 norm = normalize(Normal);
     vec3 perturbedNormal = getPerturbedNormal(FragPos, norm);
@@ -89,7 +89,7 @@ void main()
     if (useTexture) {
         color *= texture(texture1, FragPos.xy).rgb;
     } else {
-        color *= noise(FragPos * 0.1);
+        color *= noise(FragPos * 0.05);
     }
 
     for (int i = 0; i < NUM_LIGHTS; i++) {
