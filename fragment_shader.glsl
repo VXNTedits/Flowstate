@@ -1,17 +1,17 @@
 #version 330 core
 
+#define NUM_LIGHTS 3
+
 out vec4 FragColor;
 
 in vec3 FragPos;
 in vec3 Normal;
-in vec4 FragPosLightSpace;
+in vec4 FragPosLightSpace[NUM_LIGHTS];
 
 struct Light {
     vec3 position;
     vec3 color;
 };
-
-#define NUM_LIGHTS 3
 
 uniform Light lights[NUM_LIGHTS];
 uniform vec3 viewPos;
@@ -94,7 +94,7 @@ void main()
         float spec = pow(max(dot(perturbedNormal, halfwayDir), 0.0), shininess * (1.0 - roughness));
         vec3 specular = spec * lights[i].color * specularColor;
 
-        float shadow = shadowCalculation(FragPosLightSpace, perturbedNormal, lightDir);
+        float shadow = shadowCalculation(FragPosLightSpace[i], perturbedNormal, lightDir);
         result += (diffuse + specular) * (1.0 - shadow);
     }
 
