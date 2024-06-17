@@ -53,7 +53,6 @@ class InputHandler:
 
     def process_input(self, player, delta_time):
         if self.keys.get(glfw.KEY_W):
-            #print('w')
             self.handle_input('FORWARD', delta_time)
 
         if self.keys.get(glfw.KEY_S):
@@ -69,7 +68,7 @@ class InputHandler:
             self.handle_input('RIGHT', delta_time)
 
         if self.keys.get(glfw.KEY_SPACE):
-            #print('space')
+            #print('input: space')
             self.handle_input('JUMP', delta_time)
 
     def handle_input(self, direction, delta_time):

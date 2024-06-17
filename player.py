@@ -32,7 +32,7 @@ class Player(Model):
         self.front = glm.vec3(0.0, 0.0, -1.0)
         self.up = glm.vec3(0.0, 1.0, 0.0)
         self.accelerator = 10
-        self.jump_force = 5
+        self.jump_force = glm.vec3(0,15,0)
         self.max_speed = 10.0
         self.thrust = glm.vec3(0.0, 0.0, 0.0)
         self.velocity = glm.vec3(0, 0, 0)
@@ -55,18 +55,22 @@ class Player(Model):
 
     def update_player(self, delta_time: float):
         #self.apply_forces(delta_time)
-        self.previous_position = glm.vec3(self.position)  # Update previous position before changing current position
+        self.previous_position = self.position  # Update previous position before changing current position
         self.position += self.velocity * delta_time
+        #self.velocity = (self.position - self.previous_position)/delta_time
+        #print(f"position={self.position} previous={self.previous_position} velocity={self.velocity}")
         self.update_camera_position()
         self.set_hand_position()
         self.update_player_model_matrix()
         self.trajectory = glm.normalize(self.position - self.previous_position)
-        if self.velocity.y < 0:
+        if self.velocity.y <= -0.01:
             self.is_jumping = False
         self.calculate_player_bounding_box(self.previous_position, self.position)
 
+
     def reset_thrust(self):
         self.thrust = glm.vec3(0.0, 0.0, 0.0)
+        self.proposed_thrust = glm.vec3(0.0, 0.0, 0.0)
 
     def propose_updated_thrust(self, direction: str, delta_time: float):
         front = glm.vec3(glm.cos(glm.radians(self.yaw)), 0, glm.sin(glm.radians(self.yaw)))
@@ -74,21 +78,20 @@ class Player(Model):
         proposed_thrust = glm.vec3(0, 0, 0)
 
         if direction == 'FORWARD':
-            proposed_thrust += front * self.accelerator
+            proposed_thrust += front #* self.accelerator
         if direction == 'BACKWARD':
-            proposed_thrust -= front * self.accelerator
+            proposed_thrust += -front #* self.accelerator
         if direction == 'LEFT':
-            proposed_thrust -= right * self.accelerator
+            proposed_thrust += -right #* self.accelerator
         if direction == 'RIGHT':
-            proposed_thrust += right * self.accelerator
+            proposed_thrust += right #* self.accelerator
         if direction == 'JUMP' and self.is_grounded:
             self.is_jumping = True
-            self.velocity.y = self.jump_force
+            proposed_thrust += self.jump_force
             self.is_grounded = False
-            print('jump: updated velocity to', self.velocity)
+            print('jump: updated proposed_thrust to', proposed_thrust)
 
-        # Propose the new position based on thrust
-        self.proposed_thrust = proposed_thrust# * delta_time
+        self.proposed_thrust = proposed_thrust
 
 
     def update_player_model_matrix(self):
