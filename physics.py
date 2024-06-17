@@ -3,6 +3,8 @@ from collections import defaultdict
 from typing import Tuple, List, Set
 import glfw
 import glm
+import numpy as np
+
 from pid import PIDController
 from model import Model
 
@@ -169,6 +171,8 @@ class Physics:
         return collisions
 
     def handle_collisions(self, player_thrust, delta_time):
+        #self.adjust_velocity_based_on_wall_collision(player_thrust,delta_time)
+
         collisions = self.check_linear_collision()
 
         if collisions:
@@ -179,8 +183,8 @@ class Physics:
             # Check and resolve secondary collisions
             for face_name, face_vectors in collisions[1:]:
                 if self.is_secondary_collision(face_vectors):
-                    self.adjust_velocity_based_on_wall_collision(self.player.velocity, delta_time)
-                    #self.simple_resolve_collision(face_vectors, player_thrust, delta_time, face_name)
+                    print("Secondary collision detected!")
+                    self.simple_resolve_collision(face_vectors, player_thrust, delta_time, face_name)
 
     def is_secondary_collision(self, face_vectors):
         """
@@ -401,8 +405,6 @@ class Physics:
         return True
 
     def simple_resolve_collision(self, collision_face, proposed_thrust, delta_time, nearest_face_name):
-        # print('nearest face:', nearest_face_name)
-
         p0, p1, p2 = collision_face
 
         p0 = glm.vec3(p0)
@@ -444,11 +446,11 @@ class Physics:
             velocity_projection_onto_normal = glm.dot(self.player.velocity, N_normalized) * N_normalized
 
             # Subtract the projection from the player's velocity
-            self.player.velocity -= velocity_projection_onto_normal
             proposed_thrust -= velocity_projection_onto_normal
+            self.player.velocity -= velocity_projection_onto_normal
+
         else:
             # The player's velocity is already moving the player in a direction away from the collision surface
-            # print("out")
             pass
 
         if nearest_face_name == 'top':
@@ -465,8 +467,11 @@ class Physics:
             self.player.velocity = max_speed * glm.normalize(self.player.velocity)
 
     def adjust_velocity_based_on_wall_collision(self, thrust_direction, delta_time, deceleration_multiplier=1.0):
+        print("Checking whether to adjust velocity based on wall collision...")
         start_pos = self.player.position
-        max_distance = glm.length(thrust_direction) * delta_time
+        print("        Thrust direction = ", thrust_direction)
+        max_distance = glm.length(thrust_direction)  # * delta_time
+        print("        Max distance = ", max_distance)
         closest_distance = float('inf')
         closest_face = None
         closest_face_name = None
@@ -483,13 +488,16 @@ class Physics:
                     t1 = (aabb[0][i] - start_pos[i]) / direction_normalized[i]
                     t2 = (aabb[1][i] - start_pos[i]) / direction_normalized[i]
 
-                    tmin = max(tmin, min(t1, t2))
-                    tmax = min(tmax, max(t1, t2))
+                    tmin_i = min(t1, t2)
+                    tmax_i = max(t1, t2)
+
+                    tmin = max(tmin, tmin_i)
+                    tmax = min(tmax, tmax_i)
 
                     if tmin > tmax:
-                        continue
+                        break
 
-            if tmin > max_distance:
+            if tmin > tmax or tmin > max_distance:
                 continue
 
             intersection_point = start_pos + direction_normalized * tmin
@@ -515,31 +523,63 @@ class Physics:
                 closest_face_name = intersecting_face
 
         if closest_face is not None:
+            print("    Closest face:", closest_face_name)
             wall_normal = glm.normalize(glm.cross(glm.vec3(closest_face[1]) - glm.vec3(closest_face[0]),
-                                                  glm.vec3(closest_face[2]) - glm.vec3(closest_face[0])))
-            deceleration_factor = self.calculate_deceleration_factor(closest_distance, max_distance, min_distance=0.01,
-                                                                     deceleration_multiplier=deceleration_multiplier)
-            self.apply_deceleration(deceleration_factor, thrust_direction, wall_normal, delta_time)
+                                                  glm.vec3(closest_face[2]) - glm.vec3(closest_face[0]))
+                                        )
 
-    def calculate_deceleration_factor(self, distance, max_distance, min_distance=0.01, deceleration_multiplier=1.0):
-        if distance <= 0:
-            return 1.0  # Maximum deceleration
+            deceleration_factor = self.calculate_deceleration_factor(closest_distance,
+                                                                     max_distance,
+                                                                     min_distance=0.01,
+                                                                     deceleration_multiplier=deceleration_multiplier)
+            print("    Deceleration factor = ", glm.round(deceleration_factor))
+            self.apply_deceleration(deceleration_factor,
+                                    thrust_direction,
+                                    wall_normal,
+                                    delta_time,
+                                    closest_distance,
+                                    min_distance=0.1)
+
+    def calculate_deceleration_factor(self, distance, max_distance, min_distance=0.5, deceleration_multiplier=1.0):
         if distance < min_distance:
             return 1.0  # Maximum deceleration when within min_distance
+
         normalized_distance = (distance - min_distance) / (max_distance - min_distance)
         deceleration = 1.0 - glm.exp(-normalized_distance * deceleration_multiplier)
+
+        # Ensure the deceleration factor is clamped between 0 and 1
         return min(1.0, max(0.0, deceleration))
 
-    def apply_deceleration(self, deceleration_factor, thrust_direction, wall_normal, delta_time):
-        print("player initial velocity = ", self.player.velocity)
+    def apply_deceleration(self, deceleration_factor, thrust_direction, wall_normal, delta_time, distance,
+                           min_distance):
+        print("    Applying deceleration...")
+        print("        player initial velocity = ", glm.round(self.player.velocity))
+
+        # Calculate the component of thrust in the direction of the wall normal
         normal_component = glm.dot(thrust_direction, wall_normal) * wall_normal
-        normal_component *= (1.0 - deceleration_factor)
-        thrust_direction -= -normal_component
+
+        # If the distance is less than min_distance, set thrust towards the wall to zero
+        if distance < min_distance:
+            print("        Minimum distance! Setting thrust to zero.")
+            if glm.dot(thrust_direction, wall_normal) > 0:
+                # Thrust is towards the wall, set it to zero
+                normal_component = glm.vec3(0.0, 0.0, 0.0)
+                thrust_direction = normal_component
+        else:
+            # Apply deceleration only to this normal component
+            normal_component *= (1.0 - deceleration_factor)
+            # Adjust thrust direction by removing the normal component
+            thrust_direction -= normal_component
+            print("        Computed thrust direction:", glm.round(thrust_direction))
+
+        # Update player's thrust and velocity
         self.player.proposed_thrust += thrust_direction
-        self.player.thrust += thrust_direction
-        self.player.velocity += thrust_direction
-        print("applying deceleration", glm.length(thrust_direction))
-        print("player corrected velocity = ", self.player.velocity)
+        self.player.thrust = self.player.proposed_thrust
+        self.player.velocity += self.player.thrust
+
+        print("        Applied deceleration:", glm.round(glm.length(normal_component)))
+        print("player corrected velocity = ", glm.round(self.player.velocity))
+        print("_______________________")
 
     def update_physics(self, delta_time: float):
         # Apply forces to the player
@@ -559,11 +599,12 @@ class Physics:
         # Apply speed limiter
         self.limit_speed()
 
-        # Reset inputs
+        # Debugging output
         if self.player.is_jumping:
             print("grounded=", self.player.is_grounded, " jumping=", self.player.is_jumping, "\n",
                   "thrust=", self.player.thrust, "\n",
                   "proposed=", self.player.proposed_thrust, "\n",
                   "velocity=", self.player.velocity, "\n")
 
+        # Reset inputs
         self.player.reset_thrust()
