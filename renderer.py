@@ -12,21 +12,17 @@ class Renderer:
         self.camera = camera
         self.shadow_width = 2048
         self.shadow_height = 2048
-        self.width, self.height = 800, 600  # Window dimensions
-
         glEnable(GL_DEPTH_TEST)
-        glViewport(0, 0, self.width, self.height)
+        glViewport(0, 0, 800, 600)
         glClearColor(0.0, 0.0, 0.0, 1.0)
 
         self.shadow_shader = Shader('shadow_vertex.glsl', 'shadow_fragment.glsl')
         self.emissive_shader = Shader('emissive_vertex.glsl', 'emissive_fragment.glsl')
-        self.bright_pass_shader = Shader('bright_pass.glsl', 'bright_pass.glsl')  # Initialize Bright Pass Shader
-
         self.depth_map_fbo = glGenFramebuffers(1)
         self.depth_map = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D, self.depth_map)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, self.shadow_width, self.shadow_height, 0,
-                     GL_DEPTH_COMPONENT, GL_FLOAT, None)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, self.shadow_width, self.shadow_height, 0, GL_DEPTH_COMPONENT,
+                     GL_FLOAT, None)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER)
@@ -37,34 +33,6 @@ class Renderer:
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, self.depth_map, 0)
         glDrawBuffer(GL_NONE)
         glReadBuffer(GL_NONE)
-        self.check_framebuffer_status()
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
-
-        # Framebuffer for rendering scene
-        self.scene_fbo = glGenFramebuffers(1)
-        self.scene_texture = glGenTextures(1)
-        glBindTexture(GL_TEXTURE_2D, self.scene_texture)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, self.width, self.height, 0, GL_RGB, GL_FLOAT, None)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-        glBindFramebuffer(GL_FRAMEBUFFER, self.scene_fbo)
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.scene_texture, 0)
-        self.check_framebuffer_status()
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
-
-        # Framebuffer for Bright Pass
-        self.bright_pass_fbo = glGenFramebuffers(1)
-        self.bright_pass_texture = glGenTextures(1)
-        glBindTexture(GL_TEXTURE_2D, self.bright_pass_texture)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, self.width, self.height, 0, GL_RGB, GL_FLOAT, None)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-        glBindFramebuffer(GL_FRAMEBUFFER, self.bright_pass_fbo)
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.bright_pass_texture, 0)
         self.check_framebuffer_status()
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
@@ -82,11 +50,10 @@ class Renderer:
         light_view = glm.lookAt(light_position, glm.vec3(0.0, 0.0, 0.0), glm.vec3(0.0, 1.0, 0.0))
         return light_proj * light_view
 
-    def render_scene(self, shader, player_object, world, interactables, light_space_matrices, view_matrix=None,
+    def render_scene(self, shader, player_object, world, interactables, light_space_matrix, view_matrix=None,
                      projection_matrix=None):
         shader.use()
-        for i, light_space_matrix in enumerate(light_space_matrices):
-            shader.set_uniform_matrix4fv(f"lightSpaceMatrix[{i}]", light_space_matrix)
+        shader.set_uniform_matrix4fv("lightSpaceMatrix", light_space_matrix)
 
         # Render world objects
         for obj in world.get_objects():
@@ -130,7 +97,6 @@ class Renderer:
             glm.vec3(0.0, 0.0, 1)
         ]
 
-        # Render shadow map
         glViewport(0, 0, self.shadow_width, self.shadow_height)
         glBindFramebuffer(GL_FRAMEBUFFER, self.depth_map_fbo)
         glClear(GL_DEPTH_BUFFER_BIT)
@@ -141,13 +107,11 @@ class Renderer:
             light_space_matrices.append(light_space_matrix)
             self.shadow_shader.use()
             self.shadow_shader.set_uniform_matrix4fv("lightSpaceMatrix", light_space_matrix)
-            self.render_scene(self.shadow_shader, player_object, world, interactables, [light_space_matrix])
+            self.render_scene(self.shadow_shader, player_object, world, interactables, light_space_matrix)
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
-        # Render scene to framebuffer
-        glViewport(0, 0, self.width, self.height)
-        glBindFramebuffer(GL_FRAMEBUFFER, self.scene_fbo)
+        glViewport(0, 0, 800, 600)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         self.shader.use()
         self.shader.set_uniform_matrix4fv("view", view_matrix)
@@ -165,33 +129,10 @@ class Renderer:
         self.shader.set_bump_scale(1.0)
         self.shader.set_roughness(0.5)
 
-        self.render_scene(self.shader, player_object, world, interactables, light_space_matrices, view_matrix,
+        self.render_scene(self.shader, player_object, world, interactables, light_space_matrix, view_matrix,
                           projection_matrix)
 
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
-
-        # Apply Bright Pass Shader
-        glViewport(0, 0, self.width, self.height)
-        glBindFramebuffer(GL_FRAMEBUFFER, self.bright_pass_fbo)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        self.bright_pass_shader.use()
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, self.scene_texture)
-        self.bright_pass_shader.set_uniform1i("scene", 0)
-        self.bright_pass_shader.set_uniform1f("threshold", 0.1)  # Adjust the threshold as needed
-
-        self.render_quad()
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
-
-        # Final pass to render to screen
-        glViewport(0, 0, self.width, self.height)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        glBindTexture(GL_TEXTURE_2D, self.bright_pass_texture)
-        self.render_quad()
-
         self.render_lights(light_positions, light_colors, view_matrix, projection_matrix)
-
 
     def render_lights(self, light_positions, light_colors, view_matrix, projection_matrix):
         self.emissive_shader.use()
@@ -249,36 +190,6 @@ class Renderer:
         glDeleteVertexArrays(1, [VAO])
         glDeleteBuffers(1, [EBO])
 
-    def render_quad(self):
-        # Define the quad vertices and indices
-        quad_vertices = [
-            -1.0, 1.0, 0.0, 1.0,
-            -1.0, -1.0, 0.0, 0.0,
-            1.0, -1.0, 1.0, 0.0,
-            1.0, 1.0, 1.0, 1.0,
-        ]
-        quad_vertices = np.array(quad_vertices, dtype=np.float32)
-
-        quad_vao = glGenVertexArrays(1)
-        quad_vbo = glGenBuffers(1)
-
-        glBindVertexArray(quad_vao)
-
-        glBindBuffer(GL_ARRAY_BUFFER, quad_vbo)
-        glBufferData(GL_ARRAY_BUFFER, quad_vertices.nbytes, quad_vertices, GL_STATIC_DRAW)
-
-        glEnableVertexAttribArray(0)
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * quad_vertices.itemsize, ctypes.c_void_p(0))
-        glEnableVertexAttribArray(1)
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * quad_vertices.itemsize,
-                              ctypes.c_void_p(2 * quad_vertices.itemsize))
-
-        glDrawArrays(GL_TRIANGLE_FAN, 0, 4)
-
-        glBindVertexArray(0)
-        glDeleteBuffers(1, [quad_vbo])
-        glDeleteVertexArrays(1, [quad_vao])
-
     def update_uniforms(self, model_matrix, view_matrix, projection_matrix, model: Model):
         self.shader.set_uniform_matrix4fv("model", model_matrix)
         self.shader.set_uniform_matrix4fv("view", view_matrix)
@@ -296,3 +207,4 @@ class Renderer:
             self.shader.set_uniform1f("shininess", ns)
             self.shader.set_roughness(roughness)
             self.shader.set_bump_scale(bump_scale)
+
