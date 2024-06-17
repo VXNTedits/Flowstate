@@ -14,9 +14,11 @@ class MaterialOverride:
 
 class Model:
     default_material = {
-        'diffuse': [1, 0.0, 0.0],  # Example values
+        'diffuse': [1.0, 0.0, 0.0],  # Example values
         'specular': [1.0, 1.0, 1.0],  # Example values (or a glm.vec3 if using glm)
-        'shininess': 10.0  # Example value
+        'shininess': 10.0,  # Example value
+        'roughness': 0.1,  # Example value for roughness
+        'bumpScale': 0.1
     }
 
     def __init__(self,
@@ -31,7 +33,9 @@ class Model:
                  ns_override=None,
                  scale=1,
                  is_collidable=True,
-                 shift_to_centroid=False):
+                 shift_to_centroid=False,
+                 roughness_override=None,
+                 bump_scale_override=None):
 
         self.orientation = rotation_angles
         self.scale = scale
@@ -43,7 +47,7 @@ class Model:
         print(f"Initializing Model with filepath: {filepath}")
         self.name = filepath
         self.vertices, self.indices = self.load_obj(filepath, shift_to_centroid=self.shift_to_centroid)
-        self.materials = self.load_mtl(mtl_filepath)  # if mtl_filepath else {}
+        self.materials = self.load_mtl(mtl_filepath)
         # Apply overrides if provided
         first_material_key = next(iter(self.materials))
         if kd_override is not None:
@@ -55,6 +59,12 @@ class Model:
         if ns_override is not None:
             print(f'{self.name}, ns: {ns_override}')
             self.materials[first_material_key]['shininess'] = ns_override
+        if roughness_override is not None:
+            print(f'{self.name}, roughness: {roughness_override}')
+            self.materials[first_material_key]['roughness'] = roughness_override
+        if bump_scale_override is not None:
+            print(f'{self.name}, bumpScale: {bump_scale_override}')
+            self.materials[first_material_key]['bumpScale'] = bump_scale_override
 
         self.default_material = self.materials[first_material_key]
         self.vao, self.vbo, self.ebo = self.setup_buffers()
@@ -63,17 +73,13 @@ class Model:
         self.set_position(translation)
         self.draw_convex_only = draw_convex_only
         if self.is_player:
-            #self.player_width = 0.5
-            #self.player_height = 2
             self.bounding_box = self.calculate_bounding_box()
             self.aabb = self.calculate_aabb()
-            #
         else:
-            # self.convex_components = self.decompose_model()
             if self.is_collidable:
                 self.bounding_box = self.calculate_bounding_box()
                 self.aabb = self.calculate_aabb()
-                self.voxels = None  # self.decompose_to_voxels(self.vertices, 5)
+                self.voxels = None
                 self.voxel_size = 5
         print(f"{self.name}'s Materials: {self.materials} ")
         print()
@@ -83,6 +89,10 @@ class Model:
             self.materials['specular'] = ks_override
         if ns_override is not None:
             self.materials['shininess'] = ns_override
+        if roughness_override is not None:
+            self.materials['roughness'] = roughness_override
+        if bump_scale_override is not None:
+            self.materials['bumpScale'] = bump_scale_override
         self.centroid = self.calculate_centroid()
 
     def calculate_centroid(self):
@@ -155,7 +165,7 @@ class Model:
                 if line.startswith('newmtl'):
                     current_material = line.split()[1]
                     materials[current_material] = {'diffuse': [1.0, 0.0, 0.0], 'specular': [0.0, 1.0, 0.0],
-                                                   'shininess': 1000.0}
+                                                   'shininess': 500.0, 'roughness':0.91, 'bumpScale':0.5}
                 elif current_material:
                     if line.startswith('Kd '):
                         parts = line.split()
@@ -287,8 +297,6 @@ class Model:
         print("Calculated AABB:", aabb)
         return aabb
 
-    # def __getattr__(self, name):
-    #     return getattr(self._model, name)
     def update_model_matrix(self, parent_matrix=None):
         translation_matrix = glm.translate(glm.mat4(1.0),
                                            glm.vec3(self.position[0], self.position[1], self.position[2]))
@@ -319,6 +327,10 @@ class Model:
 
         self.model_matrix = translation_matrix * rotation_matrix * scale_matrix
 
-
+    def update_uniforms(self, shader):
+        shader.set_uniform3f("objectColor", glm.vec3(*self.default_material['diffuse']))
+        shader.set_uniform3f("specularColor", glm.vec3(*self.default_material['specular']))
+        shader.set_uniform1f("shininess", self.default_material['shininess'])
+        shader.set_roughness(self.default_material['roughness'])
 
 

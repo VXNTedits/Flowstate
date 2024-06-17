@@ -1,169 +1,176 @@
-import time
-
 import glm
 import numpy as np
 from OpenGL.GL import *
-
 import model
 from model import Model
+from shader import Shader
 
 
 class Renderer:
     def __init__(self, shader, camera):
         self.shader = shader
         self.camera = camera
+        self.shadow_width = 2024
+        self.shadow_height = 2024
         glEnable(GL_DEPTH_TEST)
         glViewport(0, 0, 800, 600)  # Set the viewport
         glClearColor(0.0, 0.0, 0.0, 1.0)  # Set clear color (black)
 
-    def render_player(self, player_object, view_matrix, projection_matrix):
+        # Shadow mapping setup
+        self.shadow_shader = Shader('shadow_vertex.glsl', 'shadow_fragment.glsl')
+        self.depth_map_fbo = glGenFramebuffers(1)
+        self.depth_map = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, self.depth_map)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, self.shadow_width, self.shadow_height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, None)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER)
+        border_color = [1.0, 1.0, 1.0, 1.0]
+        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color)
+        glBindFramebuffer(GL_FRAMEBUFFER, self.depth_map_fbo)
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, self.depth_map, 0)
+        glDrawBuffer(GL_NONE)
+        glReadBuffer(GL_NONE)
+        self.check_framebuffer_status()
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+    def check_framebuffer_status(self):
+        status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
+        if status != GL_FRAMEBUFFER_COMPLETE:
+            print(f"Framebuffer is not complete: {status}")
+        else:
+            print("Framebuffer is complete.")
+
+    def render_scene(self, shader):
+        # Render your scene here using the given shader
+        pass
+
+    def render(self, player_object, world, interactables, view_matrix, projection_matrix):
+        # Set light positions and colors
+        light_positions = [glm.vec3(1.2, 10.0, 2.0), glm.vec3(-1.2, 20.0, 2.0), glm.vec3(0.0, 20.0, 2.0)]
+        light_colors = [glm.vec3(1.0, 1.0, 1.0), glm.vec3(1.0, 1.0, 1.0), glm.vec3(1.0, 1.0, 1.0)]
+
+        light_space_matrix = self.calculate_light_space_matrix(light_positions[0])
+
+        # 1. Render depth of scene to texture (from light's perspective)
+        self.shadow_shader.use()
+        self.shadow_shader.set_uniform_matrix4fv("lightSpaceMatrix", light_space_matrix)
+        glViewport(0, 0, self.shadow_width, self.shadow_height)
+        glBindFramebuffer(GL_FRAMEBUFFER, self.depth_map_fbo)
+        glClear(GL_DEPTH_BUFFER_BIT)
+        self.render_scene(self.shadow_shader)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+        # 2. Render scene as normal using the generated depth/shadow map
+        glViewport(0, 0, 800, 600)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         self.shader.use()
-        model_matrix = player_object.model_matrix
-        self.update_uniforms(model_matrix, view_matrix, projection_matrix, player_object)
-        player_object.draw(self.camera)
+        self.shader.set_uniform_matrix4fv("view", view_matrix)
+        self.shader.set_uniform_matrix4fv("projection", projection_matrix)
+        self.shader.set_uniform_matrix4fv("lightSpaceMatrix", light_space_matrix)
+        self.shader.set_uniform3f("viewPos", self.camera.position)
+        glActiveTexture(GL_TEXTURE1)
+        glBindTexture(GL_TEXTURE_2D, self.depth_map)
+        self.shader.set_uniform1i("shadowMap", 1)
+
+        # Set light positions and colors
+        for i, (pos, color) in enumerate(zip(light_positions, light_colors)):
+            self.shader.set_uniform3f(f"lights[{i}].position", pos)
+            self.shader.set_uniform3f(f"lights[{i}].color", color)
+
+        # Set bump scale and roughness
+        self.shader.set_bump_scale(1.0)  # You can adjust the value as needed
+        self.shader.set_roughness(0.5)  # You can adjust the value as needed
+
+        # Render your scene objects here
+        self.render_world(world, view_matrix, projection_matrix)
+        self.render_player(player_object, view_matrix, projection_matrix)
+        self.render_interactables(interactables, view_matrix, projection_matrix)
+
+        # Debug: Render depth map to screen for visualization
+        self.visualize_depth_map()
+
+    def visualize_depth_map(self):
+        glViewport(0, 0, 800, 600)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        glBindTexture(GL_TEXTURE_2D, self.depth_map)
+        # Render a quad that fills the screen with the depth map texture
+        quad_vertices = [
+            -1.0, 1.0, 0.0, 0.0, 1.0,
+            -1.0, -1.0, 0.0, 0.0, 0.0,
+            1.0, -1.0, 0.0, 1.0, 0.0,
+            1.0, 1.0, 0.0, 1.0, 1.0,
+        ]
+        quad_indices = [0, 1, 2, 0, 2, 3]
+
+        VAO = glGenVertexArrays(1)
+        VBO = glGenBuffers(1)
+        EBO = glGenBuffers(1)
+
+        glBindVertexArray(VAO)
+        glBindBuffer(GL_ARRAY_BUFFER, VBO)
+        glBufferData(GL_ARRAY_BUFFER, np.array(quad_vertices, dtype=np.float32), GL_STATIC_DRAW)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, np.array(quad_indices, dtype=np.uint32), GL_STATIC_DRAW)
+
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), ctypes.c_void_p(0))
+        glEnableVertexAttribArray(0)
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), ctypes.c_void_p(3 * sizeof(GLfloat)))
+        glEnableVertexAttribArray(1)
+
+        # Use a simple shader to render the depth map texture
+        depth_shader = Shader('depth_vertex.glsl', 'depth_fragment.glsl')
+        depth_shader.use()
+        depth_shader.set_uniform1i("depthMap", 1)
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
+
+        glBindVertexArray(0)
+        glDeleteBuffers(1, [VBO])
+        glDeleteVertexArrays(1, [VAO])
+        glDeleteBuffers(1, [EBO])
+
+    def calculate_light_space_matrix(self, light_pos):
+        light_projection = glm.ortho(-10.0, 10.0, -10.0, 10.0, 1.0, 7.5)
+        light_view = glm.lookAt(light_pos, glm.vec3(0.0, 0.0, 0.0), glm.vec3(0.0, 1.0, 0.0))
+        return light_projection * light_view
 
     def render_world(self, world, view_matrix, projection_matrix):
-        self.shader.use()
         model_matrix = world.model_matrix
         self.update_uniforms(model_matrix, view_matrix, projection_matrix, world)
         world.draw()
 
+    def render_player(self, player_object, view_matrix, projection_matrix):
+        model_matrix = player_object.model_matrix
+        self.update_uniforms(model_matrix, view_matrix, projection_matrix, player_object)
+        player_object.draw(self.camera)
+
     def render_interactables(self, interactables: list, view_matrix, projection_matrix):
         for interactable in interactables:
-            self.shader.use()
             model_matrix = interactable.model_matrix
             self.update_uniforms(model_matrix, view_matrix, projection_matrix, interactable)
             interactable.draw()
-            interactable._model.update_composite_model_matrix(model_matrix)  # Ensure sub-model matrices are updated
+            interactable._model.update_composite_model_matrix(model_matrix)
             for mod, pos, dir in interactable._model.models:
-                self.shader.use()
                 model_matrix = mod.model_matrix
                 self.update_uniforms(model_matrix, view_matrix, projection_matrix, mod)
                 mod.draw()
-
-    def render_aabb(self, list_of_objects_in_world: list, player_pos: glm.vec3, view_matrix, projection_matrix):
-        self.shader.use()
-        for obj in list_of_objects_in_world:
-            min_corner, max_corner = obj.aabb
-
-            vertices = [
-                glm.vec3(min_corner[0], min_corner[1], min_corner[2]),
-                glm.vec3(min_corner[0], min_corner[1], max_corner[2]),
-                glm.vec3(min_corner[0], max_corner[1], min_corner[2]),
-                glm.vec3(min_corner[0], max_corner[1], max_corner[2]),
-                glm.vec3(max_corner[0], min_corner[1], min_corner[2]),
-                glm.vec3(max_corner[0], min_corner[1], max_corner[2]),
-                glm.vec3(max_corner[0], max_corner[1], min_corner[2]),
-                glm.vec3(max_corner[0], max_corner[1], max_corner[2]),
-            ]
-
-            edges = [
-                (0, 1), (0, 2), (0, 4), (1, 3), (1, 5), (2, 3), (2, 6), (3, 7),
-                (4, 5), (4, 6), (5, 7), (6, 7)
-            ]
-
-            for edge in edges:
-                self.draw_line(vertices[edge[0]], vertices[edge[1]], view_matrix, projection_matrix)
-
-        self.draw_player_position(player_pos, view_matrix, projection_matrix)
-
-    def draw_line(self, start, end, view_matrix, projection_matrix):
-        model_matrix = glm.mat4(1.0)
-        self.update_uniforms(model_matrix, view_matrix, projection_matrix, None)
-
-        vertices = [start.x, start.y, start.z, end.x, end.y, end.z]
-        vertex_array = np.array(vertices, dtype=np.float32)
-
-        VAO = glGenVertexArrays(1)
-        VBO = glGenBuffers(1)
-
-        glBindVertexArray(VAO)
-        glBindBuffer(GL_ARRAY_BUFFER, VBO)
-        glBufferData(GL_ARRAY_BUFFER, vertex_array.nbytes, vertex_array, GL_STATIC_DRAW)
-
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), ctypes.c_void_p(0))
-        glEnableVertexAttribArray(0)
-
-        # Set the line width for visibility
-        glLineWidth(4.0)
-
-        # Set a solid color for debugging (e.g., red)
-        self.shader.set_uniform3f("objectColor", glm.vec3(1.0, 1.0, 1.0))
-
-        glDrawArrays(GL_LINES, 0, 2)
-
-        glBindVertexArray(0)
-        glDeleteBuffers(1, [VBO])
-        glDeleteVertexArrays(1, [VAO])
-
-    def draw_player_position(self, player_pos, view_matrix, projection_matrix):
-        model_matrix = glm.mat4(1.0)
-        self.update_uniforms(model_matrix, view_matrix, projection_matrix, None)
-
-        vertices = [player_pos.x, player_pos.y, player_pos.z]
-        vertex_array = np.array(vertices, dtype=np.float32)
-
-        VAO = glGenVertexArrays(1)
-        VBO = glGenBuffers(1)
-
-        glBindVertexArray(VAO)
-        glBindBuffer(GL_ARRAY_BUFFER, VBO)
-        glBufferData(GL_ARRAY_BUFFER, vertex_array.nbytes, vertex_array, GL_STATIC_DRAW)
-
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), ctypes.c_void_p(0))
-        glEnableVertexAttribArray(0)
-
-        # Set the point size for visibility
-        glPointSize(10.0)  # Adjust the size as needed
-
-        # Set a solid color for debugging (e.g., blue)
-        self.shader.set_uniform3f("objectColor", glm.vec3(0.0, 0.0, 1.0))
-
-        glDrawArrays(GL_POINTS, 0, 1)
-
-        glBindVertexArray(0)
-        glDeleteBuffers(1, [VBO])
-        glDeleteVertexArrays(1, [VAO])
 
     def update_uniforms(self, model_matrix, view_matrix, projection_matrix, model: Model):
         self.shader.set_uniform_matrix4fv("model", model_matrix)
         self.shader.set_uniform_matrix4fv("view", view_matrix)
         self.shader.set_uniform_matrix4fv("projection", projection_matrix)
-        self.shader.set_uniform3f("viewPos", self.camera.position)
 
-        # Animate light properties
-        current_time = time.time()
-
-        # Use sinusoidal functions to oscillate between 0 and 1
-        def oscillate(frequency, phase_shift=0):
-            return (glm.sin(current_time * frequency + phase_shift) + 1) / 2
-
-        light_positions = [glm.vec3(100.2, 1.0, 2.0), glm.vec3(-1.2, 2.0, 200.0), glm.vec3(10.0, 3.0, 20.0)]
-
-        # Define base colors
-        base_colors = [
-            glm.vec3(1.0, 0.08, 0.58),  # Pink
-            glm.vec3(0.08, 0.08, 1.0),  # Blue
-            glm.vec3(0.08, 1.0, 0.08)  # Green
-        ]
-
-        # Animate colors
-        animated_colors = [
-            glm.vec3(oscillate(1.0), oscillate(0.1, 2), oscillate(0.1, 4)),  # Example frequency for Pink
-            glm.vec3(oscillate(0.1, 2), oscillate(0.1, 4), oscillate(0.1, 6)),  # Example frequency for Blue
-            glm.vec3(oscillate(0.1, 4), oscillate(0.2, 6), oscillate(0.1, 8))  # Example frequency for Green
-        ]
-
-        for i, (lightPos, lightColor) in enumerate(zip(light_positions, animated_colors)):
-            self.shader.set_uniform3f(f"lights[{i}].position", lightPos)
-            self.shader.set_uniform3f(f"lights[{i}].color", lightColor)
-
-        # Set material properties using the first material found
+        # Set other uniforms like objectColor, specularColor, shininess, roughness, etc.
         if model:
             kd = model.default_material['diffuse']
             ks = model.default_material['specular']
             ns = model.default_material['shininess']
+            roughness = model.default_material.get('roughness', 0.5)  # Default to 0.5 if not found
+            bump_scale = model.default_material.get('bumpScale', 1.0)  # Default to 1.0 if not found
 
             self.shader.set_uniform3f("objectColor", glm.vec3(*kd))
             self.shader.set_uniform3f("specularColor", glm.vec3(*ks))
             self.shader.set_uniform1f("shininess", ns)
+            self.shader.set_roughness(roughness)
+            self.shader.set_bump_scale(bump_scale)
