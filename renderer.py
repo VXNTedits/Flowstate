@@ -35,8 +35,8 @@ class Renderer:
         # Volume bounds for volumetric rendering
         # These define the boundaries of the volume in the scene
         print("Volume bounds for volumetric rendering...")
-        self.volume_min = glm.vec3(-1000, -1000, -1000)
-        self.volume_max = glm.vec3(1000, 1000, 1000)
+        self.volume_min = glm.vec3(-100, -100, -100)
+        self.volume_max = glm.vec3(100, 100, 100)
 
         # Store the provided shader and camera references
         self.shader = shader
@@ -70,6 +70,7 @@ class Renderer:
         self.debug_depth_shader = ShaderManager.get_shader("debug_vertex.glsl", "debug_fragment.glsl")
         self.screen_shader = ShaderManager.get_shader("shaders/screen_vertex.glsl", "shaders/screen_fragment.glsl")
         self.composite_shader = ShaderManager.get_shader("shaders/composite_vertex.glsl", "shaders/composite_fragment.glsl")
+        self.procedural_shader = ShaderManager.get_shader("shaders/procedural_vertex.glsl","shaders/procedural_fragment.glsl")
 
         # Set up the offscreen buffer for shader compositing
         print("Set up the offscreen buffer for shader compositing...")
@@ -77,8 +78,8 @@ class Renderer:
 
         # Generate 3D noise texture for volumetric effects
         # This texture will be used in the volumetric rendering process
-        print("Generate 3D noise texture for volumetric effects...")
-        self.noise_size = 8  # Size of the 3D noise texture
+        #print("Generate 3D noise texture for volumetric effects...")
+        self.noise_size = 32  # Size of the 3D noise texture
         self.simplex = OpenSimplex(seed=np.random.randint(0, 10000))
         self.setup_volume_texture()
 
@@ -231,14 +232,15 @@ class Renderer:
         check_gl_state()
 
         # 2. Render the scene to the framebuffer
-        self.render_scene_to_fbo(self.shader, player_object, world, interactables, self.light_space_matrix,
-                                 view_matrix, projection_matrix)
+        self.render_scene_to_fbo(self.shader, player_object, world, interactables, self.light_space_matrix, view_matrix,
+                                 projection_matrix)
 
         # 3. Render volumetric effects to the framebuffer
         self.render_volumetric_effects_to_fbo(view_matrix, projection_matrix)
 
         # 4. Composite the scene and volumetric effects
         self.composite_scene_and_volumetrics()
+        self.render_procedural_volumetrics(view_matrix, projection_matrix)
 
         # Ensure depth test is enabled for future operations
         glEnable(GL_DEPTH_TEST)
@@ -394,39 +396,6 @@ class Renderer:
             self.shader.set_uniform1f("shininess", ns)
             self.shader.set_roughness(roughness)
             self.shader.set_bump_scale(bump_scale)
-
-    def render_volumetrics(self, shader, player_object, world, interactables, view_matrix, projection_matrix):
-        glDisable(GL_DEPTH_TEST)
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-        shader.use()
-        shader.set_uniform1i("volumeData", 0)  # Texture unit 0
-
-        # Create a view matrix without the translation component
-        view_matrix_no_translation = glm.mat4(glm.mat3(view_matrix))
-
-        inv_view_proj_matrix = glm.inverse(projection_matrix * view_matrix_no_translation)
-        shader.set_uniform_matrix4fv("invViewProjMatrix", inv_view_proj_matrix)
-        shader.set_uniform_matrix4fv("viewMatrix", view_matrix_no_translation)
-        shader.set_uniform3fv("volumeMin", self.volume_min)
-        shader.set_uniform3fv("volumeMax", self.volume_max)
-
-        # Set light positions and colors
-        num_lights = len(self.light_positions)
-        shader.set_uniform1i("numLights", num_lights)
-        for i, (pos, color) in enumerate(zip(self.light_positions, self.light_colors)):
-            shader.set_uniform3fv(f"lightPositions[{i}]", pos)
-            shader.set_uniform3fv(f"lightColors[{i}]", color)
-
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_3D, self.volume_texture)
-
-        glBindVertexArray(self.quadVAO)
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
-        glBindVertexArray(0)
-
-        glDisable(GL_BLEND)
 
     def init_volumetric_fbo(self):
         """Sets up a framebuffer specifically for volumetric effects,
@@ -798,7 +767,7 @@ class Renderer:
         self.shader.set_bump_scale(5.0)
         self.shader.set_roughness(0.1)
 
-        self.render_lights(self.light_positions, self.light_colors, view_matrix, projection_matrix)
+        #self.render_lights(self.light_positions, self.light_colors, view_matrix, projection_matrix)
         self.render_scene(shader, player_object, world, interactables, light_space_matrix,
                           view_matrix, projection_matrix)
         self.check_opengl_error()
@@ -817,10 +786,19 @@ class Renderer:
         self.volumetric_shader.use()
         self.volumetric_shader.set_uniform1i("volumeData", 0)  # Texture unit 0
 
-        # Create a view matrix without the translation component
-        view_matrix_no_translation = glm.mat4(glm.mat3(view_matrix))
+        # Remove the translation component from the view matrix
+        view_matrix_no_translation = glm.mat4(view_matrix)
+        view_matrix_no_translation[3] = glm.vec4(0, 0, 0, 1)  # Set translation to zero
+
+        # Debug: Print view and projection matrices
+        print("View Matrix (No Translation):", view_matrix_no_translation)
+        print("Projection Matrix:", projection_matrix)
 
         inv_view_proj_matrix = glm.inverse(projection_matrix * view_matrix_no_translation)
+
+        # Debug: Print inverse view-projection matrix
+        print("Inverse View-Projection Matrix:", inv_view_proj_matrix)
+
         self.volumetric_shader.set_uniform_matrix4fv("invViewProjMatrix", inv_view_proj_matrix)
         self.volumetric_shader.set_uniform_matrix4fv("viewMatrix", view_matrix_no_translation)
         self.volumetric_shader.set_uniform3fv("volumeMin", self.volume_min)
@@ -910,3 +888,58 @@ class Renderer:
     def log_buffer_allocation(self, buffer_name):
         current_memory = glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX)
         print(f"Allocated {buffer_name}, current available GPU memory: {current_memory} KB")
+
+    def render_procedural_volumetrics(self, view_matrix, projection_matrix):
+        glBindFramebuffer(GL_FRAMEBUFFER, self.volumetric_fbo)
+        glViewport(0, 0, 800, 600)
+        glClear(GL_COLOR_BUFFER_BIT)
+
+        glDisable(GL_DEPTH_TEST)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        self.procedural_shader.use()
+
+        # Get uniform locations
+        camPos_location = glGetUniformLocation(self.procedural_shader.program, "camPos")
+        volumeMin_location = glGetUniformLocation(self.procedural_shader.program, "volumeMin")
+        volumeMax_location = glGetUniformLocation(self.procedural_shader.program, "volumeMax")
+        numLights_location = glGetUniformLocation(self.procedural_shader.program, "numLights")
+        lightPositions_location = [glGetUniformLocation(self.procedural_shader.program, f"lightPositions[{i}]") for i in
+                                   range(len(self.light_positions))]
+        lightColors_location = [glGetUniformLocation(self.procedural_shader.program, f"lightColors[{i}]") for i in
+                                range(len(self.light_colors))]
+        density_location = glGetUniformLocation(self.procedural_shader.program, "density")
+
+        # Set uniform values
+        cam_pos = glm.vec3(view_matrix[3][0], view_matrix[3][1], view_matrix[3][2])
+        glUniform3fv(camPos_location, 1, glm.value_ptr(cam_pos))
+        glUniform3fv(volumeMin_location, 1, glm.value_ptr(self.volume_min))
+        glUniform3fv(volumeMax_location, 1, glm.value_ptr(self.volume_max))
+        glUniform1i(numLights_location, len(self.light_positions))
+
+        print(f"Camera Position: {cam_pos}")
+        print(f"Volume Min: {self.volume_min}, Volume Max: {self.volume_max}")
+        print(f"Number of Lights: {len(self.light_positions)}")
+
+        for i, pos in enumerate(self.light_positions):
+            glUniform3fv(lightPositions_location[i], 1, glm.value_ptr(pos))
+            print(f"Light {i} Position: {pos}")
+        for i, color in enumerate(self.light_colors):
+            glUniform3fv(lightColors_location[i], 1, glm.value_ptr(color))
+            print(f"Light {i} Color: {color}")
+
+        glUniform1f(density_location, 0.1)  # Example density value
+        print(f"Density: 0.1")
+
+        glBindVertexArray(self.quadVAO)
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
+        glBindVertexArray(0)
+
+        glDisable(GL_BLEND)
+        glEnable(GL_DEPTH_TEST)
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+
+
