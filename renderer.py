@@ -11,6 +11,20 @@ from world import World
 
 class Renderer:
     def __init__(self, shader, camera):
+
+        self.light_positions = [
+            glm.vec3(50.2, 10.0, 2.0),
+            glm.vec3(10.2, 20.0, 2.0),
+            glm.vec3(0.0, 20.0, -20.0)
+        ]
+        self.light_count = len(self.light_positions)
+
+        self.light_colors = [
+            glm.vec3(1.0, 0.07, 0.58),  # Neon Pink
+            glm.vec3(0.0, 1.0, 0.38),  # Neon Green
+            glm.vec3(0.07, 0.55, 0.8)  # Neon Blue
+        ]
+
         self.shader = shader
         self.camera = camera
         self.shadow_width = 2048
@@ -22,6 +36,7 @@ class Renderer:
         self.shadow_shader = Shader('shaders/shadow_vertex.glsl', 'shaders/shadow_fragment.glsl')
         self.emissive_shader = Shader('shaders/emissive_vertex.glsl', 'shaders/emissive_fragment.glsl')
         self.volumetric_shader = Shader('shaders/volumetric_vertex.glsl', 'shaders/volumetric_fragment.glsl')
+
         self.depth_map_fbo = glGenFramebuffers(1)
         self.depth_map = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D, self.depth_map)
@@ -101,21 +116,22 @@ class Renderer:
             glm.vec3(0.0, 1.0, 0.38),  # Neon Green
             glm.vec3(0.07, 0.55, 0.8)  # Neon Blue
         ]
+        light_count = len(light_positions)
 
+        # 1. Render the depth map
         glViewport(0, 0, self.shadow_width, self.shadow_height)
         glBindFramebuffer(GL_FRAMEBUFFER, self.depth_map_fbo)
         glClear(GL_DEPTH_BUFFER_BIT)
 
-        light_space_matrices = []
+        self.shadow_shader.use()
         for pos in light_positions:
             light_space_matrix = self.calculate_light_space_matrix(pos)
-            light_space_matrices.append(light_space_matrix)
-            self.shadow_shader.use()
             self.shadow_shader.set_uniform_matrix4fv("lightSpaceMatrix", light_space_matrix)
             self.render_scene(self.shadow_shader, player_object, world, interactables, light_space_matrix)
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
+        # 2. Render the scene normally
         glViewport(0, 0, 800, 600)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         self.shader.use()
@@ -123,7 +139,7 @@ class Renderer:
         self.shader.set_uniform_matrix4fv("projection", projection_matrix)
 
         for i, (pos, color) in enumerate(zip(light_positions, light_colors)):
-            self.shader.set_uniform_matrix4fv(f"lightSpaceMatrix[{i}]", light_space_matrices[i])
+            self.shader.set_uniform_matrix4fv(f"lightSpaceMatrix[{i}]", self.calculate_light_space_matrix(pos))
             self.shader.set_uniform3f(f"lights[{i}].position", pos)
             self.shader.set_uniform3f(f"lights[{i}].color", color)
 
@@ -139,17 +155,25 @@ class Renderer:
 
         self.render_lights(light_positions, light_colors, view_matrix, projection_matrix)
 
-        # Volumetric shader pass
+        # 3. Render volumetric effects
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
         self.volumetric_shader.use()
         self.volumetric_shader.set_uniform_matrix4fv("view", view_matrix)
         self.volumetric_shader.set_uniform_matrix4fv("projection", projection_matrix)
+        self.volumetric_shader.set_uniform1i("lightCount", light_count)
+        self.volumetric_shader.set_uniform1f("lightScatteringCoefficient", 1.0)  # Example value
 
         for i, (pos, color) in enumerate(zip(light_positions, light_colors)):
             self.volumetric_shader.set_uniform3f(f"lights[{i}].position", pos)
             self.volumetric_shader.set_uniform3f(f"lights[{i}].color", color)
+        self.volumetric_shader.set_uniform3f("cameraPosition", self.camera.position)
 
         self.render_volumetrics(self.volumetric_shader, player_object, world, interactables, view_matrix,
                                 projection_matrix)
+
+        glDisable(GL_BLEND)
 
     def render_lights(self, light_positions, light_colors, view_matrix, projection_matrix):
         self.light_positions = light_positions
@@ -210,6 +234,11 @@ class Renderer:
         glDeleteBuffers(1, [EBO])
 
     def update_uniforms(self, model_matrix, view_matrix, projection_matrix, model: Model):
+        self.shader.use()
+        #print(f"Updating uniforms for object: {model}")
+        #print(f"Model matrix: {model_matrix}")
+        #print(f"View matrix: {view_matrix}")
+        #print(f"Projection matrix: {projection_matrix}")
         self.shader.set_uniform_matrix4fv("model", model_matrix)
         self.shader.set_uniform_matrix4fv("view", view_matrix)
         self.shader.set_uniform_matrix4fv("projection", projection_matrix)
@@ -228,11 +257,16 @@ class Renderer:
             self.shader.set_bump_scale(bump_scale)
 
     def render_object_with_volumetrics(self, shader, obj, view_matrix, projection_matrix):
+        #print()
+        #print(obj.name)
+
         if isinstance(obj, World):
             model_matrix = obj.model_matrix
         elif isinstance(obj, Player):
             model_matrix = obj.model_matrix
         elif isinstance(obj, InteractableObject):
+            model_matrix = obj.model_matrix
+        elif isinstance(obj, model.Model):
             model_matrix = obj.model_matrix
         else:
             raise TypeError(f"Unknown object type: {type(obj)}")

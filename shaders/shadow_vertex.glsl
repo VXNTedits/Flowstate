@@ -11,5 +11,6 @@ out vec4 FragColor;
 void main()
 {
     vec4 shadowColor = texture(shadowMap, TexCoords);
+    gl_Position = lightSpaceMatrix * model * vec4(aPos, 1.0);
     FragColor = shadowColor;
 }

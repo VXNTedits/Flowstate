@@ -4,17 +4,18 @@ in vec2 TexCoords;
 out vec4 FragColor;
 
 uniform sampler2D depthMap;
-uniform vec3 lightPositions[10];  // Assuming a maximum of 10 lights for this example
+
+struct Light {
+    vec3 position;
+    vec3 color;
+};
+
+uniform Light lights[10];  // Assuming a maximum of 10 lights for this example
 uniform int lightCount;
-uniform vec3 lightPosition;
-uniform vec3 lightColor;
 uniform mat4 view;
 uniform mat4 projection;
-uniform vec3 cameraPosition;
+uniform vec3 cameraPosition;  // Ensure this is declared
 uniform float lightScatteringCoefficient;
-
-
-// Add the inverse matrices if you have them precomputed
 uniform mat4 inverseLightSpaceMatrix;
 
 float getDepth(vec2 uv) {
@@ -34,17 +35,25 @@ void main()
     vec3 fragPositionInViewSpace = (view * vec4(fragPosition, 1.0)).xyz;
 
     float totalScattering = 0.0;
+    vec3 totalColor = vec3(0.0);
+    vec3 viewDir = normalize(cameraPosition - fragPositionInViewSpace); // Use cameraPosition to calculate view direction
+
     for (int i = 0; i < lightCount; i++) {
-        vec3 lightDirection = normalize(lightPositions[i] - fragPosition);
+        vec3 lightDirection = normalize(lights[i].position - fragPosition);
         float scattering = exp(-lightScatteringCoefficient * length(lightDirection));
+
+        // Modulate scattering by the angle between view direction and light direction
+        float angleFactor = dot(viewDir, lightDirection);
+        scattering *= max(0.0, angleFactor);  // Ensures non-negative scattering
+
         totalScattering += scattering;
+        totalColor += lights[i].color * scattering;  // Use light color
     }
 
-    // Average the scattering effect from all lights
+    // Average the scattering effect and color from all lights
     totalScattering /= float(lightCount);
+    totalColor /= float(lightCount);
 
-    // Output fragPosition for debugging
-    FragColor = vec4(fragPosition / 10.0, 1.0);
-
-    //FragColor = vec4(totalScattering, totalScattering, totalScattering, 1.0);
+    // Output the scattering effect and color as the fragment color
+    FragColor = vec4(totalScattering * totalColor, 1.0);
 }
