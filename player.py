@@ -72,29 +72,30 @@ class Player(Model):
         self.thrust = glm.vec3(0.0, 0.0, 0.0)
         self.proposed_thrust = glm.vec3(0.0, 0.0, 0.0)
 
-    def propose_updated_thrust(self, direction: str, delta_time: float):
+    def propose_updated_thrust(self, directions: list, delta_time: float):
         front = glm.vec3(glm.cos(glm.radians(self.yaw)), 0, glm.sin(glm.radians(self.yaw)))
         right = glm.normalize(glm.cross(front, self.up))
         proposed_thrust = glm.vec3(0, 0, 0)
 
-        if direction == 'FORWARD':
-            proposed_thrust += front #* self.accelerator
-        if direction == 'BACKWARD':
-            proposed_thrust += -front #* self.accelerator
-        if direction == 'LEFT':
-            proposed_thrust += -right #* self.accelerator
-        if direction == 'RIGHT':
-            proposed_thrust += right #* self.accelerator
-        if direction == 'JUMP' and self.is_grounded:
-            self.is_jumping = True
-            proposed_thrust += self.jump_force
-            self.is_grounded = False
-            print('jump: updated proposed_thrust to', proposed_thrust, "is jumping=", self.is_jumping)
-        while direction == 'INTERACT':
-            self.interact = True
+        for direction in directions:
+            if direction == 'FORWARD':
+                proposed_thrust += front  # * self.accelerator
+            if direction == 'BACKWARD':
+                proposed_thrust += -front  # * self.accelerator
+            if direction == 'LEFT':
+                proposed_thrust += -right  # * self.accelerator
+            if direction == 'RIGHT':
+                proposed_thrust += right  # * self.accelerator
+            if direction == 'JUMP' and self.is_grounded:
+                self.is_jumping = True
+                proposed_thrust += self.jump_force
+                self.is_grounded = False
+                print('jump: updated proposed_thrust to', proposed_thrust, "is jumping=", self.is_jumping)
+            if direction == 'INTERACT':
+                self.interact = True
+                print("Player interacted")
 
         self.proposed_thrust = proposed_thrust
-
 
     def update_player_model_matrix(self):
         # Rotate around the yaw axis (Y-axis)

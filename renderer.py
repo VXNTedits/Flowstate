@@ -214,11 +214,11 @@ class Renderer:
             blend_src = glGetIntegerv(GL_BLEND_SRC)
             blend_dst = glGetIntegerv(GL_BLEND_DST)
 
-            print(f"GL_DEPTH_TEST: {'ENABLED' if depth_test_enabled else 'DISABLED'}")
-            print(f"GL_BLEND: {'ENABLED' if blend_enabled else 'DISABLED'}")
-            print(f"GL_DEPTH_FUNC: {depth_func}")
-            print(f"GL_BLEND_SRC: {blend_src}")
-            print(f"GL_BLEND_DST: {blend_dst}")
+            #print(f"GL_DEPTH_TEST: {'ENABLED' if depth_test_enabled else 'DISABLED'}")
+            #print(f"GL_BLEND: {'ENABLED' if blend_enabled else 'DISABLED'}")
+            #print(f"GL_DEPTH_FUNC: {depth_func}")
+            #print(f"GL_BLEND_SRC: {blend_src}")
+            #print(f"GL_BLEND_DST: {blend_dst}")
 
         # 1. Render the depth map
         self.shadow_shader.use()
@@ -230,7 +230,7 @@ class Renderer:
 
         assert not glIsEnabled(GL_BLEND), "GL_BLEND should be disabled after depth map rendering"
         assert glIsEnabled(GL_DEPTH_TEST), "GL_DEPTH_TEST should be enabled after depth map rendering"
-        print("Step 1: Depth map rendering complete.")
+        #print("Step 1: Depth map rendering complete.")
         check_gl_state()
 
         # 2. Render the scene to the framebuffer
@@ -256,7 +256,7 @@ class Renderer:
         glEnable(GL_DEPTH_TEST)
         assert not glIsEnabled(GL_BLEND), "GL_BLEND should be disabled for future operations"
         assert glIsEnabled(GL_DEPTH_TEST), "GL_DEPTH_TEST should be enabled for future operations"
-        print("Final frame compositing complete.")
+        #print("Final frame compositing complete.")
         check_gl_state()
 
         self.log_memory_usage()
@@ -798,9 +798,9 @@ class Renderer:
         inv_view_proj_matrix = glm.inverse(view_proj_matrix)
 
         # Debug: Print matrices
-        print("View Matrix:", view_matrix)
-        print("Projection Matrix:", projection_matrix)
-        print("Inverse View-Projection Matrix:", inv_view_proj_matrix)
+        #print("View Matrix:", view_matrix)
+        #print("Projection Matrix:", projection_matrix)
+        #print("Inverse View-Projection Matrix:", inv_view_proj_matrix)
 
         self.volumetric_shader.set_uniform_matrix4fv("invViewProjMatrix", inv_view_proj_matrix)
         self.volumetric_shader.set_uniform3fv("volumeMin", self.volume_min)
@@ -889,8 +889,10 @@ class Renderer:
     def log_memory_usage(self):
         total_memory = glGetIntegerv(GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX)
         current_memory = glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX)
-        print(f"Total GPU memory: {total_memory} KB")
-        print(f"Current available GPU memory: {current_memory} KB")
+        #print(f"Total GPU memory: {total_memory} KB")
+        #print(f"Current available GPU memory: {current_memory} KB")
+        if current_memory-total_memory > 1000000:
+            print("GPU memory warning:", current_memory-total_memory, "KB used")
 
     def log_buffer_allocation(self, buffer_name):
         current_memory = glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX)

@@ -52,29 +52,29 @@ class InputHandler:
                 self.left_mouse_button_pressed = False
 
     def process_input(self, player, delta_time):
+        directions = []
+
         if self.keys.get(glfw.KEY_W):
-            self.handle_input('FORWARD', delta_time)
+            directions.append('FORWARD')
 
         if self.keys.get(glfw.KEY_S):
-            #print('s')
-            self.handle_input('BACKWARD', delta_time)
+            directions.append('BACKWARD')
 
         if self.keys.get(glfw.KEY_A):
-            #print('a')
-            self.handle_input('LEFT', delta_time)
+            directions.append('LEFT')
 
         if self.keys.get(glfw.KEY_D):
-            #print('d')
-            self.handle_input('RIGHT', delta_time)
+            directions.append('RIGHT')
 
         if self.keys.get(glfw.KEY_SPACE):
-            #print('input: space')
-            self.handle_input('JUMP', delta_time)
+            directions.append('JUMP')
 
         if self.keys.get(glfw.KEY_F):
-            #print('input: interact')
-            self.handle_input('INTERACT', delta_time)
+            directions.append('INTERACT')
 
-    def handle_input(self, direction, delta_time):
-        #print(direction)
-        self.player.propose_updated_thrust(direction, delta_time)
+        if directions:
+            self.handle_input(directions, delta_time)
+
+    def handle_input(self, directions, delta_time):
+        # print(directions)
+        self.player.propose_updated_thrust(directions, delta_time)

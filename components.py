@@ -117,8 +117,8 @@ class Components:
 
     def update_components(self, delta_time: float):
         self.world_objects.update(delta_time)
-        for item in self.interactables:
-            item.update(self.player, delta_time)
+        for interactable in self.interactables:
+            interactable.update(self.player, delta_time)
 
     def add_interactable(self, interactable_object):
         self.interactables.append(interactable_object)

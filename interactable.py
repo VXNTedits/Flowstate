@@ -144,14 +144,17 @@ class InteractableObject:
             self.update_interactable_model_matrix(player.right_arm.model_matrix)
         else:
             self.update_interactable_model_matrix()  # Ensure the model matrix is updated for non-picked objects
+        player.interact = False
 
     def check_interactions(self, player, delta_time):
         if glm.distance(player.position, self.position) < self.interaction_threshold:
             self.highlight(delta_time)
             if player.interact:
+                print("INTERACTED!")
                 self.interact(player)
                 player.pick_up(self)
                 self.update_interactable_model_matrix()
+
 
     def highlight(self, delta_time):
         # Rotate around the y-axis
