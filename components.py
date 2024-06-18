@@ -28,7 +28,7 @@ class ObjectAttributes:
 class Components:
     def __init__(self, window):
         self.camera = Camera(glm.vec3(0.0, 0.0, 3.0), glm.vec3(0.0, 1.0, 0.0))
-        self.shader = Shader('vertex_shader.glsl', 'fragment_shader.glsl')
+        self.shader = Shader('shaders/vertex_shader.glsl', 'shaders/fragment_shader.glsl')
 
         # Define object attributes for multiple objects
         world_objects = [

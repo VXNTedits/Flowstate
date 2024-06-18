@@ -2,8 +2,11 @@ import glm
 import numpy as np
 from OpenGL.GL import *
 import model
+from interactable import InteractableObject
 from model import Model
+from player import Player
 from shader import Shader
+from world import World
 
 
 class Renderer:
@@ -16,8 +19,9 @@ class Renderer:
         glViewport(0, 0, 800, 600)
         glClearColor(0.0, 0.0, 0.0, 1.0)
 
-        self.shadow_shader = Shader('shadow_vertex.glsl', 'shadow_fragment.glsl')
-        self.emissive_shader = Shader('emissive_vertex.glsl', 'emissive_fragment.glsl')
+        self.shadow_shader = Shader('shaders/shadow_vertex.glsl', 'shaders/shadow_fragment.glsl')
+        self.emissive_shader = Shader('shaders/emissive_vertex.glsl', 'shaders/emissive_fragment.glsl')
+        self.volumetric_shader = Shader('shaders/volumetric_vertex.glsl', 'shaders/volumetric_fragment.glsl')
         self.depth_map_fbo = glGenFramebuffers(1)
         self.depth_map = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D, self.depth_map)
@@ -35,6 +39,7 @@ class Renderer:
         glReadBuffer(GL_NONE)
         self.check_framebuffer_status()
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        self.init_volumetric_fbo()
 
     def check_framebuffer_status(self):
         status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
@@ -129,12 +134,33 @@ class Renderer:
         self.shader.set_bump_scale(5.0)
         self.shader.set_roughness(0.1)
 
+        # Main pass
         self.render_scene(self.shader, player_object, world, interactables, light_space_matrix, view_matrix,
                           projection_matrix)
 
+        # Emissive shader pass
         self.render_lights(light_positions, light_colors, view_matrix, projection_matrix)
 
+        # Volumetric shader pass
+        self.volumetric_shader.use()
+        self.volumetric_shader.set_uniform_matrix4fv("view", view_matrix)
+        self.volumetric_shader.set_uniform_matrix4fv("projection", projection_matrix)
+
+        for i, (pos, color) in enumerate(zip(light_positions, light_colors)):
+            self.volumetric_shader.set_uniform3f(f"lights[{i}].position", pos)
+            self.volumetric_shader.set_uniform3f(f"lights[{i}].color", color)
+
+        glActiveTexture(GL_TEXTURE1)
+        glBindTexture(GL_TEXTURE_2D, self.depth_map)
+        self.volumetric_shader.set_uniform1i("shadowMap", 1)
+
+        self.render_volumetrics(self.volumetric_shader, player_object, world, interactables, view_matrix,
+                                projection_matrix)
+
+
     def render_lights(self, light_positions, light_colors, view_matrix, projection_matrix):
+        self.light_positions = light_positions
+        self.light_colors = light_colors
         self.emissive_shader.use()
         self.emissive_shader.set_uniform_matrix4fv("view", view_matrix)
         self.emissive_shader.set_uniform_matrix4fv("projection", projection_matrix)
@@ -208,3 +234,80 @@ class Renderer:
             self.shader.set_roughness(roughness)
             self.shader.set_bump_scale(bump_scale)
 
+    def render_object_with_volumetrics(self, shader, obj, view_matrix, projection_matrix):
+        if isinstance(obj, World):
+            model_matrix = obj.model_matrix
+        elif isinstance(obj, Player):
+            model_matrix = obj.model_matrix
+        elif isinstance(obj, InteractableObject):
+            model_matrix = obj.model_matrix
+        else:
+            raise TypeError(f"Unknown object type: {type(obj)}")
+
+        if view_matrix and projection_matrix:
+            self.update_uniforms(model_matrix, view_matrix, projection_matrix, obj)
+
+        shader.set_uniform_matrix4fv("model", model_matrix)
+
+        if isinstance(obj, Player):
+            obj.draw(self.camera)
+        else:
+            obj.draw()
+
+        # Special handling for composite models in interactables
+        if isinstance(obj, InteractableObject):
+            obj._model.update_composite_model_matrix(model_matrix)
+            for mod, pos, dir in obj._model.models:
+                model_matrix = mod.model_matrix
+                if view_matrix and projection_matrix:
+                    self.update_uniforms(model_matrix, view_matrix, projection_matrix, mod)
+                shader.set_uniform_matrix4fv("model", model_matrix)
+                mod.draw()
+
+    def render_volumetrics(self, volumetric_shader, player_object, world, interactables, view_matrix,
+                           projection_matrix):
+        glBindFramebuffer(GL_FRAMEBUFFER, self.volumetric_fbo)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+        volumetric_shader.use()
+        volumetric_shader.set_uniform_matrix4fv("view", view_matrix)
+        volumetric_shader.set_uniform_matrix4fv("projection", projection_matrix)
+
+        for i, (pos, color) in enumerate(zip(self.light_positions, self.light_colors)):
+            volumetric_shader.set_uniform3f(f"lights[{i}].position", pos)
+            volumetric_shader.set_uniform3f(f"lights[{i}].color", color)
+
+        glActiveTexture(GL_TEXTURE1)
+        glBindTexture(GL_TEXTURE_2D, self.depth_map)
+        volumetric_shader.set_uniform1i("shadowMap", 1)
+
+        for obj in world.get_objects():
+            self.render_object_with_volumetrics(volumetric_shader, obj, view_matrix, projection_matrix)
+
+        self.render_object_with_volumetrics(volumetric_shader, player_object, view_matrix, projection_matrix)
+
+        for interactable in interactables:
+            self.render_object_with_volumetrics(volumetric_shader, interactable, view_matrix, projection_matrix)
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+    def init_volumetric_fbo(self):
+        self.volumetric_fbo = glGenFramebuffers(1)
+        glBindFramebuffer(GL_FRAMEBUFFER, self.volumetric_fbo)
+
+        self.volumetric_texture = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, self.volumetric_texture)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 800, 600, 0, GL_RGBA, GL_UNSIGNED_BYTE, None)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.volumetric_texture, 0)
+
+        self.volumetric_depth_buffer = glGenRenderbuffers(1)
+        glBindRenderbuffer(GL_RENDERBUFFER, self.volumetric_depth_buffer)
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, 800, 600)
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, self.volumetric_depth_buffer)
+
+        if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
+            raise Exception("Framebuffer is not complete!")
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
