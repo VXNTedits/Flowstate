@@ -6,10 +6,13 @@ out vec4 FragColor;
 uniform sampler2D depthMap;
 uniform vec3 lightPositions[10];  // Assuming a maximum of 10 lights for this example
 uniform int lightCount;
+uniform vec3 lightPosition;
+uniform vec3 lightColor;
 uniform mat4 view;
 uniform mat4 projection;
 uniform vec3 cameraPosition;
 uniform float lightScatteringCoefficient;
+
 
 // Add the inverse matrices if you have them precomputed
 uniform mat4 inverseLightSpaceMatrix;

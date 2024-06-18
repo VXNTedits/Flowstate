@@ -134,11 +134,9 @@ class Renderer:
         self.shader.set_bump_scale(5.0)
         self.shader.set_roughness(0.1)
 
-        # Main pass
         self.render_scene(self.shader, player_object, world, interactables, light_space_matrix, view_matrix,
                           projection_matrix)
 
-        # Emissive shader pass
         self.render_lights(light_positions, light_colors, view_matrix, projection_matrix)
 
         # Volumetric shader pass
@@ -150,13 +148,8 @@ class Renderer:
             self.volumetric_shader.set_uniform3f(f"lights[{i}].position", pos)
             self.volumetric_shader.set_uniform3f(f"lights[{i}].color", color)
 
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, self.depth_map)
-        self.volumetric_shader.set_uniform1i("shadowMap", 1)
-
         self.render_volumetrics(self.volumetric_shader, player_object, world, interactables, view_matrix,
                                 projection_matrix)
-
 
     def render_lights(self, light_positions, light_colors, view_matrix, projection_matrix):
         self.light_positions = light_positions
@@ -276,10 +269,6 @@ class Renderer:
         for i, (pos, color) in enumerate(zip(self.light_positions, self.light_colors)):
             volumetric_shader.set_uniform3f(f"lights[{i}].position", pos)
             volumetric_shader.set_uniform3f(f"lights[{i}].color", color)
-
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, self.depth_map)
-        volumetric_shader.set_uniform1i("shadowMap", 1)
 
         for obj in world.get_objects():
             self.render_object_with_volumetrics(volumetric_shader, obj, view_matrix, projection_matrix)

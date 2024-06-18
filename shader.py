@@ -14,7 +14,32 @@ from OpenGL.GL.shaders import compileProgram, compileShader
 
 class Shader:
     def __init__(self, vertex_path: str, fragment_path: str):
-        self.id = self.create_shader_program(vertex_path, fragment_path)
+        # Load vertex/fragment shaders from file
+        vertex_code = self.load_shader_code(vertex_path)
+        fragment_code = self.load_shader_code(fragment_path)
+        # Compile shaders
+        vertex_shader = self.compile_shader(vertex_code, GL_VERTEX_SHADER)
+        fragment_shader = self.compile_shader(fragment_code, GL_FRAGMENT_SHADER)
+        # Link shaders to create a program
+        self.program = self.link_program(vertex_shader, fragment_shader)
+
+    def load_shader_code(self, path):
+        with open(path, 'r') as file:
+            return file.read()
+
+    def link_program(self, vertex_shader, fragment_shader):
+        program = glCreateProgram()
+        glAttachShader(program, vertex_shader)
+        glAttachShader(program, fragment_shader)
+        glLinkProgram(program)
+        if not glGetProgramiv(program, GL_LINK_STATUS):
+            raise RuntimeError(glGetProgramInfoLog(program))
+        glDeleteShader(vertex_shader)
+        glDeleteShader(fragment_shader)
+        return program
+
+    def use(self):
+        glUseProgram(self.program)
 
     def create_shader_program(self, vertex_path: str, fragment_path: str) -> int:
         vertex_code = self.read_shader_source(vertex_path)
@@ -31,20 +56,6 @@ class Shader:
         glDeleteShader(fragment_shader)
         return shader_program
 
-    def use(self):
-        glUseProgram(self.id)
-
-    def set_uniform_matrix4fv(self, name: str, matrix):
-        if isinstance(matrix, glm.mat4):
-            location = glGetUniformLocation(self.id, name)
-            glUniformMatrix4fv(location, 1, GL_FALSE, glm.value_ptr(matrix))
-        else:
-            raise TypeError("Expected glm.mat4 type for the matrix parameter")
-
-    def set_uniform3f(self, name: str, vector: glm.vec3):
-        location = glGetUniformLocation(self.id, name)
-        glUniform3fv(location, 1, glm.value_ptr(vector))
-
     def read_shader_source(self, path: str) -> str:
         with open(path, 'r') as file:
             return file.read()
@@ -57,22 +68,32 @@ class Shader:
             raise RuntimeError(glGetShaderInfoLog(shader))
         return shader
 
-    def set_uniform1f(self, name, value):
-        location = glGetUniformLocation(self.id, name)
-        if location != -1:
-            glUniform1f(location, value)
+    def set_uniform_matrix4fv(self, name, matrix):
+        location = glGetUniformLocation(self.program, name)
+        if location == -1:
+            print(f"Uniform '{name}' not found in shader program {self.program}.")
         else:
-            print(f"Uniform '{name}' not found in shader program.")
+            glUniformMatrix4fv(location, 1, GL_FALSE, glm.value_ptr(matrix))
+
+    def set_uniform3f(self, name, vec3):
+        location = glGetUniformLocation(self.program, name)
+        if location == -1:
+            print(f"Uniform '{name}' not found in shader program {self.program}.")
+        else:
+            glUniform3f(location, vec3.x, vec3.y, vec3.z)
 
     def set_uniform1i(self, name, value):
-        location = glGetUniformLocation(self.id, name)
-        if location != -1:
-            glUniform1i(location, value)
+        location = glGetUniformLocation(self.program, name)
+        if location == -1:
+            print(f"Uniform '{name}' not found in shader program {self.program}.")
         else:
-            print(f"Uniform '{name}' not found in shader program.")
+            glUniform1i(location, value)
 
     def set_bump_scale(self, value: float):
         self.set_uniform1f("bumpScale", value)
 
     def set_roughness(self, value: float):
         self.set_uniform1f("roughness", value)
+
+    def set_uniform1f(self, name, value):
+        location = glGetUniformLocation(self.program, name)
