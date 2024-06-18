@@ -54,7 +54,6 @@ class Player(Model):
         self.bounding_box = self.calculate_player_bounding_box(self.previous_position, self.position)
 
     def update_player(self, delta_time: float):
-        #self.apply_forces(delta_time)
         self.previous_position = self.position  # Update previous position before changing current position
         self.position += self.velocity * delta_time
         #self.velocity = (self.position - self.previous_position)/delta_time
