@@ -19,6 +19,7 @@ class Renderer:
         # Initialization of light properties
         # These lights will be used for various shading and rendering techniques
         print("Initialization of light properties...")
+        self.exposure = 1.0
         self.light_positions = [
             glm.vec3(50.2, 10.0, 2.0),
             glm.vec3(10.2, 20.0, 2.0),
@@ -27,16 +28,17 @@ class Renderer:
         self.light_count = len(self.light_positions)
 
         self.light_colors = [
-            glm.vec3(1.0, 0.07, 0.58),  # Neon Pink
-            glm.vec3(0.0, 1.0, 0.38),  # Neon Green
-            glm.vec3(0.07, 0.55, 0.8)  # Neon Blue
+            glm.vec3(1.0, 0.07, 0.58)*self.exposure,  # Neon Pink
+            glm.vec3(0.0, 1.0, 0.38)*self.exposure,  # Neon Green
+            glm.vec3(0.07, 0.55, 0.8)*self.exposure  # Neon Blue
         ]
+
 
         # Volume bounds for volumetric rendering
         # These define the boundaries of the volume in the scene
         print("Volume bounds for volumetric rendering...")
-        self.volume_min = glm.vec3(-100, -100, -100)
-        self.volume_max = glm.vec3(100, 100, 100)
+        self.volume_min = glm.vec3(-10, -10, -10)
+        self.volume_max = glm.vec3(10, 10, 10)
 
         # Store the provided shader and camera references
         self.shader = shader
@@ -376,10 +378,6 @@ class Renderer:
 
     def update_uniforms(self, model_matrix, view_matrix, projection_matrix, model: Model):
         self.shader.use()
-        #print(f"Updating uniforms for object: {model}")
-        #print(f"Model matrix: {model_matrix}")
-        #print(f"View matrix: {view_matrix}")
-        #print(f"Projection matrix: {projection_matrix}")
         self.shader.set_uniform_matrix4fv("model", model_matrix)
         self.shader.set_uniform_matrix4fv("view", view_matrix)
         self.shader.set_uniform_matrix4fv("projection", projection_matrix)
@@ -786,21 +784,22 @@ class Renderer:
         self.volumetric_shader.use()
         self.volumetric_shader.set_uniform1i("volumeData", 0)  # Texture unit 0
 
-        # Remove the translation component from the view matrix
-        view_matrix_no_translation = glm.mat4(view_matrix)
-        view_matrix_no_translation[3] = glm.vec4(0, 0, 0, 1)  # Set translation to zero
+        # Combine model, view, and projection matrices for the volume
+        model_matrix = glm.mat4(1.0)  # Identity matrix or the actual model matrix of the volume
+        mvp_matrix = projection_matrix * view_matrix * model_matrix
+        inv_view_proj_matrix = glm.inverse(projection_matrix * view_matrix)
 
-        # Debug: Print view and projection matrices
-        print("View Matrix (No Translation):", view_matrix_no_translation)
+        # Debug: Print matrices
+        print("Model Matrix:", model_matrix)
+        print("View Matrix:", view_matrix)
         print("Projection Matrix:", projection_matrix)
-
-        inv_view_proj_matrix = glm.inverse(projection_matrix * view_matrix_no_translation)
-
-        # Debug: Print inverse view-projection matrix
+        print("MVP Matrix:", mvp_matrix)
         print("Inverse View-Projection Matrix:", inv_view_proj_matrix)
 
+        self.volumetric_shader.set_uniform_matrix4fv("model", model_matrix)
+        self.volumetric_shader.set_uniform_matrix4fv("view", view_matrix)
+        self.volumetric_shader.set_uniform_matrix4fv("projection", projection_matrix)
         self.volumetric_shader.set_uniform_matrix4fv("invViewProjMatrix", inv_view_proj_matrix)
-        self.volumetric_shader.set_uniform_matrix4fv("viewMatrix", view_matrix_no_translation)
         self.volumetric_shader.set_uniform3fv("volumeMin", self.volume_min)
         self.volumetric_shader.set_uniform3fv("volumeMax", self.volume_max)
 
