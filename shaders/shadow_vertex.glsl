@@ -7,6 +7,8 @@ uniform mat4 lightSpaceMatrix;
 in vec2 TexCoords;
 uniform sampler2D shadowMap;
 out vec4 FragColor;
+//uniform mat4 view;
+//uniform mat4 projection;
 
 void main()
 {

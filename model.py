@@ -18,7 +18,7 @@ class Model:
         'specular': [1.0, 1.0, 1.0],  # Example values (or a glm.vec3 if using glm)
         'shininess': 10.0,  # Example value
         'roughness': 0.1,  # Example value for roughness
-        'bumpScale': 0.1
+        'bumpScale': 0.0
     }
 
     def __init__(self,
@@ -165,7 +165,7 @@ class Model:
                 if line.startswith('newmtl'):
                     current_material = line.split()[1]
                     materials[current_material] = {'diffuse': [1.0, 0.0, 0.0], 'specular': [0.1, 0.5, 1.0],
-                                                   'shininess': 10.0, 'roughness':0.2, 'bumpScale':1.0}
+                                                   'shininess': 10.0, 'roughness':0.2, 'bumpScale':0.0}
                 elif current_material:
                     if line.startswith('Kd '):
                         parts = line.split()

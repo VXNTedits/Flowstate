@@ -14,7 +14,7 @@ uniform Light lights[10];  // Assuming a maximum of 10 lights for this example
 uniform int lightCount;
 uniform mat4 view;
 uniform mat4 projection;
-uniform vec3 cameraPosition;  // Ensure this is declared
+uniform vec3 cameraPosition;
 uniform float lightScatteringCoefficient;
 uniform mat4 inverseLightSpaceMatrix;
 
@@ -33,21 +33,21 @@ void main()
 
     // Transform frag position into view space
     vec3 fragPositionInViewSpace = (view * vec4(fragPosition, 1.0)).xyz;
+    vec3 viewDir = normalize(cameraPosition - fragPositionInViewSpace);
 
     float totalScattering = 0.0;
     vec3 totalColor = vec3(0.0);
-    vec3 viewDir = normalize(cameraPosition - fragPositionInViewSpace); // Use cameraPosition to calculate view direction
 
     for (int i = 0; i < lightCount; i++) {
         vec3 lightDirection = normalize(lights[i].position - fragPosition);
-        float scattering = exp(-lightScatteringCoefficient * length(lightDirection));
+        float distance = length(lights[i].position - fragPosition);
 
-        // Modulate scattering by the angle between view direction and light direction
-        float angleFactor = dot(viewDir, lightDirection);
-        scattering *= max(0.0, angleFactor);  // Ensures non-negative scattering
+        // Compute scattering based on distance and angle to the light source
+        float scattering = exp(-lightScatteringCoefficient * distance);
+        float angleFactor = max(dot(viewDir, lightDirection), 0.0);  // Ensure non-negative scattering
 
-        totalScattering += scattering;
-        totalColor += lights[i].color * scattering;  // Use light color
+        totalScattering += scattering * angleFactor;
+        totalColor += lights[i].color * scattering * angleFactor;
     }
 
     // Average the scattering effect and color from all lights

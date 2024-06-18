@@ -28,6 +28,7 @@ class Shader:
     current_program = None
 
     def __init__(self, vertex_path, fragment_path):
+        self.name = vertex_path.split('/')[-1]
         self.vertex_path = vertex_path
         self.fragment_path = fragment_path
         self.program = self.create_shader_program()
@@ -76,7 +77,7 @@ class Shader:
         self.use()
         location = glGetUniformLocation(self.program, name)
         if location == -1:
-            print(f"Uniform '{name}' not found in shader program {self.program}.")
+            print(f"Uniform '{name}' not found in shader program {self.program}: {self.name}.")
         else:
             glUniformMatrix4fv(location, 1, GL_FALSE, glm.value_ptr(matrix))
 
@@ -84,7 +85,7 @@ class Shader:
         self.use()
         location = glGetUniformLocation(self.program, name)
         if location == -1:
-            print(f"Uniform '{name}' not found in shader program {self.program}.")
+            print(f"Uniform '{name}' not found in shader program {self.program}: {self.name}.")
         else:
             glUniform3f(location, vec3.x, vec3.y, vec3.z)
 
@@ -92,7 +93,7 @@ class Shader:
         self.use()
         location = glGetUniformLocation(self.program, name)
         if location == -1:
-            print(f"Uniform '{name}' not found in shader program {self.program}.")
+            print(f"Uniform '{name}' not found in shader program {self.program}: {self.name}.")
         else:
             glUniform1i(location, value)
 
@@ -100,7 +101,7 @@ class Shader:
         self.use()
         location = glGetUniformLocation(self.program, name)
         if location == -1:
-            print(f"Uniform '{name}' not found in shader program {self.program}.")
+            print(f"Uniform '{name}' not found in shader program {self.program}: {self.name}.")
         else:
             glUniform1f(location, value)
 
