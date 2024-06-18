@@ -23,6 +23,7 @@ uniform float bumpScale;
 uniform sampler2D shadowMap;
 uniform bool useTexture;
 uniform sampler2D texture1;
+uniform bool enableBumpMapping;  // New uniform to control bump mapping
 
 float hash(float n) { return fract(sin(n) * 43758.5453); }
 
@@ -80,7 +81,12 @@ void main()
     vec3 ambient = 0.01 * objectColor;
 
     vec3 norm = normalize(Normal);
-    vec3 perturbedNormal = getPerturbedNormal(FragPos, norm);
+    vec3 perturbedNormal = norm;
+
+    if (enableBumpMapping) {
+        perturbedNormal = getPerturbedNormal(FragPos, norm);
+    }
+
     vec3 viewDir = normalize(viewPos - FragPos);
 
     vec3 result = ambient;

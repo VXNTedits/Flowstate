@@ -1,59 +1,67 @@
 #version 330 core
-
 in vec2 TexCoords;
 out vec4 FragColor;
 
-uniform sampler2D depthMap;
-
-struct Light {
-    vec3 position;
-    vec3 color;
-};
-
-uniform Light lights[10];  // Assuming a maximum of 10 lights for this example
-uniform int lightCount;
-uniform mat4 view;
-uniform mat4 projection;
-uniform vec3 cameraPosition;  // Ensure this is declared
-uniform float lightScatteringCoefficient;
-uniform mat4 inverseLightSpaceMatrix;
-
-float getDepth(vec2 uv) {
-    return texture(depthMap, uv).r;
-}
+uniform sampler3D volumeData;
+uniform mat4 invViewProjMatrix;
+uniform mat4 viewMatrix;
+uniform vec3 volumeMin;
+uniform vec3 volumeMax;
+uniform int numLights;
+uniform vec3 lightPositions[10]; // Assuming a maximum of 10 lights
+uniform vec3 lightColors[10];
 
 void main()
 {
-    float depth = getDepth(TexCoords);
+    // Compute the ray direction
+    vec4 clipPos = vec4(TexCoords * 2.0 - 1.0, 1.0, 1.0);
+    vec4 viewPos = invViewProjMatrix * clipPos;
+    vec3 rayDir = normalize(viewPos.xyz / viewPos.w);
 
-    // Reconstruct fragment position from depth
-    vec4 ndcPosition = vec4(TexCoords * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
-    vec4 fragPositionInLightSpace = inverseLightSpaceMatrix * ndcPosition;
-    vec3 fragPosition = fragPositionInLightSpace.xyz / fragPositionInLightSpace.w;
+    // Compute the camera position
+    vec3 camPos = vec3(inverse(viewMatrix) * vec4(0.0, 0.0, 0.0, 1.0));
 
-    // Transform frag position into view space
-    vec3 fragPositionInViewSpace = (view * vec4(fragPosition, 1.0)).xyz;
+    // Ray-box intersection (volume bounds)
+    vec3 invDir = 1.0 / rayDir;
+    vec3 t0s = (volumeMin - camPos) * invDir;
+    vec3 t1s = (volumeMax - camPos) * invDir;
+    float tMin = max(max(min(t0s.x, t1s.x), min(t0s.y, t1s.y)), min(t0s.z, t1s.z));
+    float tMax = min(min(max(t0s.x, t1s.x), max(t0s.y, t1s.y)), max(t0s.z, t1s.z));
 
-    float totalScattering = 0.0;
-    vec3 totalColor = vec3(0.0);
-    vec3 viewDir = normalize(cameraPosition - fragPositionInViewSpace); // Use cameraPosition to calculate view direction
+    // Early exit if no intersection
+    if (tMax < tMin) discard;
 
-    for (int i = 0; i < lightCount; i++) {
-        vec3 lightDirection = normalize(lights[i].position - fragPosition);
-        float scattering = exp(-lightScatteringCoefficient * length(lightDirection));
+    // Ray marching
+    vec3 pos = camPos + rayDir * tMin;
+    vec3 step = rayDir * 0.1; // Step size
+    vec4 color = vec4(0.0);
+    float alpha_accum = 0.0;
 
-        // Modulate scattering by the angle between view direction and light direction
-        float angleFactor = dot(viewDir, lightDirection);
-        scattering *= max(0.0, angleFactor);  // Ensures non-negative scattering
+    for (float t = tMin; t < tMax; t += 0.1)
+    {
+        vec3 samplePos = (pos - volumeMin) / (volumeMax - volumeMin); // Transform to [0, 1]
+        float sampleValue = texture(volumeData, samplePos).r; // Sample red channel as alpha
+        vec4 sampleColor = vec4(sampleValue, sampleValue, sampleValue, sampleValue); // Use sampled value as alpha and grayscale color
 
-        totalScattering += scattering;
-        totalColor += lights[i].color * scattering;  // Use light color
+        // Apply lighting from all lights
+        vec3 lighting = vec3(0.0);
+        for (int i = 0; i < numLights; ++i)
+        {
+            vec3 lightDir = normalize(lightPositions[i] - pos);
+            float diff = max(dot(rayDir, lightDir), 0.0);
+            lighting += lightColors[i] * diff;
+        }
+        sampleColor.rgb *= lighting;
+
+        // Accumulate color and alpha
+        float alpha = sampleColor.a * (1.0 - alpha_accum);
+        color.rgb += sampleColor.rgb * alpha;
+        alpha_accum += alpha;
+
+        pos += step;
+        if (alpha_accum >= 0.5) break; // Early exit if fully opaque
     }
 
-    // Average the scattering effect and color from all lights
-    totalScattering /= float(lightCount);
-    totalColor /= float(lightCount);
-
-    // Output the scattering effect and color as the fragment color
-    FragColor = vec4(totalScattering * totalColor, 1.0);
+    // Final color composition
+    FragColor = vec4(color.rgb, alpha_accum);
 }

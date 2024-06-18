@@ -28,7 +28,6 @@ class ObjectAttributes:
 class Components:
     def __init__(self, window):
         self.camera = Camera(glm.vec3(0.0, 0.0, 3.0), glm.vec3(0.0, 1.0, 0.0))
-        self.shader = Shader('shaders/vertex_shader.glsl', 'shaders/fragment_shader.glsl')
 
         # Define object attributes for multiple objects
         world_objects = [
@@ -101,14 +100,17 @@ class Components:
             print("models in components.models: ", model.name)
         print('Models initialized')
 
-        self.renderer = Renderer(self.shader, self.camera)
-        print('Renderer initialized')
-
         self.physics = Physics(self.world_objects, self.player, self.interactables, self.world)
         print('Physics initialized')
 
         self.input_handler = InputHandler(self.camera, self.player, self.physics)
         print('Input handler initialized')
+
+        self.shader = Shader('shaders/vertex_shader.glsl', 'shaders/fragment_shader.glsl')
+        print('Shader initialized')
+
+        self.renderer = Renderer(self.shader, self.camera)
+        print('Renderer initialized')
 
     def set_input_callbacks(self, window):
         window.set_callbacks(self.input_handler.key_callback, self.input_handler.mouse_callback)
