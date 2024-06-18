@@ -71,6 +71,10 @@ class InputHandler:
             #print('input: space')
             self.handle_input('JUMP', delta_time)
 
+        if self.keys.get(glfw.KEY_F):
+            #print('input: interact')
+            self.handle_input('INTERACT', delta_time)
+
     def handle_input(self, direction, delta_time):
         #print(direction)
         self.player.propose_updated_thrust(direction, delta_time)

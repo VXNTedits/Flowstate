@@ -37,8 +37,8 @@ class Renderer:
         # Volume bounds for volumetric rendering
         # These define the boundaries of the volume in the scene
         print("Volume bounds for volumetric rendering...")
-        self.volume_min = glm.vec3(-10, -10, -10)
-        self.volume_max = glm.vec3(10, 10, 10)
+        self.volume_min = glm.vec3(-1000, -1000, -1000)
+        self.volume_max = glm.vec3(1000, 1000, 1000)
 
         # Store the provided shader and camera references
         self.shader = shader
@@ -238,11 +238,19 @@ class Renderer:
                                  projection_matrix)
 
         # 3. Render volumetric effects to the framebuffer
-        self.render_volumetric_effects_to_fbo(view_matrix, projection_matrix)
+        self.render_volumetric_effects_to_fbo(view_matrix,
+                                              projection_matrix,
+                                              glow_intensity=100,
+                                              scattering_factor=1,
+                                              glow_falloff=10,
+                                              god_ray_intensity=1000,
+                                              god_ray_decay=10)
 
         # 4. Composite the scene and volumetric effects
         self.composite_scene_and_volumetrics()
-        self.render_procedural_volumetrics(view_matrix, projection_matrix)
+        #self.render_procedural_volumetrics(view_matrix, projection_matrix)
+
+
 
         # Ensure depth test is enabled for future operations
         glEnable(GL_DEPTH_TEST)
@@ -376,7 +384,7 @@ class Renderer:
         if hasattr(self, 'light_ebo'):
             glDeleteBuffers(1, [self.light_ebo])
 
-    def update_uniforms(self, model_matrix, view_matrix, projection_matrix, model: Model):
+    def update_uniforms(self, model_matrix, view_matrix, projection_matrix, model: Model = None):
         self.shader.use()
         self.shader.set_uniform_matrix4fv("model", model_matrix)
         self.shader.set_uniform_matrix4fv("view", view_matrix)
@@ -769,10 +777,11 @@ class Renderer:
         self.render_scene(shader, player_object, world, interactables, light_space_matrix,
                           view_matrix, projection_matrix)
         self.check_opengl_error()
-
+        self.render_volume_bounds()
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
-    def render_volumetric_effects_to_fbo(self, view_matrix, projection_matrix):
+    def render_volumetric_effects_to_fbo(self, view_matrix, projection_matrix, glow_intensity, scattering_factor,
+                                         glow_falloff, god_ray_intensity, god_ray_decay):
         glBindFramebuffer(GL_FRAMEBUFFER, self.volumetric_fbo)
         glViewport(0, 0, 800, 600)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -784,24 +793,23 @@ class Renderer:
         self.volumetric_shader.use()
         self.volumetric_shader.set_uniform1i("volumeData", 0)  # Texture unit 0
 
-        # Combine model, view, and projection matrices for the volume
-        model_matrix = glm.mat4(1.0)  # Identity matrix or the actual model matrix of the volume
-        mvp_matrix = projection_matrix * view_matrix * model_matrix
-        inv_view_proj_matrix = glm.inverse(projection_matrix * view_matrix)
+        # Correctly calculate the inverse view-projection matrix
+        view_proj_matrix = projection_matrix * view_matrix
+        inv_view_proj_matrix = glm.inverse(view_proj_matrix)
 
         # Debug: Print matrices
-        print("Model Matrix:", model_matrix)
         print("View Matrix:", view_matrix)
         print("Projection Matrix:", projection_matrix)
-        print("MVP Matrix:", mvp_matrix)
         print("Inverse View-Projection Matrix:", inv_view_proj_matrix)
 
-        self.volumetric_shader.set_uniform_matrix4fv("model", model_matrix)
-        self.volumetric_shader.set_uniform_matrix4fv("view", view_matrix)
-        self.volumetric_shader.set_uniform_matrix4fv("projection", projection_matrix)
         self.volumetric_shader.set_uniform_matrix4fv("invViewProjMatrix", inv_view_proj_matrix)
         self.volumetric_shader.set_uniform3fv("volumeMin", self.volume_min)
         self.volumetric_shader.set_uniform3fv("volumeMax", self.volume_max)
+        self.volumetric_shader.set_uniform1f("glowIntensity", glow_intensity)
+        self.volumetric_shader.set_uniform1f("scatteringFactor", scattering_factor)
+        self.volumetric_shader.set_uniform1f("glowFalloff", glow_falloff)
+        self.volumetric_shader.set_uniform1f("godRayIntensity", god_ray_intensity)
+        self.volumetric_shader.set_uniform1f("godRayDecay", god_ray_decay)
 
         # Set light positions and colors
         num_lights = len(self.light_positions)
@@ -900,11 +908,11 @@ class Renderer:
         self.procedural_shader.use()
 
         # Get uniform locations
-        camPos_location = glGetUniformLocation(self.procedural_shader.program, "camPos")
-        volumeMin_location = glGetUniformLocation(self.procedural_shader.program, "volumeMin")
-        volumeMax_location = glGetUniformLocation(self.procedural_shader.program, "volumeMax")
-        numLights_location = glGetUniformLocation(self.procedural_shader.program, "numLights")
-        lightPositions_location = [glGetUniformLocation(self.procedural_shader.program, f"lightPositions[{i}]") for i in
+        cam_pos_location = glGetUniformLocation(self.procedural_shader.program, "camPos")
+        volume_min_location = glGetUniformLocation(self.procedural_shader.program, "volumeMin")
+        volume_max_location = glGetUniformLocation(self.procedural_shader.program, "volumeMax")
+        num_lights_location = glGetUniformLocation(self.procedural_shader.program, "numLights")
+        light_positions_location = [glGetUniformLocation(self.procedural_shader.program, f"lightPositions[{i}]") for i in
                                    range(len(self.light_positions))]
         lightColors_location = [glGetUniformLocation(self.procedural_shader.program, f"lightColors[{i}]") for i in
                                 range(len(self.light_colors))]
@@ -912,17 +920,17 @@ class Renderer:
 
         # Set uniform values
         cam_pos = glm.vec3(view_matrix[3][0], view_matrix[3][1], view_matrix[3][2])
-        glUniform3fv(camPos_location, 1, glm.value_ptr(cam_pos))
-        glUniform3fv(volumeMin_location, 1, glm.value_ptr(self.volume_min))
-        glUniform3fv(volumeMax_location, 1, glm.value_ptr(self.volume_max))
-        glUniform1i(numLights_location, len(self.light_positions))
+        glUniform3fv(cam_pos_location, 1, glm.value_ptr(cam_pos))
+        glUniform3fv(volume_min_location, 1, glm.value_ptr(self.volume_min))
+        glUniform3fv(volume_max_location, 1, glm.value_ptr(self.volume_max))
+        glUniform1i(num_lights_location, len(self.light_positions))
 
         print(f"Camera Position: {cam_pos}")
         print(f"Volume Min: {self.volume_min}, Volume Max: {self.volume_max}")
         print(f"Number of Lights: {len(self.light_positions)}")
 
         for i, pos in enumerate(self.light_positions):
-            glUniform3fv(lightPositions_location[i], 1, glm.value_ptr(pos))
+            glUniform3fv(light_positions_location[i], 1, glm.value_ptr(pos))
             print(f"Light {i} Position: {pos}")
         for i, color in enumerate(self.light_colors):
             glUniform3fv(lightColors_location[i], 1, glm.value_ptr(color))

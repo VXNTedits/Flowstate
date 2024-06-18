@@ -90,6 +90,8 @@ class Player(Model):
             proposed_thrust += self.jump_force
             self.is_grounded = False
             print('jump: updated proposed_thrust to', proposed_thrust, "is jumping=", self.is_jumping)
+        while direction == 'INTERACT':
+            self.interact = True
 
         self.proposed_thrust = proposed_thrust
 

@@ -9,11 +9,16 @@ uniform vec3 volumeMax;
 uniform int numLights;
 uniform vec3 lightPositions[10]; // Assuming a maximum of 10 lights
 uniform vec3 lightColors[10];
+uniform float glowIntensity; // Parameter for controlling glow intensity
+uniform float scatteringFactor; // Parameter for controlling scattering
+uniform float glowFalloff; // Parameter for controlling the sharpness of the glow falloff
+uniform float godRayIntensity; // Parameter for controlling god ray intensity
+uniform float godRayDecay; // Parameter for controlling god ray decay
 
 void main()
 {
-    // Compute the ray direction in view space
-    vec4 clipPos = vec4(TexCoords * 2.0 - 1.0, 1.0, 1.0);
+    // Compute the ray direction in world space
+    vec4 clipPos = vec4(TexCoords * 2.0 - 1.0, -1.0, 1.0); // Note: using -1.0 for z to start ray from near plane
     vec4 viewPos = invViewProjMatrix * clipPos;
     vec3 rayDir = normalize(viewPos.xyz / viewPos.w);
 
@@ -48,13 +53,18 @@ void main()
             vec3 lightDir = normalize(lightPositions[i] - pos);
             float distanceToLight = length(lightPositions[i] - pos);
             float lightIntensity = max(dot(rayDir, lightDir), 0.0); // Simple scattering model
-            float glow = exp(-distanceToLight * 0.5) * lightIntensity;
 
-            scattering += lightColors[i] * (lightIntensity + glow);
+            // Sharper glow falloff
+            float glow = exp(-pow(distanceToLight * glowFalloff, 2.0)) * lightIntensity; // Use glowFalloff
+
+            // God ray effect
+            float godRayEffect = pow(max(dot(rayDir, lightDir), 0.0), godRayIntensity) * exp(-distanceToLight * godRayDecay);
+
+            scattering += lightColors[i] * (lightIntensity + glow * glowIntensity + godRayEffect);
         }
 
         // Compute attenuation
-        vec4 attenuation = vec4(exp(-density * 0.5));
+        vec4 attenuation = vec4(exp(-density * scatteringFactor)); // Use scatteringFactor
         transmittance *= attenuation;
 
         // Accumulate scattered light
