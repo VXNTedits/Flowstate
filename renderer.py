@@ -5,7 +5,7 @@ import model
 from interactable import InteractableObject
 from model import Model
 from player import Player
-from shader import Shader
+from shader import Shader, ShaderManager
 from world import World
 
 
@@ -118,11 +118,18 @@ class Renderer:
         ]
         light_count = len(light_positions)
 
+        # Get shaders from the ShaderManager
+        self.shadow_shader = ShaderManager.get_shader('shaders/shadow_vertex.glsl', 'shaders/shadow_fragment.glsl')
+        self.shader = ShaderManager.get_shader('shaders/vertex_shader.glsl', 'shaders/fragment_shader.glsl')
+        self.volumetric_shader = ShaderManager.get_shader('shaders/volumetric_vertex.glsl',
+                                                          'shaders/volumetric_fragment.glsl')
+
         # 1. Render the depth map
         glViewport(0, 0, self.shadow_width, self.shadow_height)
         glBindFramebuffer(GL_FRAMEBUFFER, self.depth_map_fbo)
         glClear(GL_DEPTH_BUFFER_BIT)
 
+        #print("Using shadow shader")
         self.shadow_shader.use()
         for pos in light_positions:
             light_space_matrix = self.calculate_light_space_matrix(pos)
@@ -134,6 +141,8 @@ class Renderer:
         # 2. Render the scene normally
         glViewport(0, 0, 800, 600)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+        #print("Using main shader")
         self.shader.use()
         self.shader.set_uniform_matrix4fv("view", view_matrix)
         self.shader.set_uniform_matrix4fv("projection", projection_matrix)
@@ -150,15 +159,14 @@ class Renderer:
         self.shader.set_bump_scale(5.0)
         self.shader.set_roughness(0.1)
 
-        self.render_scene(self.shader, player_object, world, interactables, light_space_matrix, view_matrix,
-                          projection_matrix)
-
+        self.render_scene(self.shader, player_object, world, interactables, view_matrix, projection_matrix)
         self.render_lights(light_positions, light_colors, view_matrix, projection_matrix)
 
         # 3. Render volumetric effects
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
+        #print("Using volumetric shader")
         self.volumetric_shader.use()
         self.volumetric_shader.set_uniform_matrix4fv("view", view_matrix)
         self.volumetric_shader.set_uniform_matrix4fv("projection", projection_matrix)
