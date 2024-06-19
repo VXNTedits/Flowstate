@@ -30,7 +30,7 @@ class Renderer:
         self.light_colors = [
             glm.vec3(1.0, 0.07, 0.58)*self.exposure,  # Neon Pink
             glm.vec3(0.0, 1.0, 0.38)*self.exposure,  # Neon Green
-            glm.vec3(0.07, 0.55, 0.8)*self.exposure  # Neon Blue
+            glm.vec3(0.07, 0.45, 0.9)*self.exposure  # Neon Blue
         ]
 
 
@@ -81,7 +81,7 @@ class Renderer:
         # Generate 3D noise texture for volumetric effects
         # This texture will be used in the volumetric rendering process
         #print("Generate 3D noise texture for volumetric effects...")
-        self.noise_size = 2048  # Size of the 3D noise texture
+        self.noise_size = 512  # Size of the 3D noise texture
         self.simplex = OpenSimplex(seed=np.random.randint(0, 10000))
         self.time = 0.0
         self.setup_volume_texture()
@@ -247,7 +247,7 @@ class Renderer:
                                               glow_intensity=1,
                                               scattering_factor=0.5,
                                               glow_falloff=100,
-                                              god_ray_intensity=10000,
+                                              god_ray_intensity=100,
                                               god_ray_decay=0.1)
 
         # 4. Composite the scene and volumetric effects
@@ -778,7 +778,7 @@ class Renderer:
         self.shader.set_bump_scale(5.0)
         self.shader.set_roughness(0.1)
 
-        self.render_lights(self.light_positions, self.light_colors, view_matrix, projection_matrix)
+        #self.render_lights(self.light_positions, self.light_colors, view_matrix, projection_matrix)
         self.render_scene(shader, player_object, world, interactables, light_space_matrix,
                           view_matrix, projection_matrix)
         self.check_opengl_error()
@@ -814,7 +814,7 @@ class Renderer:
         self.volumetric_shader.set_uniform1f("glowFalloff", glow_falloff)
         self.volumetric_shader.set_uniform1f("godRayIntensity", god_ray_intensity)
         self.volumetric_shader.set_uniform1f("godRayDecay", god_ray_decay)
-        self.volumetric_shader.set_uniform1f("time", self.time)  # Pass the time uniform
+        self.volumetric_shader.set_uniform1f("time", self.time)  # Pass the time uniforms
 
         # Set light positions and colors
         num_lights = len(self.light_positions)

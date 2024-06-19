@@ -3,7 +3,6 @@
 in vec2 TexCoords;
 out vec4 FragColor;
 
-uniform sampler3D volumeData;
 uniform mat4 invViewProjMatrix;
 uniform vec3 volumeMin;
 uniform vec3 volumeMax;
@@ -54,6 +53,9 @@ void main()
 
     // Early exit if no intersection
     if (tMax < tMin) discard;
+
+    // Adjust tMin if the ray starts inside the volume
+    if (tMin < 0.0) tMin = 0.0;
 
     // Ray marching
     vec3 pos = camPos + rayDir * tMin;
