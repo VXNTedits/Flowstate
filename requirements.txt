@@ -1,0 +1,9 @@
+glfw==2.7.0
+noise==1.2.2
+numpy==2.0.0
+ObjLoader==0.2.0
+opensimplex==0.4.5.1
+Pillow==10.3.0
+PyGLM==2.7.1
+PyOpenGL==3.1.7
+PyOpenGL==3.1.7

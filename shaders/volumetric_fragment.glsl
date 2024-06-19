@@ -14,6 +14,25 @@ uniform float scatteringFactor; // Parameter for controlling scattering
 uniform float glowFalloff; // Parameter for controlling the sharpness of the glow falloff
 uniform float godRayIntensity; // Parameter for controlling god ray intensity
 uniform float godRayDecay; // Parameter for controlling god ray decay
+uniform float time; // Time variable for animated noise
+
+// Simple 3D noise function
+float hash(float n) {
+    return fract(sin(n) * 43758.5453123);
+}
+
+float noise(vec3 x) {
+    vec3 p = floor(x);
+    vec3 f = fract(x);
+    f = f * f * (3.0 - 2.0 * f);
+
+    float n = p.x + p.y * 57.0 + 113.0 * p.z;
+
+    return mix(mix(mix(hash(n + 0.0), hash(n + 1.0), f.x),
+                   mix(hash(n + 57.0), hash(n + 58.0), f.x), f.y),
+               mix(mix(hash(n + 113.0), hash(n + 114.0), f.x),
+                   mix(hash(n + 170.0), hash(n + 171.0), f.x), f.y), f.z);
+}
 
 void main()
 {
@@ -44,7 +63,9 @@ void main()
     for (float t = tMin; t < tMax; t += 0.1)
     {
         vec3 samplePos = (pos - volumeMin) / (volumeMax - volumeMin); // Transform to [0, 1]
-        float density = texture(volumeData, samplePos).r;
+
+        // Animated noise
+        float density = noise(samplePos * 5.0 + vec3(0.0, 0.0, time));
 
         // Light scattering and absorption
         vec3 scattering = vec3(0.0);

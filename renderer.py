@@ -81,9 +81,11 @@ class Renderer:
         # Generate 3D noise texture for volumetric effects
         # This texture will be used in the volumetric rendering process
         #print("Generate 3D noise texture for volumetric effects...")
-        self.noise_size = 32  # Size of the 3D noise texture
+        self.noise_size = 8  # Size of the 3D noise texture
         self.simplex = OpenSimplex(seed=np.random.randint(0, 10000))
-        self.setup_volume_texture()
+        self.time = 0.0
+        self.setup_volume_texture(self.time)
+
 
         # Setup depth framebuffer for shadow mapping
         print("Setup depth framebuffer for shadow mapping")
@@ -114,8 +116,8 @@ class Renderer:
         # Set up the vertex array and buffer objects for rendering a quad
         self.setup_quad()
 
-    def setup_volume_texture(self):
-        self.noise_texture_data = self.generate_noise_texture(self.noise_size)
+    def setup_volume_texture(self, delta_time):
+        self.noise_texture_data = self.generate_noise_texture(self.noise_size, delta_time)
 
         self.volume_texture = glGenTextures(1)
         glBindTexture(GL_TEXTURE_3D, self.volume_texture)
@@ -129,7 +131,7 @@ class Renderer:
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE)
         glBindTexture(GL_TEXTURE_3D, 0)
 
-    def generate_noise_texture(self, size):
+    def generate_noise_texture(self, size, time):
         noise_texture = np.zeros((size, size, size), dtype=np.float32)
         scale = 1024.0
 
@@ -137,7 +139,7 @@ class Renderer:
             for y in range(size):
                 for z in range(size):
                     nx, ny, nz = x / size - 0.5, y / size - 0.5, z / size - 0.5
-                    noise_texture[x, y, z] = self.simplex.noise3(nx * scale, ny * scale, nz * scale)
+                    noise_texture[x, y, z] = self.simplex.noise4(nx * scale, ny * scale, nz * scale, time)
 
         # Normalize the noise texture to be in the range [0, 1]
         normalized_texture = self.normalize_noise_texture(noise_texture)
@@ -148,6 +150,14 @@ class Renderer:
         max_val = np.max(noise_texture)
         normalized_texture = (noise_texture - min_val) / (max_val - min_val)
         return normalized_texture
+
+    def update_noise(self, delta_time):
+        self.time += delta_time
+        self.noise_texture_data = self.generate_noise_texture(self.noise_size, self.time)
+        glBindTexture(GL_TEXTURE_3D, self.volume_texture)
+        glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, self.noise_size, self.noise_size, self.noise_size, GL_RED, GL_FLOAT,
+                        self.noise_texture_data)
+        glBindTexture(GL_TEXTURE_3D, 0)
 
     def setup_depth_framebuffer(self):
         self.depth_map_fbo = glGenFramebuffers(1)
@@ -204,7 +214,7 @@ class Renderer:
         self.light_space_matrix = light_proj * light_view
         return self.light_space_matrix
 
-    def render(self, player_object, world, interactables, view_matrix, projection_matrix):
+    def render(self, player_object, world, interactables, view_matrix, projection_matrix, delta_time):
         """Main rendering pipeline"""
 
         def check_gl_state():
@@ -240,13 +250,14 @@ class Renderer:
         # 3. Render volumetric effects to the framebuffer
         self.render_volumetric_effects_to_fbo(view_matrix,
                                               projection_matrix,
-                                              glow_intensity=100,
+                                              glow_intensity=1000,
                                               scattering_factor=1,
                                               glow_falloff=10,
                                               god_ray_intensity=1000,
                                               god_ray_decay=10)
 
         # 4. Composite the scene and volumetric effects
+        self.update_noise(delta_time)
         self.composite_scene_and_volumetrics()
         #self.render_procedural_volumetrics(view_matrix, projection_matrix)
 

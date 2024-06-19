@@ -154,49 +154,47 @@ class InteractableObject:
                 player.pick_up(self)
                 self.update_interactable_model_matrix()
 
-
     def highlight(self, delta_time):
         # Rotate around the y-axis
-        #rotation_angle = self.rotation_speed.y * delta_time
-        #self._model.orientation[1] += rotation_angle
-        #self._model.orientation[1] %= 360  # Keep the angle within [0, 360)
+        rotation_angle = self.rotation_speed.y * delta_time
+        self._model.orientation[1] += rotation_angle
+        rotation_angle %= 360  # Keep the angle within [0, 360)
 
-        # Use the precomputed centroid
-        centroid = self._model.centroid
-
-        # Update the position and orientation based on rotation around centroid
-        #self.update_position_and_orientation_with_centroid(centroid, glm.vec3(0, rotation_angle, 0), delta_time)
+        # Update the model matrix with the new orientation
+        self.update_interactable_model_matrix()
 
         # Bounce up and down (apply after rotation to avoid interference)
-        bounce_offset = self.bounce_amplitude * glm.sin(2.0 * glm.pi() * self.bounce_frequency * glfw.get_time())
-        self._model.position.y += bounce_offset * delta_time
+        #bounce_offset = self.bounce_amplitude * glm.sin(2.0 * glm.pi() * self.bounce_frequency * glfw.get_time())
+        #self._model.position.y += bounce_offset * delta_time
 
-        # Update the model matrix with the new position
+        # Ensure the model matrix is updated after position and orientation changes
         self.update_interactable_model_matrix()
 
     def update_position_and_orientation_with_centroid(self, centroid, rotation_angle, delta_time):
-        # Translate to centroid
-        translate_to_centroid = glm.translate(glm.mat4(1.0), -centroid)
+        # Step 1: Translate to origin
+        forward_translation_matrix = glm.translate(glm.mat4(1.0), -self._model.position)
 
-        # Create rotation matrix for y-axis
-        rotation_y = glm.rotate(glm.mat4(1.0), glm.radians(rotation_angle.y), glm.vec3(0.0, 1.0, 0.0))
+        # Step 2: Create rotation matrix for y-axis
+        rotation_matrix = glm.rotate(glm.mat4(1.0), glm.radians(rotation_angle.y), glm.vec3(0.0, 1.0, 0.0))
 
-        # Translate back from centroid
-        translate_back = glm.translate(glm.mat4(1.0), centroid)
+        # Step 3: Translate back from origin
+        reverse_translation_matrix = glm.translate(glm.mat4(1.0), self._model.position)
 
-        # Apply the rotation around the centroid
-        #transformation_matrix = rotation_y * translate_to_centroid
-        transformation_matrix = translate_back * rotation_y * translate_to_centroid
+        # Step 4: Apply the rotation around the centroid
+        transformation_matrix = reverse_translation_matrix * rotation_matrix * forward_translation_matrix
 
-        # Apply the transformation to the original position
-        original_position = glm.vec4(self._model.position, 1.0)
+        # Step 5: Apply the transformation to the original position
+        original_position = glm.vec4(self._model.position, 1.0)  # Ensure position is in homogeneous coordinates
         new_position = glm.vec3(transformation_matrix * original_position)
-        #new_position = self._model.position
 
-        # Update the model's position and orientation
+        # Step 6: Update the model's position
         self._model.position = new_position
-        self._model.orientation[1] += rotation_angle.y  # Update the orientation explicitly
 
-        # Update the model matrix with the new position
+        # Step 7: Update the model's orientation
+        self._model.orientation[1] += rotation_angle.y  # Increment the y-orientation
+
+        # Step 8: Update the model matrix with the new position and orientation
         self.update_interactable_model_matrix()
+
+
 

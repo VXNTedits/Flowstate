@@ -44,7 +44,7 @@ class Game:
             view_matrix = self.components.camera.get_view_matrix()
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)  # Clear the screen
 
-            self.components.renderer.render(self.components.player, self.components.world, self.components.interactables, view_matrix, self.projection_matrix)
+            self.components.renderer.render(self.components.player, self.components.world, self.components.interactables, view_matrix, self.projection_matrix, delta_time)
 
             self.window.swap_buffers()
 
