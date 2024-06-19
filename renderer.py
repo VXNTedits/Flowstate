@@ -21,10 +21,15 @@ class Renderer:
         print("Initialization of light properties...")
         self.exposure = 1.0
         self.light_positions = [
-            glm.vec3(50.2, 10.0, 2.0),
-            glm.vec3(10.2, 20.0, 2.0),
-            glm.vec3(0.0, 20.0, -20.0)
+            glm.vec3(20.2, 50.0, 2.0),
+            glm.vec3(10.2, 50.0, 22.0),
+            glm.vec3(0.0, 50.0, -20.0)
         ]
+        # self.light_positions = [
+        #     glm.vec3(50.2, 10.0, 2.0),
+        #     glm.vec3(10.2, 20.0, 2.0),
+        #     glm.vec3(0.0, 20.0, -20.0)
+        # ]
         self.light_count = len(self.light_positions)
 
         self.light_colors = [
@@ -244,11 +249,12 @@ class Renderer:
         # 3. Render volumetric effects to the framebuffer
         self.render_volumetric_effects_to_fbo(view_matrix,
                                               projection_matrix,
-                                              glow_intensity=1,
-                                              scattering_factor=0.5,
-                                              glow_falloff=100,
-                                              god_ray_intensity=100,
-                                              god_ray_decay=0.1)
+                                              glow_intensity=100.1,
+                                              scattering_factor=0.8,
+                                              glow_falloff=10,
+                                              god_ray_intensity=100000,
+                                              god_ray_decay=0.001,
+                                              god_ray_sharpness=100000)
 
         # 4. Composite the scene and volumetric effects
         self.update_noise(delta_time)
@@ -778,7 +784,7 @@ class Renderer:
         self.shader.set_bump_scale(5.0)
         self.shader.set_roughness(0.1)
 
-        #self.render_lights(self.light_positions, self.light_colors, view_matrix, projection_matrix)
+        self.render_lights(self.light_positions, self.light_colors, view_matrix, projection_matrix)
         self.render_scene(shader, player_object, world, interactables, light_space_matrix,
                           view_matrix, projection_matrix)
         self.check_opengl_error()
@@ -786,7 +792,7 @@ class Renderer:
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
     def render_volumetric_effects_to_fbo(self, view_matrix, projection_matrix, glow_intensity, scattering_factor,
-                                         glow_falloff, god_ray_intensity, god_ray_decay):
+                                         glow_falloff, god_ray_intensity, god_ray_decay, god_ray_sharpness):
         glBindFramebuffer(GL_FRAMEBUFFER, self.volumetric_fbo)
         glViewport(0, 0, 800, 600)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -814,7 +820,8 @@ class Renderer:
         self.volumetric_shader.set_uniform1f("glowFalloff", glow_falloff)
         self.volumetric_shader.set_uniform1f("godRayIntensity", god_ray_intensity)
         self.volumetric_shader.set_uniform1f("godRayDecay", god_ray_decay)
-        self.volumetric_shader.set_uniform1f("time", self.time)  # Pass the time uniforms
+        self.volumetric_shader.set_uniform1f("godRaySharpness", god_ray_sharpness)  # Pass the sharpness uniform
+        self.volumetric_shader.set_uniform1f("time", self.time)  # Pass the time uniform
 
         # Set light positions and colors
         num_lights = len(self.light_positions)

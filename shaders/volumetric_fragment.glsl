@@ -14,6 +14,7 @@ uniform float scatteringFactor; // Parameter for controlling scattering
 uniform float glowFalloff; // Parameter for controlling the sharpness of the glow falloff
 uniform float godRayIntensity; // Parameter for controlling god ray intensity
 uniform float godRayDecay; // Parameter for controlling god ray decay
+uniform float godRaySharpness; // Parameter for controlling god ray sharpness
 uniform float time; // Time variable for animated noise
 
 // Simple 3D noise function
@@ -59,7 +60,7 @@ void main()
 
     // Ray marching
     vec3 pos = camPos + rayDir * tMin;
-    vec3 step = rayDir * 0.1; // Step size
+    vec3 step = rayDir * 0.001; // Step size
     vec4 scatteredLight = vec4(0.0);
     vec4 transmittance = vec4(1.0);
 
@@ -81,8 +82,9 @@ void main()
             // Sharper glow falloff
             float glow = exp(-pow(distanceToLight * glowFalloff, 2.0)) * lightIntensity; // Use glowFalloff
 
-            // God ray effect
+            // God ray effect with added sharpness
             float godRayEffect = pow(max(dot(rayDir, lightDir), 0.0), godRayIntensity) * exp(-distanceToLight * godRayDecay);
+            godRayEffect = pow(godRayEffect, godRaySharpness); // Increase sharpness
 
             scattering += lightColors[i] * (lightIntensity + glow * glowIntensity + godRayEffect);
         }

@@ -83,7 +83,7 @@ class Components:
         self.interactables = [
             deagle
         ]
-        self.world = World('world2')
+        self.world = World('world3')
         self.world_objects = WorldObjects(filepaths, mtl_filepaths, rotations, translations, material_overrides, scales)
         print('World initialized')
         self.player = Player('obj/body.obj', 'obj/head.obj', 'obj/arm_right.obj', mtl_path='obj/body.mtl',
