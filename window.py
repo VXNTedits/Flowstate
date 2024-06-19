@@ -1,6 +1,5 @@
 import glfw
 
-
 class Window:
     def __init__(self, width, height, title, fullscreen=False):
         if not glfw.init():
@@ -17,8 +16,7 @@ class Window:
             video_mode = glfw.get_video_mode(primary_monitor)
             if not video_mode:
                 raise Exception("Failed to get video mode for primary monitor")
-            self.window = glfw.create_window(video_mode.size.width, video_mode.size.height, title, primary_monitor,
-                                             None)
+            self.window = glfw.create_window(video_mode.size.width, video_mode.size.height, title, primary_monitor, None)
             self.width = video_mode.size.width
             self.height = video_mode.size.height
         else:
