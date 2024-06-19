@@ -50,16 +50,16 @@ class World(CompositeModel):
             for i in range(1, len(filepaths)):
                 model = Model(filepath=filepaths[i],
                               mtl_filepath=mtl_filepaths[i],
-                              rotation_angles=rotations[i],
-                              translation=translations[i],
-                              kd_override=material_overrides[i],
-                              ks_override=material_overrides[i],
-                              ns_override=material_overrides[i],
-                              scale=scales[i],
+                              rotation_angles=rotations[0],
+                              translation=translations[0],
+                              kd_override=material_overrides[0],
+                              ks_override=material_overrides[0],
+                              ns_override=material_overrides[0],
+                              scale=scales[0],
                               is_collidable=True)
-                self.add_model(model, scale=scales[i],
-                               relative_position=translations[i],
-                               relative_rotation=rotations[i])
+                self.add_world_model(model, scale=scales[0],
+                                     relative_position=translations[0],
+                                     relative_rotation=rotations[0])
 
 
 

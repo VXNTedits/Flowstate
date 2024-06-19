@@ -52,13 +52,12 @@ class InteractableObject:
         self.interactable = interactable
         self.interaction_threshold = 1000
         self.velocity = velocity
-        self.bounce_amplitude = 10
+        self.bounce_amplitude = 1
         self.bounce_frequency = 2.0  # in cycles per second
         self.rotation_speed = glm.vec3(0, 45, 0)  # degrees per second
         self.picked_up = False
-
-        # Create a CompositeModel to manage multiple sub-models
-        #self.composite_model = CompositeModel()
+        self.position = translation
+        self.rotation = rotation
 
         if material_overrides:
             self.material_overrides = material_overrides
@@ -72,20 +71,20 @@ class InteractableObject:
         except AttributeError:
             raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
 
-    def add_sub_model(self, sub_model, relative_position, relative_rotation, scale):
-        if self.use_composite:
-            self.models.append([sub_model, relative_position, relative_rotation])
-            self._model.set_scale(scale)
-            self._model.set_position(relative_position)
-            self._model.set_orientation(relative_rotation)
-            self._model.update_model_matrix(parent_matrix=self.model_matrix)
-        else:
-            self.model.add_model(sub_model, relative_position, relative_rotation)
-            self.models.add_model(sub_model, relative_position, relative_rotation)
-            self.model.set_scale(scale)
-            self.model.set_position(relative_position)
-            self.model.set_orientation(relative_rotation)
-            self.model.update_player_model_matrix(parent_matrix=self.model_matrix)
+    # def add_sub_model(self, sub_model, relative_position, relative_rotation, scale):
+    #     if self.use_composite:
+    #         self.models.append([sub_model, relative_position, relative_rotation])
+    #         self._model.set_scale(scale)
+    #         self._model.set_position(relative_position)
+    #         self._model.set_orientation(relative_rotation)
+    #         self._model.update_model_matrix(parent_matrix=self.model_matrix)
+    #     else:
+    #         self.model.add_model(sub_model, relative_position, relative_rotation)
+    #         self.models.add_model(sub_model, relative_position, relative_rotation)
+    #         self.model.set_scale(scale)
+    #         self.model.set_position(relative_position)
+    #         self.model.set_orientation(relative_rotation)
+    #         self.model.update_player_model_matrix(parent_matrix=self.model_matrix)
 
     def interact(self, player):
         if self.interactable:
@@ -97,8 +96,9 @@ class InteractableObject:
         print(f"{self.name} picked up by {player.name}")
         print("Initial orientation:", self.orientation)
         if self.interactable:
-            self._model.position = glm.vec3(-0.4, -0.1, 1)  #player.position
-            self._model.orientation = glm.vec3(0, 0, 0)  #glm.vec3(player.camera.pitch,player.camera.yaw,0.0)
+            for model in self.get_objects():
+                model.position = glm.vec3(-0.4, -0.1, 1)  #player.position
+                model.orientation = glm.vec3(0, 0, 0)  #glm.vec3(player.camera.pitch,player.camera.yaw,0.0)
             #self._model.set_scale(self.scale)
         print("Reset orientation:", self.orientation)
         player.inventory.append(self)
@@ -110,8 +110,8 @@ class InteractableObject:
     def update_interactable_model_matrix(self, parent_matrix=None):
         self.model_matrices.clear()
 
-        # Create translation matrix for the object's position
-        translation_matrix = glm.translate(glm.mat4(1.0), self._model.position)
+        # Create scaling matrix for the object's scale
+        scale_matrix = glm.scale(glm.mat4(1.0), glm.vec3(self._model.scale, self._model.scale, self._model.scale))
 
         # Create rotation matrices for the object's orientation
         rotation_x = glm.rotate(glm.mat4(1.0), glm.radians(self._model.orientation[0]), glm.vec3(1.0, 0.0, 0.0))
@@ -121,8 +121,8 @@ class InteractableObject:
         # Combine rotations to form the object's rotation matrix
         rotation_matrix = rotation_z * rotation_y * rotation_x
 
-        # Create scaling matrix for the object's scale
-        scale_matrix = glm.scale(glm.mat4(1.0), glm.vec3(self._model.scale, self._model.scale, self._model.scale))
+        # Create translation matrix for the object's position
+        translation_matrix = glm.translate(glm.mat4(1.0), self._model.position)
 
         # Combine translation, rotation, and scale to form the local model matrix
         local_model_matrix = translation_matrix * rotation_matrix * scale_matrix
@@ -133,9 +133,8 @@ class InteractableObject:
         else:
             self.model_matrix = parent_matrix * local_model_matrix
 
-        # Update the composite model's model matrix
-        if self.use_composite:
-            self._model.update_model_matrix()
+        # Update the model's matrix
+        self._model.update_model_matrix(self.model_matrix)
 
     def update(self, player, delta_time):
         if self.interactable:
@@ -163,14 +162,14 @@ class InteractableObject:
         self._model.orientation[1] %= 360  # Keep the angle within [0, 360)
 
         # Use the precomputed centroid
-        centroid = self.centroid
+        centroid = self._model.centroid
 
         # Update the position and orientation based on rotation around centroid
         self.update_position_and_orientation_with_centroid(centroid, glm.vec3(0, rotation_angle, 0), delta_time)
 
         # Bounce up and down (apply after rotation to avoid interference)
         bounce_offset = self.bounce_amplitude * glm.sin(2.0 * glm.pi() * self.bounce_frequency * glfw.get_time())
-        self.position.y += bounce_offset * delta_time
+        self._model.position.y += bounce_offset * delta_time
 
         # Update the model matrix with the new position
         self.update_interactable_model_matrix()
@@ -185,14 +184,17 @@ class InteractableObject:
         # Translate back from centroid
         translate_back = glm.translate(glm.mat4(1.0), centroid)
 
-        # Combine transformations
+        # Apply the rotation around the centroid
         transformation_matrix = translate_back * rotation_y * translate_to_centroid
 
-        # Apply the transformation to the original position (without previous updates)
-        original_position = self.position - glm.vec3(0, self.bounce_amplitude * glm.sin(
-            2.0 * glm.pi() * self.bounce_frequency * glfw.get_time()) * delta_time, 0)
-        new_position = glm.vec3(transformation_matrix * glm.vec4(original_position, 1.0))
+        # Apply the transformation to the original position
+        original_position = glm.vec4(self._model.position, 1.0)
+        new_position = glm.vec3(transformation_matrix * original_position)
 
-        # Update position and orientation
-        self.position = new_position
+        # Update the model's position and orientation
+        self._model.position = new_position
+        self._model.orientation[1] += rotation_angle.y  # Update the orientation explicitly
+
+        # Update the model matrix with the new position
         self.update_interactable_model_matrix()
+

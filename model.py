@@ -47,6 +47,7 @@ class Model:
         print(f"Initializing Model with filepath: {filepath}")
         self.name = filepath
         self.vertices, self.indices = self.load_obj(filepath, shift_to_centroid=self.shift_to_centroid)
+        self.centroid = self.calculate_centroid()
         self.materials = self.load_mtl(mtl_filepath)
         # Apply overrides if provided
         first_material_key = next(iter(self.materials))
@@ -93,25 +94,22 @@ class Model:
             self.materials['roughness'] = roughness_override
         if bump_scale_override is not None:
             self.materials['bumpScale'] = bump_scale_override
-        self.centroid = self.calculate_centroid()
 
     def calculate_centroid(self):
-        # Ensure vertices are transformed by the model matrix to get world coordinates
         transformed_vertices = []
         for i in range(0, len(self.vertices), 6):
             local_vertex = glm.vec3(self.vertices[i], self.vertices[i + 1], self.vertices[i + 2])
-            world_vertex = glm.vec3(self.model_matrix * glm.vec4(local_vertex, 1.0))
-            transformed_vertices.append(world_vertex)
+            transformed_vertices.append(local_vertex)
 
-        # Extract x and z coordinates in world space
         x_coords = [vertex.x for vertex in transformed_vertices]
+        y_coords = [vertex.y for vertex in transformed_vertices]
         z_coords = [vertex.z for vertex in transformed_vertices]
 
-        # Calculate the average of x and z coordinates
         centroid_x = np.mean(x_coords)
+        centroid_y = np.mean(y_coords)
         centroid_z = np.mean(z_coords)
 
-        return glm.vec3(centroid_x, 0, centroid_z)
+        return glm.vec3(centroid_x, centroid_y, centroid_z)
 
     def load_obj(self, filepath: str, shift_to_centroid=False) -> Tuple[np.ndarray, np.ndarray]:
         vertices = []
@@ -298,19 +296,25 @@ class Model:
         return aabb
 
     def update_model_matrix(self, parent_matrix=None):
+        # Create translation matrix for the object's position
         translation_matrix = glm.translate(glm.mat4(1.0),
                                            glm.vec3(self.position[0], self.position[1], self.position[2]))
 
+        # Create rotation matrices for the object's orientation
         rotation_x = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[0]), glm.vec3(1.0, 0.0, 0.0))
         rotation_y = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[1]), glm.vec3(0.0, 1.0, 0.0))
         rotation_z = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[2]), glm.vec3(0.0, 0.0, 1.0))
 
+        # Combine rotations to form the object's rotation matrix
         rotation_matrix = rotation_z * rotation_y * rotation_x
 
+        # Create scaling matrix for the object's scale
         scale_matrix = glm.scale(glm.mat4(1.0), glm.vec3(self.scale, self.scale, self.scale))
 
+        # Combine translation, rotation, and scale to form the local model matrix
         local_model_matrix = translation_matrix * rotation_matrix * scale_matrix
 
+        # Handle case where there is no parent matrix
         if parent_matrix is None:
             self.model_matrix = local_model_matrix
         else:
