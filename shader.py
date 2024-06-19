@@ -122,6 +122,9 @@ class Shader:
         else:
             glUniform1f(location, value)
 
+    def set_uniform_bool(self, name, value):
+        glUniform1i(glGetUniformLocation(self.program, name), value)
+
     def set_bump_scale(self, value: float):
         self.set_uniform1f("bumpScale", value)
 

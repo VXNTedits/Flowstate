@@ -4,6 +4,8 @@ import glm
 
 class Camera:
     def __init__(self, position, up, yaw=-90.0, pitch=0.0):
+        self.aspect_ratio = 800/600
+        self.zoom = 1
         self.position = position
         self.up = up
         self.yaw = yaw
@@ -32,6 +34,10 @@ class Camera:
                 self.pitch = -89.0
 
         self.update_camera_vectors()
+
+    def get_projection_matrix(self):
+        # Return the projection matrix
+        return glm.perspective(glm.radians(self.zoom), self.aspect_ratio, 0.1, 100.0)
 
     def update_camera_vectors(self):
         front = glm.vec3()

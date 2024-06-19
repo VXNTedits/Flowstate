@@ -18,7 +18,7 @@ class Model:
         'specular': [1.0, 1.0, 1.0],  # Example values (or a glm.vec3 if using glm)
         'shininess': 10.0,  # Example value
         'roughness': 0.1,  # Example value for roughness
-        'bumpScale': 0.0
+        'bumpScale': 10.0
     }
 
     def __init__(self,

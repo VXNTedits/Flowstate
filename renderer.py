@@ -20,16 +20,16 @@ class Renderer:
         # These lights will be used for various shading and rendering techniques
         print("Initialization of light properties...")
         self.exposure = 1.0
-        self.light_positions = [
-            glm.vec3(20.2, 50.0, 2.0),
-            glm.vec3(10.2, 50.0, 22.0),
-            glm.vec3(0.0, 50.0, -20.0)
-        ]
         # self.light_positions = [
-        #     glm.vec3(50.2, 10.0, 2.0),
-        #     glm.vec3(10.2, 20.0, 2.0),
-        #     glm.vec3(0.0, 20.0, -20.0)
+        #     glm.vec3(20.2, 50.0, 2.0),
+        #     glm.vec3(10.2, 50.0, 22.0),
+        #     glm.vec3(0.0, 50.0, -20.0)
         # ]
+        self.light_positions = [
+            glm.vec3(50.2, 10.0, 2.0),
+            glm.vec3(10.2, 20.0, 2.0),
+            glm.vec3(0.0, 20.0, -20.0)
+        ]
         self.light_count = len(self.light_positions)
 
         self.light_colors = [
@@ -244,7 +244,7 @@ class Renderer:
 
         # 2. Render the scene to the framebuffer
         self.render_scene_to_fbo(self.shader, player_object, world, interactables, self.light_space_matrix, view_matrix,
-                                 projection_matrix)
+                                 projection_matrix,enable_bump_mapping=False,bump_scale=5)
 
         # 3. Render volumetric effects to the framebuffer
         self.render_volumetric_effects_to_fbo(view_matrix,
@@ -288,9 +288,10 @@ class Renderer:
 
 
     def render_scene(self, shader, player_object, world, interactables, light_space_matrix, view_matrix,
-                     projection_matrix):
+                     projection_matrix, enable_bump_mapping=False, bump_scale=0.0):
         shader.use()
         shader.set_uniform_matrix4fv("lightSpaceMatrix", light_space_matrix)
+        self.shader.set_uniform_bool("enableBumpMapping", enable_bump_mapping)
 
         # Render interactables
         for interactable in interactables:
@@ -314,7 +315,8 @@ class Renderer:
             shader.set_uniform_matrix4fv("model", model_matrix)
             player_object.draw(self.camera)
 
-        # Render world objects
+        # Render world
+        self.shader.set_bump_scale(bump_scale)
         for obj in world.get_objects():
             model_matrix = obj.model_matrix
             if view_matrix and projection_matrix:
@@ -533,6 +535,12 @@ class Renderer:
         for pos in light_positions:
             light_space_matrix = self.calculate_light_space_matrix(pos)
             self.shadow_shader.set_uniform_matrix4fv("lightSpaceMatrix", light_space_matrix)
+
+            # Set additional uniforms if needed
+            self.shadow_shader.set_uniform_matrix4fv("view", self.camera.get_view_matrix())
+            self.shadow_shader.set_uniform_matrix4fv("projection", self.camera.get_projection_matrix())
+
+            # Render the world with the shadow shader
             self.render_world(self.shadow_shader, player_object, world, interactables, light_space_matrix)
 
         self.check_framebuffer_status()
@@ -762,7 +770,7 @@ class Renderer:
         self.check_gl_state()
 
     def render_scene_to_fbo(self, shader, player_object, world, interactables, light_space_matrix,
-                          view_matrix, projection_matrix):
+                          view_matrix, projection_matrix, enable_bump_mapping=False, bump_scale=0.0):
         glBindFramebuffer(GL_FRAMEBUFFER, self.scene_fbo)
         glViewport(0, 0, 800, 600)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -781,14 +789,17 @@ class Renderer:
         self.shader.set_uniform1i("shadowMap", 1)
         self.check_opengl_error()
 
-        self.shader.set_bump_scale(5.0)
         self.shader.set_roughness(0.1)
 
         self.render_lights(self.light_positions, self.light_colors, view_matrix, projection_matrix)
         self.render_scene(shader, player_object, world, interactables, light_space_matrix,
-                          view_matrix, projection_matrix)
+                          view_matrix, projection_matrix, enable_bump_mapping, bump_scale)
         self.check_opengl_error()
+
+        # debug
         self.render_volume_bounds()
+        # --//--
+
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
     def render_volumetric_effects_to_fbo(self, view_matrix, projection_matrix, glow_intensity, scattering_factor,
