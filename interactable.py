@@ -50,7 +50,7 @@ class InteractableObject:
                                 )
         self.use_composite = use_composite
         self.interactable = interactable
-        self.interaction_threshold = 1000
+        self.interaction_threshold = 100
         self.velocity = velocity
         self.bounce_amplitude = 1
         self.bounce_frequency = 2.0  # in cycles per second
@@ -157,15 +157,15 @@ class InteractableObject:
 
     def highlight(self, delta_time):
         # Rotate around the y-axis
-        rotation_angle = self.rotation_speed.y * delta_time
-        self._model.orientation[1] += rotation_angle
-        self._model.orientation[1] %= 360  # Keep the angle within [0, 360)
+        #rotation_angle = self.rotation_speed.y * delta_time
+        #self._model.orientation[1] += rotation_angle
+        #self._model.orientation[1] %= 360  # Keep the angle within [0, 360)
 
         # Use the precomputed centroid
         centroid = self._model.centroid
 
         # Update the position and orientation based on rotation around centroid
-        self.update_position_and_orientation_with_centroid(centroid, glm.vec3(0, rotation_angle, 0), delta_time)
+        #self.update_position_and_orientation_with_centroid(centroid, glm.vec3(0, rotation_angle, 0), delta_time)
 
         # Bounce up and down (apply after rotation to avoid interference)
         bounce_offset = self.bounce_amplitude * glm.sin(2.0 * glm.pi() * self.bounce_frequency * glfw.get_time())
@@ -185,11 +185,13 @@ class InteractableObject:
         translate_back = glm.translate(glm.mat4(1.0), centroid)
 
         # Apply the rotation around the centroid
+        #transformation_matrix = rotation_y * translate_to_centroid
         transformation_matrix = translate_back * rotation_y * translate_to_centroid
 
         # Apply the transformation to the original position
         original_position = glm.vec4(self._model.position, 1.0)
         new_position = glm.vec3(transformation_matrix * original_position)
+        #new_position = self._model.position
 
         # Update the model's position and orientation
         self._model.position = new_position
