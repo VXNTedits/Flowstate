@@ -81,10 +81,10 @@ class Renderer:
         # Generate 3D noise texture for volumetric effects
         # This texture will be used in the volumetric rendering process
         #print("Generate 3D noise texture for volumetric effects...")
-        self.noise_size = 8  # Size of the 3D noise texture
+        self.noise_size = 2048  # Size of the 3D noise texture
         self.simplex = OpenSimplex(seed=np.random.randint(0, 10000))
         self.time = 0.0
-        self.setup_volume_texture(self.time)
+        self.setup_volume_texture()
 
 
         # Setup depth framebuffer for shadow mapping
@@ -116,13 +116,12 @@ class Renderer:
         # Set up the vertex array and buffer objects for rendering a quad
         self.setup_quad()
 
-    def setup_volume_texture(self, delta_time):
-        self.noise_texture_data = self.generate_noise_texture(self.noise_size, delta_time)
-
+    def setup_volume_texture(self):
+        # Create an empty 3D texture
         self.volume_texture = glGenTextures(1)
         glBindTexture(GL_TEXTURE_3D, self.volume_texture)
         glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, self.noise_size, self.noise_size, self.noise_size, 0, GL_RED, GL_FLOAT,
-                     self.noise_texture_data)
+                     None)
 
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
@@ -130,6 +129,9 @@ class Renderer:
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE)
         glBindTexture(GL_TEXTURE_3D, 0)
+
+    def update_noise(self, delta_time):
+        self.time += delta_time
 
     def generate_noise_texture(self, size, time):
         noise_texture = np.zeros((size, size, size), dtype=np.float32)
@@ -150,14 +152,6 @@ class Renderer:
         max_val = np.max(noise_texture)
         normalized_texture = (noise_texture - min_val) / (max_val - min_val)
         return normalized_texture
-
-    def update_noise(self, delta_time):
-        self.time += delta_time
-        self.noise_texture_data = self.generate_noise_texture(self.noise_size, self.time)
-        glBindTexture(GL_TEXTURE_3D, self.volume_texture)
-        glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, self.noise_size, self.noise_size, self.noise_size, GL_RED, GL_FLOAT,
-                        self.noise_texture_data)
-        glBindTexture(GL_TEXTURE_3D, 0)
 
     def setup_depth_framebuffer(self):
         self.depth_map_fbo = glGenFramebuffers(1)
@@ -250,11 +244,11 @@ class Renderer:
         # 3. Render volumetric effects to the framebuffer
         self.render_volumetric_effects_to_fbo(view_matrix,
                                               projection_matrix,
-                                              glow_intensity=1000,
-                                              scattering_factor=1,
-                                              glow_falloff=10,
-                                              god_ray_intensity=1000,
-                                              god_ray_decay=10)
+                                              glow_intensity=1,
+                                              scattering_factor=0.5,
+                                              glow_falloff=100,
+                                              god_ray_intensity=10000,
+                                              god_ray_decay=0.1)
 
         # 4. Composite the scene and volumetric effects
         self.update_noise(delta_time)
@@ -784,7 +778,7 @@ class Renderer:
         self.shader.set_bump_scale(5.0)
         self.shader.set_roughness(0.1)
 
-        #self.render_lights(self.light_positions, self.light_colors, view_matrix, projection_matrix)
+        self.render_lights(self.light_positions, self.light_colors, view_matrix, projection_matrix)
         self.render_scene(shader, player_object, world, interactables, light_space_matrix,
                           view_matrix, projection_matrix)
         self.check_opengl_error()
@@ -802,7 +796,6 @@ class Renderer:
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self.volumetric_shader.use()
-        self.volumetric_shader.set_uniform1i("volumeData", 0)  # Texture unit 0
 
         # Correctly calculate the inverse view-projection matrix
         view_proj_matrix = projection_matrix * view_matrix
@@ -821,6 +814,7 @@ class Renderer:
         self.volumetric_shader.set_uniform1f("glowFalloff", glow_falloff)
         self.volumetric_shader.set_uniform1f("godRayIntensity", god_ray_intensity)
         self.volumetric_shader.set_uniform1f("godRayDecay", god_ray_decay)
+        self.volumetric_shader.set_uniform1f("time", self.time)  # Pass the time uniform
 
         # Set light positions and colors
         num_lights = len(self.light_positions)
