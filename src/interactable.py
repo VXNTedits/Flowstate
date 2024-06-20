@@ -51,8 +51,8 @@ class InteractableObject(CompositeModel):
         self.use_composite = use_composite
         self.interactable = interactable
         self.interaction_threshold = 10
-        self.bounce_amplitude = 3
-        self.bounce_frequency = 2.0  # in cycles per second
+        self.bounce_amplitude = 1
+        self.bounce_frequency = 1.5  # in cycles per second
         self.rotation_speed = glm.vec3(0, 45, 0)  # degrees per second
         self.picked_up = False
         self.position = self.model.composite_position
@@ -77,7 +77,7 @@ class InteractableObject(CompositeModel):
             self.interactable = False
             self.picked_up = True
 
-    def update_interactables(self, player, delta_time):
+    def update_interactable(self, player, delta_time):
         self.position = self.model.composite_position
         self.rotation = self.model.composite_rotation
         if self.interactable:
@@ -101,10 +101,10 @@ class InteractableObject(CompositeModel):
     def highlight(self, delta_time):
         # Rotate around the y-axis
         self.rotation_angle += self.rotation_speed.y * delta_time
-        print(self.rotation_angle)
+
         centroid = self.model.composite_centroid
 
-        #self.rotate_about_centroid(centroid, self.rotation_angle, delta_time)
+        self.rotate_about_centroid(centroid, self.rotation_angle, delta_time)
 
         # Keep the angle within [0, 360)
         self.rotation_angle %= 360
@@ -119,9 +119,14 @@ class InteractableObject(CompositeModel):
 
     def rotate_about_centroid(self, centroid, rotation_angle, delta_time):
         initial_position = self.model.composite_position
+        #print(f"1. Initial position = {initial_position}")
+        # 1. Translate to origin
         self.model.set_composite_position(-centroid - initial_position)
-        self.update_composite_model_matrix()
+        self.model.update_composite_model_matrix()
+        #print(f"2. Translated position = {-centroid-initial_position}")
+        # 2. Rotate
         self.model.set_composite_rotation((0, rotation_angle, 0))
-        self.update_composite_model_matrix()
+        self.model.update_composite_model_matrix()
+        # 3. Translate back
         self.model.set_composite_position(centroid + initial_position)
-        self.update_composite_model_matrix()
+        self.model.update_composite_model_matrix()

@@ -293,12 +293,11 @@ class Renderer:
 
         # Render interactables
         for interactable in interactables:
-            for mod, pos, dir in interactable.model.models:
+            for mod, pos, dir in interactable.models:
                 model_matrix = mod.model_matrix
-                if view_matrix and projection_matrix:
-                    self.update_uniforms(model_matrix, view_matrix, projection_matrix, mod)
-                    shader.set_uniform_matrix4fv("model", model_matrix)
-                    mod.draw()
+                self.update_uniforms(model_matrix, view_matrix, projection_matrix, mod)
+                shader.set_uniform_matrix4fv("model", model_matrix)
+                mod.draw()
 
         # Render player
         model_matrix = player_object.model_matrix

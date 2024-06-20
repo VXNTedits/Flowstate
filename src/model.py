@@ -224,13 +224,26 @@ class Model:
             raise RuntimeError(f"Failed to scale model_matrix: {e}")
 
     def set_orientation(self, rotation_angles):
+        # Validate input
+        # assert len(rotation_angles) == 3, "rotation_angles must be a list or tuple of 3 elements"
+        # assert all(isinstance(angle, (int, float)) for angle in
+        #            rotation_angles), "All elements in rotation_angles must be numbers"
+
         # Apply rotations around x, y, z axes respectively
         rotation_matrix = glm.mat4(1.0)
         rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_angles[0]), glm.vec3(1.0, 0.0, 0.0))
         rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_angles[1]), glm.vec3(0.0, 1.0, 0.0))
         rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_angles[2]), glm.vec3(0.0, 0.0, 1.0))
+
+        # Update orientation and model matrix
         self.orientation = glm.vec3(rotation_angles)
         self.model_matrix = rotation_matrix * self.model_matrix
+
+        # Post-conditions to verify the state
+        # assert glm.equal(self.orientation, glm.vec3(rotation_angles)), "Orientation was not set correctly"
+        # assert glm.determinant(rotation_matrix) != 0, "Rotation matrix is not valid (determinant should not be zero)"
+        # assert glm.length(self.orientation) <= 360 * glm.sqrt(
+        #     3), "Orientation angles are out of expected bounds (0 to 360 degrees for each axis)"
 
     def set_position(self, translation):
         # Ensure the translation is a glm.vec3

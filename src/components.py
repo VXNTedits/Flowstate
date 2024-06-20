@@ -69,7 +69,7 @@ class Components:
 
         deagle = InteractableObject(filepath=get_relative_path("res/deagle_main.obj"),
                                     mtl_filepath=get_relative_path("res/deagle_main.mtl"),
-                                    translation=glm.vec3(3.0, 3.0, -3.0),
+                                    translation=glm.vec3(3.0, 2.0, -3.0),
                                     rotation=glm.vec3(0, 0, 0),
                                     scale=1,
                                     is_collidable=False,
@@ -89,7 +89,7 @@ class Components:
                                                     mtl_filepath=get_relative_path("res/cube.mtl"),
                                                     use_composite=False,
                                                     shift_to_centroid=False,
-                                                    translation=glm.vec3(20,0,10))
+                                                    translation=glm.vec3(20,1,-10))
 
         self.interactables = [deagle, test_cube_interactable]
         self.world = World("world2")
@@ -139,7 +139,7 @@ class Components:
     def update_components(self, delta_time: float):
         self.world_objects.update(delta_time)
         for interactable in self.interactables:
-            interactable.update_interactables(self.player, delta_time)
+            interactable.update_interactable(self.player, delta_time)
 
     def add_interactable(self, interactable_object):
         self.interactables.append(interactable_object)

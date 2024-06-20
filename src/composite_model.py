@@ -49,6 +49,7 @@ class CompositeModel(Model):
 
         self.models.append((self, self.composite_position, self.composite_rotation))
         self.composite_centroid = self.calculate_composite_centroid()
+        self.accumulator = 0
 
     def add_world_model(self, model, scale, relative_position=glm.vec3(0.0, 0.0, 0.0),
                         relative_rotation=glm.vec3(0.0, 0.0, 0.0)):
@@ -66,81 +67,23 @@ class CompositeModel(Model):
     def update_composite_model_matrix(self, parent_matrix=None):
         self.model_matrices.clear()
 
-        # Ensure parent_matrix is a glm.mat4
         if parent_matrix is None:
             parent_matrix = glm.mat4(1.0)
-        elif isinstance(parent_matrix, glm.vec4):
-            raise ValueError("parent_matrix should be a glm.mat4, not a glm.vec4")
 
-        #print(f"Initial parent matrix:\n{parent_matrix}")
-
-        # Check if there are models to process
         if not self.models:
             return
 
-        # Process the root model (first model in the list)
-        root_model, root_rel_pos, root_rel_rot = self.models[0]
+        root_model = self.models[0][0]
+        root_model.update_model_matrix(parent_matrix)
+        self.model_matrices.append(root_model.model_matrix)
 
-        # Create translation matrix for the root model
-        root_translation_matrix = glm.translate(glm.mat4(1.0), root_rel_pos)
-        #print(f"Root translation matrix:\n{root_translation_matrix}")
+        current_root_model_matrix = root_model.model_matrix
 
-        # Create rotation matrices for the root model and combine them
-        root_rotation_x = glm.rotate(glm.mat4(1.0), glm.radians(root_rel_rot.x), glm.vec3(1.0, 0.0, 0.0))
-        root_rotation_y = glm.rotate(root_rotation_x, glm.radians(root_rel_rot.y), glm.vec3(0.0, 1.0, 0.0))
-        root_rotation_z = glm.rotate(root_rotation_y, glm.radians(root_rel_rot.z), glm.vec3(0.0, 0.0, 1.0))
-        root_rotation_matrix = root_rotation_z
-        #print(f"Root rotation matrix:\n{root_rotation_matrix}")
-
-        # Create scale matrix for the root model
-        root_scale_matrix = glm.scale(glm.mat4(1.0), glm.vec3(root_model.scale, root_model.scale, root_model.scale))
-        #print(f"Root scale matrix:\n{root_scale_matrix}")
-
-        # Combine parent matrix with root translation, rotation, and scale matrices
-        root_model_matrix = parent_matrix * root_translation_matrix * root_rotation_matrix * root_scale_matrix
-        #print(f"Combined root model matrix:\n{root_model_matrix}")
-
-        # Store the computed root model matrix
-        self.model_matrices.append(root_model_matrix)
-
-        # Update the root model's matrix
-        root_model.update_model_matrix(root_model_matrix)
-
-        # If there are no child models, return after updating the root model
-        if len(self.models) == 1:
-            return
-
-        # Use the root model matrix as the base for child models
-        current_parent_matrix = root_model_matrix
-
-        # Process child models (remaining models in the list)
         for model, relative_pos, relative_rot in self.models[1:]:
-            # Create translation matrix
-            translation_matrix = glm.translate(glm.mat4(1.0), relative_pos)
-            #print(f"Translation matrix for child model:\n{translation_matrix}")
-
-            # Create rotation matrices for each axis and combine them
-            rotation_x = glm.rotate(glm.mat4(1.0), glm.radians(relative_rot.x), glm.vec3(1.0, 0.0, 0.0))
-            rotation_y = glm.rotate(rotation_x, glm.radians(relative_rot.y), glm.vec3(0.0, 1.0, 0.0))
-            rotation_z = glm.rotate(rotation_y, glm.radians(relative_rot.z), glm.vec3(0.0, 0.0, 1.0))
-            rotation_matrix = rotation_z
-            #print(f"Rotation matrix for child model:\n{rotation_matrix}")
-
-            # Create scale matrix
-            scale_matrix = glm.scale(glm.mat4(1.0), glm.vec3(model.scale, model.scale, model.scale))
-            #print(f"Scale matrix for child model:\n{scale_matrix}")
-
-            # Combine current parent matrix with translation, rotation, and scale matrices
-            model_matrix = current_parent_matrix * translation_matrix * rotation_matrix * scale_matrix
-            #print(f"Combined model matrix for child model:\n{model_matrix}")
-
-            # Store the computed model matrix
-            self.model_matrices.append(model_matrix)
-
-            # Update the model's matrix
-            model.update_model_matrix(model_matrix)
-
-        #print(f"Final updated composite model matrices:\n{self.model_matrices}")
+            model.position = relative_pos
+            model.orientation = relative_rot
+            model.update_model_matrix(current_root_model_matrix)
+            self.model_matrices.append(model.model_matrix)
 
     def update_flat_model_matrix(self, parent_matrix=glm.mat4(1.0)):
         self.model_matrices.clear()
@@ -199,7 +142,8 @@ class CompositeModel(Model):
             #print("set composite position for ", model.name, " to ", model.position)
             model.set_position(position)
 
+
     def set_composite_rotation(self, rotation):
         for model in self.get_objects():
-            #print("set composite rotation for ", model.name + " to ", model.orientation)
+            # print("set composite rotation for ", model.name + " to ", model.orientation)
             model.set_orientation(rotation)

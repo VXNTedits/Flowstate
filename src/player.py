@@ -20,7 +20,7 @@ class Player(Model):
         self.local_hand_position = glm.vec3(0, 0, 0)
         self.torso = Model(body_path, mtl_path, player=True, translation=(0, 1, 0))
         self.head = Model(head_path, mtl_path, player=True, translation=(0, 1, 0))
-        self.right_arm = Model(right_arm_path, mtl_path, player=True, translation=(0, 1, 0))
+        self.right_arm = Model(right_arm_path, mtl_path, player=True, translation=(0, 0, 0))
         super().__init__(filepath, mtl_filepath)
         self.set_right_hand_model_matrix()
         self.position = glm.vec3(3.0, 2.0, 3.0)
