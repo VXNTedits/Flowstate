@@ -20,7 +20,7 @@ def parse_obj_file(file_path):
     return vertices, normals, faces
 
 # Path to the uploaded OBJ file
-file_path = r"C:\Users\leona\OneDrive\Projects\Game\obj\world1.obj"
+file_path = r"/res\world1.obj"
 
 # Parse the OBJ file
 vertices, normals, faces = parse_obj_file(file_path)

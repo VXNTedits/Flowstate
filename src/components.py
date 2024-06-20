@@ -1,0 +1,149 @@
+import os
+
+from src.camera import Camera
+from src.model import Model
+from src.shader import Shader
+from src.player import Player
+from src.renderer import Renderer
+from src.input_handler import InputHandler
+from src.physics import Physics
+from text_renderer import TextRenderer
+import glm
+from src.world import World
+from src.world_objects import WorldObjects, MaterialOverride
+from src.interactable import InteractableObject
+
+
+class ObjectAttributes:
+    def __init__(self, filepath, mtl_filepath, rotation=[0, 0, 0], translation=[0, 0, 0], material_override=None,
+                 scale=1):
+        self.scale = scale
+        self.filepath = filepath
+        self.mtl_filepath = mtl_filepath
+        self.rotation = rotation
+        self.translation = translation
+        self.material_override = material_override
+
+
+class Components:
+    def __init__(self, window):
+        self.script_dir = os.path.dirname(os.path.dirname(__file__))
+        self.window = window
+        self.camera = None
+        self.world = None
+        self.world_objects = None
+        self.player = None
+        self.models = []
+        self.physics = None
+        self.input_handler = None
+        self.shader = None
+        self.renderer = None
+        self.interactables = []
+
+    def initialize_gameplay_components(self):
+
+        script_dir = os.path.dirname(os.path.dirname(__file__))
+
+        def get_relative_path(relative_path):
+            print("os.path.join(script_dir, relative_path):",os.path.join(script_dir, relative_path))
+            return os.path.join(script_dir, relative_path)
+
+        self.camera = Camera(glm.vec3(0.0, 0.0, 0.0), glm.vec3(0.0, 1.0, 0.0))
+
+        # Define object attributes for multiple objects
+        world_objects = [
+            ObjectAttributes(get_relative_path("res/cube.obj"), get_relative_path("res/cube.mtl"),
+                             (-45.0, 45.0, 45.0), (-70.0, 0.0, 50.0),
+                             MaterialOverride(None, glm.vec3(1, 1, 0), 1000.0)),
+            ObjectAttributes(get_relative_path("res/cube.obj"), get_relative_path("res/cube.mtl"),
+                             (-45.0, 45.0, 45.0), (20.0, 0.0, -50.0),
+                             MaterialOverride(None, glm.vec3(0, 1, 0), 1000.0))
+        ]
+
+        filepaths = [attr.filepath for attr in world_objects]
+        mtl_filepaths = [attr.mtl_filepath for attr in world_objects]
+        rotations = [attr.rotation for attr in world_objects]
+        translations = [attr.translation for attr in world_objects]
+        material_overrides = [attr.material_override for attr in world_objects]
+        scales = [attr.scale for attr in world_objects]
+
+        deagle = InteractableObject(filepath=get_relative_path("res/deagle_main.obj"),
+                                    mtl_filepath=get_relative_path("res/deagle_main.mtl"),
+                                    translation=glm.vec3(3.0, 3.0, -3.0),
+                                    rotation=glm.vec3(0, 0, 0),
+                                    scale=1,
+                                    is_collidable=False,
+                                    material_overrides=MaterialOverride(None, glm.vec3(1, 1, 1), 500),
+                                    use_composite=True,
+                                    shift_to_centroid=False
+                                    )
+        deagle_slide = Model(filepath=get_relative_path("res/deagle_slide.obj"),
+                             mtl_filepath=get_relative_path("res/deagle_slide.mtl"),
+                             shift_to_centroid=False,
+                             scale=1)
+        deagle.add_comp_model(model=deagle_slide,
+                              relative_position=glm.vec3(0.0, 0.0, 0.0),
+                              relative_rotation=glm.vec3(0.0, 0.0, 0.0))
+
+        test_cube_interactable = InteractableObject(filepath=get_relative_path("res/cube.obj"),
+                                                    mtl_filepath=get_relative_path("res/cube.mtl"),
+                                                    use_composite=False,
+                                                    shift_to_centroid=False,
+                                                    translation=glm.vec3(20,0,10))
+
+        self.interactables = [deagle, test_cube_interactable]
+        self.world = World("world2")
+        self.world_objects = WorldObjects(filepaths,
+                                          mtl_filepaths,
+                                          rotations,
+                                          translations,
+                                          material_overrides,
+                                          scales)
+        print("World initialized")
+        self.player = Player(get_relative_path("res/body.obj"),
+                             get_relative_path("res/head.obj"),
+                             get_relative_path("res/arm_right.obj"),
+                             mtl_path=get_relative_path("res/body.mtl"),
+                             camera=self.camera,
+                             default_material=Model.default_material,
+                             filepath=get_relative_path("res/body.obj"),
+                             mtl_filepath=get_relative_path("res/body.mtl"))
+        print("Player initialized")
+
+        self.models = [self.player.torso, self.player.right_arm]
+        self.models += self.world.get_world_objects()
+        self.models += self.world_objects.objects
+        self.models += self.interactables
+        print("Components created")
+
+        for model in self.models:
+            print(model)
+            print("model in components.models: ", model.name)
+        print("Models initialized")
+
+        self.physics = Physics(self.world_objects, self.player, self.interactables, self.world)
+        print("Physics initialized")
+
+        self.input_handler = InputHandler(self.camera, self.player, self.physics)
+        print("Input handler initialized")
+
+        self.shader = Shader(get_relative_path("shaders/vertex_shader.glsl"), get_relative_path("shaders/fragment_shader.glsl"))
+        print("Shader initialized")
+
+        self.renderer = Renderer(self.shader, self.camera)
+        print("Renderer initialized")
+
+    def set_input_callbacks(self):
+        self.window.set_callbacks(self.input_handler.key_callback, self.input_handler.mouse_callback)
+
+    def update_components(self, delta_time: float):
+        self.world_objects.update(delta_time)
+        for interactable in self.interactables:
+            interactable.update_interactables(self.player, delta_time)
+
+    def add_interactable(self, interactable_object):
+        self.interactables.append(interactable_object)
+        self.models.append(interactable_object)
+
+    def get_relative_path(self, relative_path):
+        return os.path.join(self.script_dir, relative_path)
