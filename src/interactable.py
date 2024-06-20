@@ -72,18 +72,20 @@ class InteractableObject(CompositeModel):
     def on_pickup(self, player):
         # Define what happens when the player picks up this object
         if self.interactable:
+            #self.set_composite_position(glm.vec3(0,0,0))
+            #self.set_composite_rotation(glm.vec3(0,0,0))
             print(f"{self.name} picked up by {player.name}.")
             player.inventory.append(self)
             self.interactable = False
             self.picked_up = True
 
     def update_interactable(self, player, delta_time):
-        self.position = self.model.composite_position
-        self.rotation = self.model.composite_rotation
+        #self.position = self.model.composite_position
+        #self.rotation = self.model.composite_rotation
         if self.interactable:
             self.check_interactions(player, delta_time)
         if self.picked_up:
-            self.update_composite_model_matrix(player.right_hand_model_matrix)
+            self.update_composite_model_matrix(player.torso.model_matrix)#right_hand_model_matrix)
             #print(f"player.right_hand_model_matrix =\n{player.right_hand_model_matrix}")
         else:
             self.update_composite_model_matrix()  # Ensure the model matrix is updated for non-picked objects
@@ -118,15 +120,13 @@ class InteractableObject(CompositeModel):
         self.update_composite_model_matrix()
 
     def rotate_about_centroid(self, centroid, rotation_angle, delta_time):
-        initial_position = self.model.composite_position
-        #print(f"1. Initial position = {initial_position}")
+        initial_position = self.composite_position
         # 1. Translate to origin
-        self.model.set_composite_position(-centroid - initial_position)
-        self.model.update_composite_model_matrix()
-        #print(f"2. Translated position = {-centroid-initial_position}")
+        self.set_composite_position(-centroid - initial_position)
+        self.update_composite_model_matrix()
         # 2. Rotate
-        self.model.set_composite_rotation((0, rotation_angle, 0))
-        self.model.update_composite_model_matrix()
+        self.set_composite_rotation((0, rotation_angle, 0))
+        self.update_composite_model_matrix()
         # 3. Translate back
-        self.model.set_composite_position(centroid + initial_position)
-        self.model.update_composite_model_matrix()
+        self.set_composite_position(centroid + initial_position)
+        self.update_composite_model_matrix()

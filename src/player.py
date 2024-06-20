@@ -17,7 +17,7 @@ class Player(Model):
         self.player_width = 1
         self.default_material = default_material
         self.camera = camera
-        self.local_hand_position = glm.vec3(0, 0, 0)
+        self.local_hand_position = glm.vec3(0, 1, 0)
         self.torso = Model(body_path, mtl_path, player=True, translation=(0, 1, 0))
         self.head = Model(head_path, mtl_path, player=True, translation=(0, 1, 0))
         self.right_arm = Model(right_arm_path, mtl_path, player=True, translation=(0, 0, 0))
@@ -180,11 +180,14 @@ class Player(Model):
         # Perform the transformation using the right arm's model matrix
         transformed_hand_position = self.right_arm.model_matrix * local_hand_vec4
 
-        # Create the right hand model matrix
-        self.right_hand_model_matrix = self.right_arm.model_matrix * glm.translate(glm.mat4(1.0),
-                                                                                   glm.vec3(transformed_hand_position))
+        # Create the right hand model matrix using only the transformation, not additional translation
+        self.right_hand_model_matrix = self.right_arm.model_matrix
 
-        #print(f"Right hand model matrix:\n{self.right_hand_model_matrix}")
+        # Update the translation part of the right hand model matrix with the transformed hand position
+        self.right_hand_model_matrix[3] = transformed_hand_position
+
+        print(f"Torso model matrix:\n{self.torso.model_matrix}")
+        print(f"Right hand model matrix:\n{self.right_hand_model_matrix}")
 
     def calculate_player_bounding_box(self, start_pos, end_pos, bounding_margin=0.1):
         min_x = min(start_pos.x, end_pos.x) - self.player_width / 2 - bounding_margin

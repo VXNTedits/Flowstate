@@ -69,7 +69,7 @@ class Components:
 
         deagle = InteractableObject(filepath=get_relative_path("res/deagle_main.obj"),
                                     mtl_filepath=get_relative_path("res/deagle_main.mtl"),
-                                    translation=glm.vec3(3.0, 2.0, -3.0),
+                                    translation=glm.vec3(0,0,0),#(3.0, 2.0, -3.0),
                                     rotation=glm.vec3(0, 0, 0),
                                     scale=1,
                                     is_collidable=False,
