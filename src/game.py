@@ -51,9 +51,13 @@ class Game:
                 view_matrix = self.components.camera.get_view_matrix()
                 gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)  # Clear the screen
 
-                self.components.renderer.render(self.components.player, self.components.world,
-                                                self.components.interactables, view_matrix, self.projection_matrix,
-                                                delta_time) # heads-up we're not passing world_objects so they won't render
+                self.components.renderer.render(player_object=self.components.player,
+                                                world=self.components.world,
+                                                interactables=self.components.interactables,
+                                                world_objects=self.components.world_objects.get_objects(),
+                                                view_matrix=view_matrix,
+                                                projection_matrix=self.projection_matrix,
+                                                delta_time=delta_time)
 
             imgui.render()
             self.impl.render(imgui.get_draw_data())
@@ -82,8 +86,8 @@ class Game:
         # Update game logic at fixed intervals
         while accumulator >= self.tick_rate:
             self.components.input_handler.process_input(self.components.player, self.tick_rate)
-            self.components.player.update_player(self.tick_rate)
-            self.components.physics.update_physics(self.tick_rate)
+            self.components.player.update_player(self.tick_rate, self.components.player.mouse_buttons, self.components.world)
+            self.components.physics.update_physics(self.tick_rate, self.components.weapons, self.components.player)
             self.components.update_components(self.tick_rate)
             accumulator -= self.tick_rate
 

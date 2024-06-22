@@ -7,6 +7,7 @@ import numpy as np
 
 from pid import PIDController
 from model import Model
+from OpenGL.GL import *
 
 
 class Physics:
@@ -22,6 +23,7 @@ class Physics:
         self.pid_controller = PIDController(kp=0.8, ki=0.0, kd=0.0)
         self.offset = 0.1
         self.set_gravity = True
+        self.active_trajectories = []
 
     def apply_gravity(self, delta_time: float):
         if not self.player.is_grounded:
@@ -150,6 +152,27 @@ class Physics:
         v = (dot00 * dot12 - dot01 * dot02) * invDenom
         return (u >= 0) and (v >= 0) and (u + v < 1)
 
+    def check_projectile_collision(self, projectile_positions):
+        """
+        Checks if the projectile intersects with any object in the world.
+        Returns the exact collision point if a collision is detected, otherwise None.
+        """
+        for i in range(len(projectile_positions) - 1):
+            start_pos = projectile_positions[i]
+            end_pos = projectile_positions[i + 1]
+            for obj in self.world.get_world_objects():
+                aabb = obj.aabb
+                is_intersecting, nearest_face_name, nearest_face_vectors = (
+                    self.is_bounding_box_intersecting_aabb((start_pos, end_pos), aabb))
+
+                if is_intersecting:
+                    collision_point = self.calculate_collision_point(start_pos, end_pos, nearest_face_vectors)
+                    print("Checking collisions on arc: ", projectile_positions)
+                    print("Projectile collision detected at: ", collision_point)
+                    return collision_point
+
+        return None
+
     def check_linear_collision(self):
         """
         Checks if the player's movement intersects with any object in the world.
@@ -168,7 +191,6 @@ class Physics:
             if is_intersecting:
                 collisions.append((nearest_face_name, nearest_face_vectors))
 
-        return collisions
 
     def handle_collisions(self, player_thrust, delta_time):
         #self.adjust_velocity_based_on_wall_collision(player_thrust,delta_time)
@@ -214,97 +236,90 @@ class Physics:
         # If the dot product is close to zero, there's no collision
         return abs(dot_product) > 1e-5
 
-    def is_line_segment_intersecting_aabb(self, start, end, aabb):
-        """
-        Checks if a line segment (start to end) intersects with an AABB (Axis-Aligned Bounding Box).
-        Returns True if there is an intersection, otherwise False.
-        """
-        (min_x, min_y, min_z), (max_x, max_y, max_z) = aabb
-
-        def slab_check(p0, p1, min_b, max_b):
-            """
-            Checks intersection of the line segment with a slab along one axis.
-            Returns the intersection intervals [t0, t1] along the axis.
-            """
-            inv_d = 1.0 / (p1 - p0) if (p1 - p0) != 0 else float('inf')
-            t0 = (min_b - p0) * inv_d
-            t1 = (max_b - p0) * inv_d
-            if t0 > t1:
-                t0, t1 = t1, t0
-            return t0, t1
-
-        tmin, tmax = 0.0, 1.0
-
-        for axis in range(3):
-            p0 = start[axis]
-            p1 = end[axis]
-            min_b = [min_x, min_y, min_z][axis]
-            max_b = [max_x, max_y, max_z][axis]
-
-            if p0 == p1:
-                if p0 < min_b or p0 > max_b:
-                    return False
-            else:
-                t0, t1 = slab_check(p0, p1, min_b, max_b)
-                tmin = max(tmin, t0)
-                tmax = min(tmax, t1)
-                if tmin > tmax:
-                    return False
-
-        return True
-
-    def is_bounding_box_intersecting_aabb(self, player_bb, aabb):
-        (min_px, min_py, min_pz) = player_bb[0]
-        (max_px, max_py, max_pz) = player_bb[1]
+    def is_bounding_box_intersecting_aabb(self, line_segment, aabb):
+        (start_pos, end_pos) = line_segment
         (min_x, min_y, min_z), (max_x, max_y, max_z) = aabb
 
         faces = {
-            "left": ((min_x, min_y, min_z), (min_x, max_y, min_z), (min_x, min_y, max_z)),
-            "right": ((max_x, min_y, min_z), (max_x, max_y, min_z), (max_x, min_y, max_z)),
-            "bottom": ((min_x, min_y, min_z), (max_x, min_y, min_z), (min_x, min_y, max_z)),
-            "top": ((min_x, max_y, min_z), (max_x, max_y, min_z), (min_x, max_y, max_z)),
-            "front": ((min_x, min_y, min_z), (max_x, min_y, min_z), (min_x, max_y, min_z)),
-            "back": ((min_x, min_y, max_z), (max_x, min_y, max_z), (min_x, max_y, max_z))
+            "left": (glm.vec3(min_x, min_y, min_z), glm.vec3(min_x, max_y, min_z), glm.vec3(min_x, min_y, max_z)),
+            "right": (glm.vec3(max_x, min_y, min_z), glm.vec3(max_x, max_y, min_z), glm.vec3(max_x, min_y, max_z)),
+            "bottom": (glm.vec3(min_x, min_y, min_z), glm.vec3(max_x, min_y, min_z), glm.vec3(min_x, min_y, max_z)),
+            "top": (glm.vec3(min_x, max_y, min_z), glm.vec3(max_x, max_y, min_z), glm.vec3(min_x, max_y, max_z)),
+            "front": (glm.vec3(min_x, min_y, min_z), glm.vec3(max_x, min_y, min_z), glm.vec3(min_x, max_y, min_z)),
+            "back": (glm.vec3(min_x, min_y, max_z), glm.vec3(max_x, min_y, max_z), glm.vec3(min_x, max_y, max_z))
         }
 
-        # Check for overlap on each axis
-        if (min_px <= max_x and max_px >= min_x and
-                min_py <= max_y and max_py >= min_y and
-                min_pz <= max_z and max_pz >= min_z):
-
-            # Determine the nearest intersecting face
-            intersection_distances = {}
-
-            for face, vertices in faces.items():
-                point1, point2, point3 = vertices
-                distance = None
-                if face == "left":
-                    if min_py <= max_y and max_py >= min_y and min_pz <= max_z and max_pz >= min_z:
-                        distance = abs(min_px - min_x)
-                elif face == "right":
-                    if min_py <= max_y and max_py >= min_y and min_pz <= max_z and max_pz >= min_z:
-                        distance = abs(max_px - max_x)
-                elif face == "bottom":
-                    if min_px <= max_x and max_px >= min_x and min_pz <= max_z and max_pz >= min_z:
-                        distance = abs(min_py - min_y)
-                elif face == "top":
-                    if min_px <= max_x and max_px >= min_x and min_pz <= max_z and max_pz >= min_z:
-                        distance = abs(max_py - max_y)
-                elif face == "front":
-                    if min_px <= max_x and max_px >= min_x and min_py <= max_y and max_py >= min_y:
-                        distance = abs(min_pz - min_z)
-                elif face == "back":
-                    if min_px <= max_x and max_px >= min_x and min_py <= max_y and max_py >= min_y:
-                        distance = abs(max_pz - max_z)
-
-                if distance is not None:
-                    intersection_distances[face] = (distance, vertices)
-
-            if intersection_distances:
-                nearest_face = min(intersection_distances, key=lambda k: intersection_distances[k][0])
-                return True, nearest_face, intersection_distances[nearest_face][1]
+        for face, vertices in faces.items():
+            if self.line_intersects_plane(glm.vec3(start_pos), glm.vec3(end_pos), vertices):
+                return True, face, vertices
 
         return False, None, None
+
+    def line_intersects_plane(self, start, end, plane_vertices):
+        """
+        Check if a line segment intersects a plane and return the intersection point.
+        """
+        p0, p1, p2 = plane_vertices
+        plane_normal = glm.normalize(glm.cross(p1 - p0, p2 - p0))
+        plane_d = -glm.dot(plane_normal, p0)
+        line_dir = end - start
+        line_length = glm.length(line_dir)
+        line_dir = glm.normalize(line_dir)
+
+        denom = glm.dot(plane_normal, line_dir)
+        if abs(denom) < 1e-6:
+            return False  # No intersection, line is parallel to plane
+
+        t = -(glm.dot(plane_normal, start) + plane_d) / denom
+        if t < 0 or t > line_length:
+            return False  # No intersection within the segment
+
+        intersection_point = start + line_dir * t
+        if self.point_in_plane_bounds(intersection_point, plane_vertices):
+            return True
+
+        return False
+
+    def point_in_plane_bounds(self, point, plane_vertices):
+        """
+        Check if a point is within the bounds of the plane's rectangular area.
+        """
+        p0, p1, p2 = plane_vertices
+        u = p1 - p0
+        v = p2 - p0
+        w = point - p0
+
+        uu = glm.dot(u, u)
+        uv = glm.dot(u, v)
+        vv = glm.dot(v, v)
+        wu = glm.dot(w, u)
+        wv = glm.dot(w, v)
+
+        denom = uv * uv - uu * vv
+        if abs(denom) < 1e-6:
+            return False  # Degenerate plane
+
+        s = (uv * wv - vv * wu) / denom
+        t = (uv * wu - uu * wv) / denom
+
+        return (s >= 0) and (t >= 0) and (s + t <= 1)
+
+    def calculate_collision_point(self, start_pos, end_pos, plane_vertices):
+        """
+        Calculate the exact collision point using plane-line intersection.
+        """
+        p0, p1, p2 = plane_vertices
+        plane_normal = glm.normalize(glm.cross(p1 - p0, p2 - p0))
+        plane_d = -glm.dot(plane_normal, p0)
+        line_dir = end_pos - start_pos
+        line_length = glm.length(line_dir)
+        line_dir = glm.normalize(line_dir)
+
+        denom = glm.dot(plane_normal, line_dir)
+        t = -(glm.dot(plane_normal, start_pos) + plane_d) / denom
+
+        intersection_point = start_pos + line_dir * t
+        return intersection_point
 
     def apply_forces(self, delta_time: float):
         # Apply lateral thrust for movement
@@ -581,7 +596,7 @@ class Physics:
         print("player corrected velocity = ", glm.round(self.player.velocity))
         print("_______________________")
 
-    def update_physics(self, delta_time: float):
+    def update_physics(self, delta_time: float, weapons, player):
         # Apply forces to the player
         self.apply_forces(delta_time)
 
@@ -608,4 +623,38 @@ class Physics:
 
         # Reset inputs
         self.player.reset_thrust()
+        self.update_projectile_trajectory(delta_time=delta_time, weapons=weapons)
 
+    def update_projectile_trajectory(self, delta_time, weapons, gravity=10, air_density=1.3, time_to_live=1.0):
+        for weapon in weapons:
+            for trajectory in weapon.active_trajectories[:]:
+                elapsed_time = trajectory['elapsed_time'] + delta_time
+                velocity = trajectory['velocity']
+                position = trajectory['position']
+
+                # Calculate drag force
+                speed = glm.length(velocity) * weapon.bullet_velocity_modifier
+                epsilon = 1e-6
+                drag_force_magnitude = 0.5 * air_density * weapon.caliber.drag_coefficient * weapon.caliber.bullet_area * speed ** 2
+                drag_force = -drag_force_magnitude * (velocity / (speed + epsilon))
+
+                # Update velocity and position
+                acceleration = drag_force / weapon.caliber.mass
+                acceleration.y -= gravity
+                new_velocity = velocity + acceleration * delta_time
+                new_position = position + new_velocity * delta_time
+
+                # Check for collisions
+                trajectory['positions'].append(new_position)
+                trajectory['velocity'] = new_velocity
+                trajectory['position'] = new_position
+                trajectory['elapsed_time'] = elapsed_time
+                trajectory['dirty'] = True
+
+                collision_point = self.check_projectile_collision(trajectory['positions'])
+                if collision_point:
+                    print("Projectile collision detected at: ", collision_point)
+                    weapon.active_trajectories.remove(trajectory)
+                elif elapsed_time > time_to_live:
+                    print("Removing trajectory due to time expiration.")
+                    weapon.active_trajectories.remove(trajectory)

@@ -1,5 +1,7 @@
 import os
 from dataclasses import dataclass
+import random
+
 import numpy as np
 import glm
 from typing import List, Tuple
@@ -38,6 +40,7 @@ class Model:
                  roughness_override=None,
                  bump_scale_override=None):
 
+        self.impact = False
         self.script_dir = os.path.dirname(os.path.dirname(__file__))
 
         self.scale = scale
@@ -189,26 +192,104 @@ class Model:
         return materials
 
     def setup_buffers(self) -> Tuple[int, int, int]:
+        assert self.vertices is not None and len(self.vertices) > 0, "Vertices data should not be empty."
+        assert self.indices is not None and len(self.indices) > 0, "Indices data should not be empty."
+
         vao = glGenVertexArrays(1)
         glBindVertexArray(vao)
+
         vbo = glGenBuffers(1)
         glBindBuffer(GL_ARRAY_BUFFER, vbo)
         glBufferData(GL_ARRAY_BUFFER, self.vertices.nbytes, self.vertices, GL_STATIC_DRAW)
+
         ebo = glGenBuffers(1)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.indices.nbytes, self.indices, GL_STATIC_DRAW)
+
         stride = 6 * self.vertices.itemsize
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
         glEnableVertexAttribArray(0)
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(3 * self.vertices.itemsize))
         glEnableVertexAttribArray(1)
+
+        # Verify the buffer sizes
+        glBindBuffer(GL_ARRAY_BUFFER, vbo)
+        vbo_size = glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE)
+        assert vbo_size == self.vertices.nbytes, f"VBO size {vbo_size} does not match vertices data size {self.vertices.nbytes}."
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
+        ebo_size = glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE)
+        assert ebo_size == self.indices.nbytes, f"EBO size {ebo_size} does not match indices data size {self.indices.nbytes}."
+
         glBindVertexArray(0)
+
         return vao, vbo, ebo
 
+    def update_buffers(self, vao: int, vbo: int, ebo: int) -> None:
+        def check_gl_error():
+            error = glGetError()
+            if error != GL_NO_ERROR:
+                print(f"OpenGL error: {error}")
+                assert error == GL_NO_ERROR, f"OpenGL error occurred: {error}"
+
+        print("Updating buffers...")
+        print(f"Vertices size: {self.vertices.nbytes}")
+        print(f"Indices size: {self.indices.nbytes}")
+
+        assert self.vertices is not None and len(self.vertices) > 0, "Vertices data should not be empty."
+        assert self.indices is not None and len(self.indices) > 0, "Indices data should not be empty."
+
+        glBindVertexArray(vao)
+        check_gl_error()
+
+        glBindBuffer(GL_ARRAY_BUFFER, vbo)
+        check_gl_error()
+        glBufferData(GL_ARRAY_BUFFER, self.vertices.nbytes, self.vertices, GL_STATIC_DRAW)
+        check_gl_error()
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
+        check_gl_error()
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, self.indices.nbytes, self.indices, GL_STATIC_DRAW)
+        check_gl_error()
+
+        stride = 6 * self.vertices.itemsize
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(0))
+        check_gl_error()
+        glEnableVertexAttribArray(0)
+        check_gl_error()
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, ctypes.c_void_p(3 * self.vertices.itemsize))
+        check_gl_error()
+        glEnableVertexAttribArray(1)
+        check_gl_error()
+
+        glBindVertexArray(0)
+        check_gl_error()
+
+        # Verify the buffer sizes
+        glBindBuffer(GL_ARRAY_BUFFER, vbo)
+        vbo_size = glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE)
+        assert vbo_size == self.vertices.nbytes, f"VBO size {vbo_size} does not match vertices data size {self.vertices.nbytes}."
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
+        ebo_size = glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE)
+        assert ebo_size == self.indices.nbytes, f"EBO size {ebo_size} does not match indices data size {self.indices.nbytes}."
+
+        print(self.name, "vao = ", self.vao, " vbo = ", self.vbo, " ebo = ", self.ebo)
+
+
     def draw(self, camera=None):
+        assert self.vao is not None, "VAO should not be None."
+        assert len(self.indices) > 0, "Indices should not be empty."
+
         glBindVertexArray(self.vao)
         glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, None)
         glBindVertexArray(0)
+
+        # Check for OpenGL errors
+        error = glGetError()
+        if error != GL_NO_ERROR:
+            print(f"OpenGL error during draw: {error}")
+            assert error == GL_NO_ERROR, f"OpenGL error occurred during draw: {error}"
 
     def set_scale(self, scale):
         print("setting scale for ", self.name, " to ", scale)
@@ -361,5 +442,84 @@ class Model:
         shader.set_uniform3f("specularColor", glm.vec3(*self.default_material['specular']))
         shader.set_uniform1f("shininess", self.default_material['shininess'])
         shader.set_roughness(self.default_material['roughness'])
+
+    def add_crater(self, impact_point, crater_radius, crater_depth):
+        self.impact = True
+        vertices_2d = self.vertices.reshape(-1, 3)
+
+        print("Vertices before crater addition:")
+        print(vertices_2d)
+
+        num_crater_vertices = 12
+        angle_step = 360.0 / num_crater_vertices
+
+        crater_vertices = []
+        for i in range(num_crater_vertices):
+            angle = i * angle_step
+            radian = glm.radians(angle)
+            x = impact_point.x + crater_radius * random.uniform(0.8, 1.2) * glm.cos(radian)
+            y = impact_point.y + crater_radius * random.uniform(0.8, 1.2) * glm.sin(radian)
+            z = impact_point.z - random.uniform(crater_depth * 0.8, crater_depth * 1.2)
+            crater_vertices.append([x, y, z])
+
+        crater_center = [impact_point.x, impact_point.y, impact_point.z - crater_depth]
+        crater_vertices.append(crater_center)
+
+        crater_vertices = np.array(crater_vertices)
+        vertices_2d = np.vstack((vertices_2d, crater_vertices))
+
+        print("Crater vertices:")
+        print(crater_vertices)
+
+        self.vertices = vertices_2d.reshape(-1)
+
+        print("Vertices after crater addition:")
+        print(vertices_2d)
+
+        crater_start_index = len(vertices_2d) - len(crater_vertices)
+        crater_center_index = crater_start_index + num_crater_vertices
+        crater_faces = []
+        for i in range(num_crater_vertices):
+            next_index = crater_start_index + (i + 1) % num_crater_vertices
+            current_index = crater_start_index + i
+            crater_faces.append([current_index, next_index, crater_center_index])
+
+        crater_faces = np.array(crater_faces)
+
+        print("Crater faces:")
+        print(crater_faces)
+
+        assert self.indices is not None, "Indices data should not be None."
+
+        if self.indices.ndim == 1:
+            assert self.indices.size % 3 == 0, "Indices size is not a multiple of 3 and cannot be reshaped."
+            self.indices = self.indices.reshape(-1, 3)
+
+        print("Indices before vstack:")
+        print(self.indices)
+
+        if self.indices.size == 0:
+            print("Warning: self.indices is empty or not initialized. Initializing with crater_faces.")
+            self.indices = crater_faces
+        else:
+            if crater_faces.shape[1] < self.indices.shape[1]:
+                extra_columns = self.indices.shape[1] - crater_faces.shape[1]
+                extra_data = np.zeros((crater_faces.shape[0], extra_columns), dtype=crater_faces.dtype)
+                crater_faces = np.hstack((crater_faces, extra_data))
+            elif crater_faces.shape[1] > self.indices.shape[1]:
+                extra_columns = crater_faces.shape[1] - self.indices.shape[1]
+                extra_data = np.zeros((self.indices.shape[0], extra_columns), dtype=self.indices.dtype)
+                self.indices = np.hstack((self.indices, extra_data))
+
+            self.indices = np.vstack((self.indices, crater_faces))
+
+        print("Indices after vstack:")
+        print(self.indices)
+
+        assert self.vertices.size % 3 == 0, "Vertices size is not a multiple of 3 after crater addition."
+        assert self.indices.size % 3 == 0, "Indices size is not a multiple of 3 after crater addition."
+
+        self.update_buffers(self.vao, self.vbo, self.ebo)
+
 
 

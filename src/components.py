@@ -1,5 +1,6 @@
 import os
 
+from src.caliber import Caliber
 from src.camera import Camera
 from src.model import Model
 from src.shader import Shader
@@ -7,6 +8,7 @@ from src.player import Player
 from src.renderer import Renderer
 from src.input_handler import InputHandler
 from src.physics import Physics
+from src.weapon import Weapon
 from text_renderer import TextRenderer
 import glm
 from src.world import World
@@ -39,6 +41,7 @@ class Components:
         self.shader = None
         self.renderer = None
         self.interactables = []
+        self.weapons = []
 
     def initialize_gameplay_components(self):
 
@@ -52,11 +55,11 @@ class Components:
 
         # Define object attributes for multiple objects
         world_objects = [
-            ObjectAttributes(get_relative_path("res/cube.obj"), get_relative_path("res/cube.mtl"),
-                             (-45.0, 45.0, 45.0), (-70.0, 0.0, 50.0),
+            ObjectAttributes(get_relative_path("res/donut.obj"), get_relative_path("res/cube.mtl"),
+                             (-45.0, 45.0, 45.0), (-50.0, 5.0, 0.0),
                              MaterialOverride(None, glm.vec3(1, 1, 0), 1000.0)),
             ObjectAttributes(get_relative_path("res/cube.obj"), get_relative_path("res/cube.mtl"),
-                             (-45.0, 45.0, 45.0), (20.0, 0.0, -50.0),
+                             (-45.0, 45.0, 45.0), (50.0, 5.0, -5.0),
                              MaterialOverride(None, glm.vec3(0, 1, 0), 1000.0))
         ]
 
@@ -67,16 +70,23 @@ class Components:
         material_overrides = [attr.material_override for attr in world_objects]
         scales = [attr.scale for attr in world_objects]
 
-        deagle = InteractableObject(filepath=get_relative_path("res/deagle_main.obj"),
-                                    mtl_filepath=get_relative_path("res/deagle_main.mtl"),
-                                    translation=glm.vec3(0,0,0),#(3.0, 2.0, -3.0),
-                                    rotation=glm.vec3(0, 0, 0),
-                                    scale=1,
-                                    is_collidable=False,
-                                    material_overrides=MaterialOverride(None, glm.vec3(1, 1, 1), 500),
-                                    use_composite=True,
-                                    shift_to_centroid=False
-                                    )
+        fifty_ae = Caliber(initial_velocity=470,mass=0.02,drag_coefficient=0.5, bullet_area=0.000127)
+
+        deagle = Weapon(
+            fire_rate=1,
+            bullet_velocity_modifier=1,
+            caliber=fifty_ae,
+            filepath=get_relative_path("res/deagle_main.obj"),
+            mtl_filepath=get_relative_path("res/deagle_main.mtl"),
+            translation=glm.vec3(0, 0, 0),  # (3.0, 2.0, -3.0),
+            rotation=glm.vec3(0, 0, 0),
+            scale=1,  # TODO: Scaling doesn't work as expected between root and child
+            is_collidable=False,
+            material_overrides=MaterialOverride(None, glm.vec3(1, 1, 1), 500),
+            use_composite=True,
+            shift_to_centroid=False
+        )
+
         deagle_slide = Model(filepath=get_relative_path("res/deagle_slide.obj"),
                              mtl_filepath=get_relative_path("res/deagle_slide.mtl"),
                              shift_to_centroid=False,
@@ -85,14 +95,16 @@ class Components:
                               relative_position=glm.vec3(0.0, 0.0, 0.0),
                               relative_rotation=glm.vec3(0.0, 0.0, 0.0))
 
-        test_cube_interactable = InteractableObject(filepath=get_relative_path("res/cube.obj"),
-                                                    mtl_filepath=get_relative_path("res/cube.mtl"),
+        test_cube_interactable = InteractableObject(filepath=get_relative_path("res/10cube.obj"),
+                                                    mtl_filepath=get_relative_path("res/10cube.mtl"),
                                                     use_composite=False,
                                                     shift_to_centroid=False,
-                                                    translation=glm.vec3(20,1,-10))
+                                                    translation=glm.vec3(20,5,-20))
 
-        self.interactables = [deagle, test_cube_interactable]
-        self.world = World("world2")
+         # TODO: Events are only polled for the first interactable in the list ???
+        self.add_interactable(deagle)
+        self.add_interactable(test_cube_interactable)
+        self.world = World("world4",air_density=1.3)
         self.world_objects = WorldObjects(filepaths,
                                           mtl_filepaths,
                                           rotations,
@@ -130,11 +142,17 @@ class Components:
         self.shader = Shader(get_relative_path("shaders/vertex_shader.glsl"), get_relative_path("shaders/fragment_shader.glsl"))
         print("Shader initialized")
 
-        self.renderer = Renderer(self.shader, self.camera)
+        self.renderer = Renderer(self.shader, self.camera, self.weapons)
         print("Renderer initialized")
 
+        # TESTING
+        #print("vertices before add_crater:\n", test_cube_interactable.vertices)
+        #test_cube_interactable.add_crater(glm.vec3(1.5,1.5,1.5),0.1,0.1)
+        #print("vertices after add_crater:\n", test_cube_interactable.vertices)
+        # --//--
+
     def set_input_callbacks(self):
-        self.window.set_callbacks(self.input_handler.key_callback, self.input_handler.mouse_callback)
+        self.window.set_callbacks(self.input_handler.key_callback, self.input_handler.mouse_callback, self.input_handler.mouse_button_callback)
 
     def update_components(self, delta_time: float):
         self.world_objects.update(delta_time)
@@ -144,6 +162,13 @@ class Components:
     def add_interactable(self, interactable_object):
         self.interactables.append(interactable_object)
         self.models.append(interactable_object)
+
+        if isinstance(interactable_object, Weapon):
+            self.add_weapon(interactable_object)
+
+
+    def add_weapon(self, weapon):
+        self.weapons.append(weapon)
 
     def get_relative_path(self, relative_path):
         return os.path.join(self.script_dir, relative_path)

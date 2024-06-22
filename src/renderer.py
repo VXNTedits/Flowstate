@@ -16,16 +16,12 @@ from opensimplex import OpenSimplex
 
 
 class Renderer:
-    def __init__(self, shader, camera):
+    def __init__(self, shader, camera, weapons):
         # Initialization of light properties
         # These lights will be used for various shading and rendering techniques
         print("Initialization of light properties...")
         self.exposure = 1.0
-        # self.light_positions = [
-        #     glm.vec3(20.2, 50.0, 2.0),
-        #     glm.vec3(10.2, 50.0, 22.0),
-        #     glm.vec3(0.0, 50.0, -20.0)
-        # ]
+
         self.light_positions = [
             glm.vec3(50.2, 10.0, 2.0),
             glm.vec3(10.2, 20.0, 2.0),
@@ -80,6 +76,7 @@ class Renderer:
                                                          "shaders/composite_fragment.glsl")
         self.procedural_shader = ShaderManager.get_shader("shaders/procedural_vertex.glsl",
                                                           "shaders/procedural_fragment.glsl")
+        self.quad_shader = ShaderManager.get_shader("shaders/quad_vertex.glsl", "shaders/quad_fragment.glsl")
 
         # Set up the offscreen buffer for shader compositing
         print("Set up the offscreen buffer for shader compositing...")
@@ -121,6 +118,13 @@ class Renderer:
 
         # Set up the vertex array and buffer objects for rendering a quad
         self.setup_quad()
+
+        print("Initialize projectile buffers...")
+        # Initialize projectile buffers
+        self.projectile_vao = glGenVertexArrays(1)
+        self.projectile_vbo = glGenBuffers(1)
+        self.init_projectile_buffers()
+        self.weapons = weapons
 
     def setup_volume_texture(self):
         # Create an empty 3D texture
@@ -214,21 +218,8 @@ class Renderer:
         self.light_space_matrix = light_proj * light_view
         return self.light_space_matrix
 
-    def render(self, player_object, world, interactables, view_matrix, projection_matrix, delta_time):
+    def render(self, player_object, world, interactables, world_objects, view_matrix, projection_matrix, delta_time):
         """Main rendering pipeline"""
-
-        def check_gl_state():
-            depth_test_enabled = glIsEnabled(GL_DEPTH_TEST)
-            blend_enabled = glIsEnabled(GL_BLEND)
-            depth_func = glGetIntegerv(GL_DEPTH_FUNC)
-            blend_src = glGetIntegerv(GL_BLEND_SRC)
-            blend_dst = glGetIntegerv(GL_BLEND_DST)
-
-            #print(f"GL_DEPTH_TEST: {'ENABLED' if depth_test_enabled else 'DISABLED'}")
-            #print(f"GL_BLEND: {'ENABLED' if blend_enabled else 'DISABLED'}")
-            #print(f"GL_DEPTH_FUNC: {depth_func}")
-            #print(f"GL_BLEND_SRC: {blend_src}")
-            #print(f"GL_BLEND_DST: {blend_dst}")
 
         # 1. Render the depth map
         self.shadow_shader.use()
@@ -241,11 +232,18 @@ class Renderer:
         assert not glIsEnabled(GL_BLEND), "GL_BLEND should be disabled after depth map rendering"
         assert glIsEnabled(GL_DEPTH_TEST), "GL_DEPTH_TEST should be enabled after depth map rendering"
         #print("Step 1: Depth map rendering complete.")
-        check_gl_state()
 
         # 2. Render the scene to the framebuffer
-        self.render_scene_to_fbo(self.shader, player_object, world, interactables, self.light_space_matrix, view_matrix,
-                                 projection_matrix, enable_bump_mapping=False, bump_scale=5)
+        self.render_scene_to_fbo(shader=self.shader,
+                                 player_object=player_object,
+                                 world=world,
+                                 interactables=interactables,
+                                 world_objects=world_objects,
+                                 light_space_matrix=self.light_space_matrix,
+                                 view_matrix=view_matrix,
+                                 projection_matrix=projection_matrix,
+                                 enable_bump_mapping=False,
+                                 bump_scale=5)
 
         # 3. Render volumetric effects to the framebuffer
         self.render_volumetric_effects_to_fbo(view_matrix,
@@ -267,7 +265,7 @@ class Renderer:
         assert not glIsEnabled(GL_BLEND), "GL_BLEND should be disabled for future operations"
         assert glIsEnabled(GL_DEPTH_TEST), "GL_DEPTH_TEST should be enabled for future operations"
         #print("Final frame compositing complete.")
-        check_gl_state()
+
 
         self.log_memory_usage()
 
@@ -285,18 +283,22 @@ class Renderer:
             self.emissive_shader.set_uniform3f("lightColor", color)
             self.render_light_object(size=3)
 
-    def render_scene(self, shader, player_object, world, interactables, light_space_matrix, view_matrix,
+    def render_scene(self, shader, player_object, world, world_objects, interactables, light_space_matrix, view_matrix,
                      projection_matrix, enable_bump_mapping=False, bump_scale=0.0):
         shader.use()
         shader.set_uniform_matrix4fv("lightSpaceMatrix", light_space_matrix)
-        self.shader.set_uniform_bool("enableBumpMapping", enable_bump_mapping)
+        shader.set_uniform_bool("enableBumpMapping", enable_bump_mapping)
 
         # Render interactables
         for interactable in interactables:
             for mod, pos, dir in interactable.models:
                 model_matrix = mod.model_matrix
                 self.update_uniforms(model_matrix, view_matrix, projection_matrix, mod)
+
+                # Set the model matrix uniform
                 shader.set_uniform_matrix4fv("model", model_matrix)
+
+                # Draw the model
                 mod.draw()
 
         # Render player
@@ -306,14 +308,49 @@ class Renderer:
             shader.set_uniform_matrix4fv("model", model_matrix)
             player_object.draw(self.camera)
 
+
         # Render world
-        self.shader.set_bump_scale(bump_scale)
+        model_loc = glGetUniformLocation(shader.program, "model")
+        view_loc = glGetUniformLocation(shader.program, "view")
+        projection_loc = glGetUniformLocation(shader.program, "projection")
+        impact_point_loc = glGetUniformLocation(shader.program, "impactPoint")
+        crater_radius_loc = glGetUniformLocation(shader.program, "craterRadius")
+        crater_depth_loc = glGetUniformLocation(shader.program, "craterDepth")
+
+        # Set the view and projection matrices once per frame
+        glUniformMatrix4fv(view_loc, 1, GL_FALSE, glm.value_ptr(view_matrix))
+        glUniformMatrix4fv(projection_loc, 1, GL_FALSE, glm.value_ptr(projection_matrix))
+
+        shader.set_bump_scale(bump_scale)
         for obj in world.get_world_objects():
             model_matrix = obj.model_matrix
             if view_matrix and projection_matrix:
                 self.update_uniforms(model_matrix, view_matrix, projection_matrix, obj)
-                shader.set_uniform_matrix4fv("model", model_matrix)
+                glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm.value_ptr(model_matrix))
+
+                # If an impact has occurred, update the impact-related uniforms
+                if hasattr(obj, 'impact') and obj.impact:
+                    impact_point = obj.impact_point  # Assuming this attribute is set when an impact occurs
+                    crater_radius = obj.crater_radius  # Example value, set appropriately
+                    crater_depth = obj.crater_depth  # Example value, set appropriately
+
+                    glUniform3fv(impact_point_loc, 1, glm.value_ptr(impact_point))
+                    glUniform1f(crater_radius_loc, crater_radius)
+                    glUniform1f(crater_depth_loc, crater_depth)
+
                 obj.draw()
+
+        # Render world objects
+        for wobj in world_objects:
+            self.update_uniforms(model_matrix, view_matrix, projection_matrix, wobj)
+            shader.set_uniform_matrix4fv("model", model_matrix)
+            wobj.draw()
+
+        # Render tracers
+        for weapon in self.weapons:
+            self.draw_projectiles(weapon.active_trajectories)
+
+
 
     def render_world(self, shader, player_object, world, interactables, light_space_matrix, view_matrix=None,
                      projection_matrix=None):
@@ -760,7 +797,7 @@ class Renderer:
         print("draw_offscreen_texture complete.")
         self.check_gl_state()
 
-    def render_scene_to_fbo(self, shader, player_object, world, interactables, light_space_matrix,
+    def render_scene_to_fbo(self, shader, player_object, world, world_objects, interactables, light_space_matrix,
                             view_matrix, projection_matrix, enable_bump_mapping=False, bump_scale=0.0):
         glBindFramebuffer(GL_FRAMEBUFFER, self.scene_fbo)
         glViewport(0, 0, 800, 600)
@@ -783,7 +820,7 @@ class Renderer:
         self.shader.set_roughness(0.1)
 
         self.render_lights(self.light_positions, self.light_colors, view_matrix, projection_matrix)
-        self.render_scene(shader, player_object, world, interactables, light_space_matrix,
+        self.render_scene(shader, player_object, world, world_objects, interactables, light_space_matrix,
                           view_matrix, projection_matrix, enable_bump_mapping, bump_scale)
         self.check_opengl_error()
 
@@ -964,3 +1001,34 @@ class Renderer:
         glEnable(GL_DEPTH_TEST)
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+    def init_projectile_buffers(self):
+        self.projectile_vao = glGenVertexArrays(1)
+        self.projectile_vbo = glGenBuffers(1)
+        glBindVertexArray(self.projectile_vao)
+        glBindBuffer(GL_ARRAY_BUFFER, self.projectile_vbo)
+        # Assume a maximum of 10,000 points for projectile trajectories
+        glBufferData(GL_ARRAY_BUFFER, 30000 * sizeof(GLfloat), None, GL_DYNAMIC_DRAW)  # 3 floats per point, hence 30000
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, None)
+        glEnableVertexAttribArray(0)
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindVertexArray(0)
+
+    def draw_projectiles(self, trajectories):
+        glDisable(GL_DEPTH_TEST)
+        self.shader.use()
+        glBindVertexArray(self.projectile_vao)
+        glBindBuffer(GL_ARRAY_BUFFER, self.projectile_vbo)
+
+        for trajectory in trajectories:
+            if trajectory['dirty']:  # Access 'dirty' as a dictionary key
+                projectile_positions = np.array([[p.x, p.y, p.z] for p in trajectory['positions']], dtype=np.float32)
+                # Only update the buffer data that's needed
+                glBufferSubData(GL_ARRAY_BUFFER, 0, projectile_positions.nbytes, projectile_positions.flatten())
+                trajectory['dirty'] = False  # Reset dirty flag
+
+            glDrawArrays(GL_LINE_STRIP, 0, len(trajectory['positions']))
+
+        glBindVertexArray(0)
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glEnable(GL_DEPTH_TEST)

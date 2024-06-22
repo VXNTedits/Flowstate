@@ -28,9 +28,10 @@ class Window:
 
         glfw.make_context_current(self.window)
 
-    def set_callbacks(self, key_callback, mouse_callback):
+    def set_callbacks(self, key_callback, mouse_callback, mouse_button_callback):
         glfw.set_key_callback(self.window, key_callback)
         glfw.set_cursor_pos_callback(self.window, mouse_callback)
+        glfw.set_mouse_button_callback(self.window, mouse_button_callback)
         glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_DISABLED)
 
     def should_close(self):

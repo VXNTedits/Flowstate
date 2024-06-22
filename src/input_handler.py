@@ -47,9 +47,13 @@ class InputHandler:
         if button == glfw.MOUSE_BUTTON_LEFT:
             if action == glfw.PRESS:
                 self.left_mouse_button_pressed = True
-                self.player.handle_left_click()
+                self.player.handle_left_click(self.left_mouse_button_pressed)
             elif action == glfw.RELEASE:
                 self.left_mouse_button_pressed = False
+                self.player.handle_left_click(self.left_mouse_button_pressed)
+
+    def is_left_mouse_button_pressed(self):
+        return self.left_mouse_button_pressed
 
     def process_input(self, player, delta_time):
         directions = []
