@@ -6,6 +6,7 @@ import numpy as np
 import glm
 from typing import List, Tuple
 from OpenGL.GL import *
+from utils.file_utils import get_relative_path
 
 
 @dataclass
@@ -105,9 +106,6 @@ class Model:
         if bump_scale_override is not None:
             self.materials['bumpScale'] = bump_scale_override
 
-    def get_relative_path(self, relative_path):
-        return os.path.join(self.script_dir, relative_path)
-
     def calculate_centroid(self):
         transformed_vertices = []
         for i in range(0, len(self.vertices), 6):
@@ -125,7 +123,7 @@ class Model:
         return glm.vec3(centroid_x, centroid_y, centroid_z)
 
     def load_obj(self, relative_filepath: str, shift_to_centroid=False) -> Tuple[np.ndarray, np.ndarray]:
-        filepath = self.get_relative_path(relative_filepath)
+        filepath = get_relative_path(relative_filepath)
         vertices = []
         normals = []
         faces = []

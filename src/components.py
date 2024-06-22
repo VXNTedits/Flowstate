@@ -14,6 +14,7 @@ import glm
 from src.world import World
 from src.world_objects import WorldObjects, MaterialOverride
 from src.interactable import InteractableObject
+from utils.file_utils import get_relative_path
 
 
 class ObjectAttributes:
@@ -44,12 +45,6 @@ class Components:
         self.weapons = []
 
     def initialize_gameplay_components(self):
-
-        script_dir = os.path.dirname(os.path.dirname(__file__))
-
-        def get_relative_path(relative_path):
-            print("os.path.join(script_dir, relative_path):",os.path.join(script_dir, relative_path))
-            return os.path.join(script_dir, relative_path)
 
         self.camera = Camera(glm.vec3(0.0, 0.0, 0.0), glm.vec3(0.0, 1.0, 0.0))
 
@@ -141,7 +136,7 @@ class Components:
 
         self.input_handler = InputHandler(self.camera, self.player, self.physics)
         print("Input handler initialized")
-
+        print(get_relative_path(("shaders/vertex_shader.glsl")))
         self.shader = Shader(get_relative_path("shaders/vertex_shader.glsl"), get_relative_path("shaders/fragment_shader.glsl"))
         print("Shader initialized")
 
@@ -172,6 +167,3 @@ class Components:
 
     def add_weapon(self, weapon):
         self.weapons.append(weapon)
-
-    def get_relative_path(self, relative_path):
-        return os.path.join(self.script_dir, relative_path)

@@ -2,7 +2,7 @@ import os
 
 import glm
 from OpenGL.GL import *
-
+from utils.file_utils import *
 
 class ShaderManager:
     _instances = {}
@@ -19,12 +19,10 @@ class Shader:
     current_program = None
 
     def __init__(self, vertex_path, fragment_path):
-        self.script_dir = os.path.dirname(os.path.dirname(__file__))
         self.name = vertex_path.split('/')[-1]
-        self.vertex_path = self.get_relative_path(vertex_path)
-        self.fragment_path = self.get_relative_path(fragment_path)
-        self.program = self.create_shader_program(vertex_path, fragment_path)
-
+        self.vertex_path = get_relative_path(vertex_path)
+        self.fragment_path = get_relative_path(fragment_path)
+        self.program = self.create_shader_program(self.vertex_path, self.fragment_path)
 
     def load_shader_code(self, path):
         with open(path, 'r') as file:
@@ -133,6 +131,3 @@ class Shader:
 
     def set_roughness(self, value: float):
         self.set_uniform1f("roughness", value)
-
-    def get_relative_path(self, relative_path):
-        return os.path.join(self.script_dir, relative_path)

@@ -3,6 +3,7 @@ import os
 from src.model import Model
 from dataclasses import dataclass
 import glm
+from utils.file_utils import get_relative_path
 
 @dataclass
 class MaterialOverride:
@@ -13,10 +14,6 @@ class MaterialOverride:
 class WorldObjects:
     def __init__(self, filepaths: list, mtl_filepaths: list, rotations: list, translations: list, material_overrides: list, scales: list):
         self.models = []
-        script_dir = os.path.dirname(os.path.dirname(__file__))
-
-        def get_relative_path(relative_path):
-            return os.path.join(script_dir, relative_path)
 
         for i in range(len(filepaths)):
             material_override = material_overrides[i]
