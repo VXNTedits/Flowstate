@@ -61,7 +61,7 @@
 //    FragColor = accumulatedColor;
 //}
 
-#version 330 core
+#version 430 core
 in vec2 TexCoords; // Input texture coordinates from the vertex shader
 out vec4 FragColor; // Output fragment color
 

@@ -1,4 +1,4 @@
-#version 330 core
+#version 430 core
 
 #define NUM_LIGHTS 3  // Move this line to the top
 

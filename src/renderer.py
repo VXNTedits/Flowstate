@@ -17,6 +17,7 @@ from opensimplex import OpenSimplex
 import ctypes
 from OpenGL.GL import *
 
+
 class Renderer:
     def __init__(self, shader, camera, weapons):
         # Initialization of light properties
@@ -65,21 +66,28 @@ class Renderer:
 
         # Load and compile shaders from ShaderManager
         print("Load and compile shaders from ShaderManager...")
-        self.depth_shader = ShaderManager.get_shader('shaders/depth_vertex.glsl', 'shaders/depth_fragment.glsl')
-        self.shadow_shader = ShaderManager.get_shader('shaders/shadow_vertex.glsl', 'shaders/shadow_fragment.glsl')
-        self.shader = ShaderManager.get_shader('shaders/vertex_shader.glsl', 'shaders/fragment_shader.glsl')
+        self.depth_shader = ShaderManager.get_shader('shaders/depth_vertex.glsl',
+                                                     'shaders/depth_fragment.glsl')
+        self.shadow_shader = ShaderManager.get_shader('shaders/shadow_vertex.glsl',
+                                                      'shaders/shadow_fragment.glsl')
+        self.shader = ShaderManager.get_shader('shaders/vertex_shader.glsl',
+                                               'shaders/fragment_shader.glsl')
         self.volumetric_shader = ShaderManager.get_shader('shaders/volumetric_vertex.glsl',
                                                           'shaders/volumetric_fragment.glsl')
         self.emissive_shader = ShaderManager.get_shader('shaders/emissive_vertex.glsl',
                                                         'shaders/emissive_fragment.glsl')
-        self.debug_depth_shader = ShaderManager.get_shader("shaders/debug_vertex.glsl", "shaders/debug_fragment.glsl")
-        self.screen_shader = ShaderManager.get_shader("shaders/screen_vertex.glsl", "shaders/screen_fragment.glsl")
+        self.debug_depth_shader = ShaderManager.get_shader("shaders/debug_vertex.glsl",
+                                                           "shaders/debug_fragment.glsl")
+        self.screen_shader = ShaderManager.get_shader("shaders/screen_vertex.glsl",
+                                                      "shaders/screen_fragment.glsl")
         self.composite_shader = ShaderManager.get_shader("shaders/composite_vertex.glsl",
                                                          "shaders/composite_fragment.glsl")
         self.procedural_shader = ShaderManager.get_shader("shaders/procedural_vertex.glsl",
                                                           "shaders/procedural_fragment.glsl")
-        self.quad_shader = ShaderManager.get_shader("shaders/quad_vertex.glsl", "shaders/quad_fragment.glsl")
-        self.tracer_shader = ShaderManager.get_shader("shaders/tracer_vertex.glsl", "shaders/tracer_fragment.glsl")
+        self.quad_shader = ShaderManager.get_shader("shaders/quad_vertex.glsl",
+                                                    "shaders/quad_fragment.glsl")
+        self.tracer_shader = ShaderManager.get_shader("shaders/tracer_vertex.glsl",
+                                                      "shaders/tracer_fragment.glsl", use_glsl_430=False)
 
         # Set up the offscreen buffer for shader compositing
         print("Set up the offscreen buffer for shader compositing...")
@@ -251,11 +259,7 @@ class Renderer:
         glEnable(GL_DEPTH_TEST)
         assert glIsEnabled(GL_DEPTH_TEST), "GL_DEPTH_TEST should be enabled for future operations"
 
-        # 3. Render tracers before volumetric effects
-        # for weapon in self.weapons:
-        #    self.draw_tracers(tracers=weapon.tracers, view_matrix=view_matrix, projection_matrix=projection_matrix)
-
-        # 4. Render volumetric effects to the framebuffer
+        # 3. Render volumetric effects to the framebuffer
         self.render_volumetric_effects_to_fbo(view_matrix,
                                               projection_matrix,
                                               glow_intensity=100.1,
@@ -351,6 +355,8 @@ class Renderer:
             self.update_uniforms(model_matrix, view_matrix, projection_matrix, wobj)
             shader.set_uniform_matrix4fv("model", model_matrix)
             wobj.draw()
+
+
 
     def render_world(self, shader, player_object, world, interactables, light_space_matrix, view_matrix=None,
                      projection_matrix=None):
@@ -828,6 +834,8 @@ class Renderer:
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
+
+
     def render_volumetric_effects_to_fbo(self, view_matrix, projection_matrix, glow_intensity, scattering_factor,
                                          glow_falloff, god_ray_intensity, god_ray_decay, god_ray_sharpness):
         glBindFramebuffer(GL_FRAMEBUFFER, self.volumetric_fbo)
@@ -892,7 +900,6 @@ class Renderer:
         glBindVertexArray(self.quadVAO)
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
         glBindVertexArray(0)
-
 
     def check_gl_state(self):
         depth_test_enabled = glIsEnabled(GL_DEPTH_TEST)
@@ -1018,42 +1025,113 @@ class Renderer:
             raise RuntimeError(f"OpenGL error during buffer initialization: {gluErrorString(error).decode()}")
 
     def draw_tracers(self, tracers, view_matrix, projection_matrix):
+        if len(tracers) > 0:
+            self.tracer_shader.use()
+
+            # Set the tracers and trajectories using SSBOs
+            #self.tracer_shader.set_tracers_uniform(tracers)
+
+            glDisable(GL_DEPTH_TEST)
+            glEnable(GL_BLEND)
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+            #self.tracer_shader.set_uniform_matrix4fv("view", view_matrix)
+            #self.tracer_shader.set_uniform_matrix4fv("projection", projection_matrix)
+            #self.tracer_shader.set_uniform3fv("viewPos", self.camera.position)
+            #self.tracer_shader.set_uniform3fvec("tracerColor", [1.0, 1.0, 1.0])
+
+            num_tracers = len(tracers)
+            #print("num_tracers = ", num_tracers)
+            #self.tracer_shader.set_uniform1i("numTracers", num_tracers)
+
+            # Calculate the total number of vertices
+            total_vertices = sum(len(tracer) * 2 for tracer in tracers)
+            #print("total vertices = ", total_vertices)
+            # Bind the VAO and VBO for drawing
+            glBindVertexArray(self.projectile_vao)
+            glBindBuffer(GL_ARRAY_BUFFER, self.projectile_vbo)
+            glLineWidth(5.0)
+
+            # Perform the draw call
+            glDrawArrays(GL_LINE_STRIP, 0, total_vertices)
+
+            # Unbind the VAO and VBO
+            glBindVertexArray(0)
+            glBindBuffer(GL_ARRAY_BUFFER, 0)
+
+            glEnable(GL_DEPTH_TEST)
+            glDisable(GL_BLEND)
+            glLineWidth(1.0)
+
+            error = glGetError()
+            if error != GL_NO_ERROR:
+                print(f"OpenGL error after drawing tracers: {gluErrorString(error).decode()}")
+
+    def debug_render(self):
+        # Create and bind the Vertex Array Object (VAO)
+        vao = glGenVertexArrays(1)
+        glBindVertexArray(vao)
+
+        # Create and bind the Vertex Buffer Object (VBO)
+        vbo = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo)
+
+        # Define the vertex data for a triangle
+        vertices = np.array([
+            -0.5, -0.5, 0.0,  # Vertex 1: x, y, z
+            0.5, -0.5, 0.0,  # Vertex 2: x, y, z
+            0.0, 0.5, 0.0  # Vertex 3: x, y, z
+        ], dtype=np.float32)
+
+        # Upload the vertex data to the GPU
+        glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * vertices.itemsize, ctypes.c_void_p(0))
+        glEnableVertexAttribArray(0)
+
+        # Unbind the VBO and VAO
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindVertexArray(0)
+
+        # Set up the Shader Storage Buffer Object (SSBO) with colors for each vertex
+        colors_data = np.array([
+            [1.0, 0.0, 0.0, 1.0],  # Color for Vertex 1: Red
+            [0.0, 1.0, 0.0, 1.0],  # Color for Vertex 2: Green
+            [0.0, 0.0, 1.0, 1.0],  # Color for Vertex 3: Blue
+        ], dtype=np.float32)
+        self.ssbo = self.set_ssbo(0, colors_data)
+
+        # Clear the screen
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+        # Use the shader program
         self.tracer_shader.use()
 
-        glDisable(GL_DEPTH_TEST)
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        # Bind the SSBO
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, self.ssbo)
 
-        self.tracer_shader.set_uniform_matrix4fv("model", glm.mat4(1.0))
-        self.tracer_shader.set_uniform_matrix4fv("view", view_matrix)
-        self.tracer_shader.set_uniform_matrix4fv("projection", projection_matrix)
-        self.tracer_shader.set_uniform3fv("viewPos", self.camera.position)
+        # Bind the VAO
+        glBindVertexArray(vao)
 
-        num_tracers = len(tracers)
-        self.tracer_shader.set_uniform1i("numTracers", num_tracers)
+        # Draw the triangle
+        total_vertices = 3  # Number of vertices to draw
+        glDrawArrays(GL_TRIANGLES, 0, total_vertices)
 
-        glBindVertexArray(self.projectile_vao)
-        glBindBuffer(GL_ARRAY_BUFFER, self.projectile_vbo)
-        glLineWidth(5.0)
-
-        for i, tracer in enumerate(tracers):
-            positions = np.array([[pos.x, pos.y, pos.z] for pos in tracer[1:]], dtype=np.float32).flatten()
-            if len(positions) > 0:
-                light_pos = glm.vec3(positions[-3], positions[-2], positions[-1])
-                self.tracer_shader.set_uniform3fv(f"tracers[{i}].position", light_pos)
-                self.tracer_shader.set_uniform3fv(f"tracers[{i}].color", glm.vec3(1.0, 1.0, 1.0))  # Pure white color
-                self.tracer_shader.set_uniform1f(f"tracers[{i}].intensity", 1000000.0)  # High intensity for visibility
-
-                glBufferData(GL_ARRAY_BUFFER, positions.nbytes, positions, GL_DYNAMIC_DRAW)
-                glDrawArrays(GL_LINE_STRIP, 0, len(positions) // 3)
-
+        # Unbind the VAO
         glBindVertexArray(0)
+
+        # Unbind the SSBO
         glBindBuffer(GL_ARRAY_BUFFER, 0)
 
-        glEnable(GL_DEPTH_TEST)
-        glDisable(GL_BLEND)
-        glLineWidth(1.0)
-
+        # Check for and print any OpenGL errors
         error = glGetError()
         if error != GL_NO_ERROR:
-            print(f"OpenGL error after drawing tracers: {gluErrorString(error).decode()}")
+            print(f"OpenGL error after drawing: {gluErrorString(error).decode()}")
+
+    def set_ssbo(self, binding, data, usage=GL_DYNAMIC_DRAW):
+        ssbo = glGenBuffers(1)
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo)
+        glBufferData(GL_SHADER_STORAGE_BUFFER, data.nbytes, data, usage)
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, ssbo)
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0)
+        print(f"SSBO Data (binding {binding}): {data.tolist()}")
+        return ssbo
