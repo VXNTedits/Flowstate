@@ -671,10 +671,10 @@ class Physics:
         weapon.tracers = updated_tracers
 
         # Debugging prints to verify tracer positions
-        for tracer in weapon.tracers:
-            if tracer:
-                print("Tracer ID:", id(tracer), "Number of positions:", len(tracer) - 1,
-                      "Last known position:", tracer[-1], "Elapsed Time:", tracer[0])
+        # for tracer in weapon.tracers:
+        #     if tracer:
+        #         print("Tracer ID:", id(tracer), "Number of positions:", len(tracer) - 1,
+        #               "Last known position:", tracer[-1], "Elapsed Time:", tracer[0])
 
     def calculate_drag_force(self, velocity, caliber):
         speed = glm.length(velocity)
@@ -682,7 +682,7 @@ class Physics:
 
     def is_out_of_bounds(self, position):
         # print("Projectile displacement = ", glm.length(position))
-        if glm.length(position) > 1000:
+        if glm.length(position) > 511:
             print("Projectile out of bounds.")
             return True
         return False
