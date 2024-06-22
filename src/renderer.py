@@ -4,6 +4,7 @@ import ctypes
 from OpenGL.GL import *
 from OpenGL.raw.GL.NVX.gpu_memory_info import GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, \
     GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX
+from OpenGL.raw.GLU import gluErrorString
 
 import model
 from interactable import InteractableObject
@@ -13,14 +14,15 @@ from src.shader import Shader, ShaderManager
 from world import World
 import noise
 from opensimplex import OpenSimplex
-
+import ctypes
+from OpenGL.GL import *
 
 class Renderer:
     def __init__(self, shader, camera, weapons):
         # Initialization of light properties
         # These lights will be used for various shading and rendering techniques
         print("Initialization of light properties...")
-        self.exposure = 1.0
+        self.light_intensity = 0.1
 
         self.light_positions = [
             glm.vec3(50.2, 10.0, 2.0),
@@ -30,9 +32,9 @@ class Renderer:
         self.light_count = len(self.light_positions)
 
         self.light_colors = [
-            glm.vec3(1.0, 0.07, 0.58) * self.exposure,  # Neon Pink
-            glm.vec3(0.0, 1.0, 0.38) * self.exposure,  # Neon Green
-            glm.vec3(0.07, 0.45, 0.9) * self.exposure  # Neon Blue
+            glm.vec3(1.0, 0.07, 0.58) * self.light_intensity,  # Neon Pink
+            glm.vec3(0.0, 1.0, 0.38) * self.light_intensity,  # Neon Green
+            glm.vec3(0.07, 0.45, 0.9) * self.light_intensity  # Neon Blue
         ]
 
         # Volume bounds for volumetric rendering
@@ -245,7 +247,15 @@ class Renderer:
                                  enable_bump_mapping=False,
                                  bump_scale=5)
 
-        # 3. Render volumetric effects to the framebuffer
+        # Ensure depth test is enabled for future operations
+        glEnable(GL_DEPTH_TEST)
+        assert glIsEnabled(GL_DEPTH_TEST), "GL_DEPTH_TEST should be enabled for future operations"
+
+        # 3. Render tracers before volumetric effects
+        # for weapon in self.weapons:
+        #    self.draw_tracers(tracers=weapon.tracers, view_matrix=view_matrix, projection_matrix=projection_matrix)
+
+        # 4. Render volumetric effects to the framebuffer
         self.render_volumetric_effects_to_fbo(view_matrix,
                                               projection_matrix,
                                               glow_intensity=100.1,
@@ -255,15 +265,13 @@ class Renderer:
                                               god_ray_decay=0.001,
                                               god_ray_sharpness=100000)
 
-        # 4. Composite the scene and volumetric effects
+        # 5. Composite the scene and volumetric effects
         self.update_noise(delta_time)
         self.composite_scene_and_volumetrics()
 
-        # Ensure depth test is enabled for future operations
+        # Final check for depth and blend states
         glEnable(GL_DEPTH_TEST)
-        assert not glIsEnabled(GL_BLEND), "GL_BLEND should be disabled for future operations"
-        assert glIsEnabled(GL_DEPTH_TEST), "GL_DEPTH_TEST should be enabled for future operations"
-
+        glDisable(GL_BLEND)
         self.log_memory_usage()
 
     def render_lights(self, light_positions, light_colors, view_matrix, projection_matrix):
@@ -343,11 +351,6 @@ class Renderer:
             self.update_uniforms(model_matrix, view_matrix, projection_matrix, wobj)
             shader.set_uniform_matrix4fv("model", model_matrix)
             wobj.draw()
-
-        # Render tracers
-        for weapon in self.weapons:
-            # print("Rendering tracers for ", weapon.tracers)
-            self.draw_tracers(tracers=weapon.tracers, view_matrix=view_matrix, projection_matrix=projection_matrix)
 
     def render_world(self, shader, player_object, world, interactables, light_space_matrix, view_matrix=None,
                      projection_matrix=None):
@@ -819,11 +822,9 @@ class Renderer:
         self.render_lights(self.light_positions, self.light_colors, view_matrix, projection_matrix)
         self.render_scene(shader, player_object, world, world_objects, interactables, light_space_matrix,
                           view_matrix, projection_matrix, enable_bump_mapping, bump_scale)
-        self.check_opengl_error()
 
-        # debug
-        self.render_volume_bounds()
-        # --//--
+        for weapon in self.weapons:
+            self.draw_tracers(tracers=weapon.tracers, view_matrix=view_matrix, projection_matrix=projection_matrix)
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
@@ -843,11 +844,6 @@ class Renderer:
         view_proj_matrix = projection_matrix * view_matrix
         inv_view_proj_matrix = glm.inverse(view_proj_matrix)
 
-        # Debug: Print matrices
-        #print("View Matrix:", view_matrix)
-        #print("Projection Matrix:", projection_matrix)
-        #print("Inverse View-Projection Matrix:", inv_view_proj_matrix)
-
         self.volumetric_shader.set_uniform_matrix4fv("invViewProjMatrix", inv_view_proj_matrix)
         self.volumetric_shader.set_uniform3fv("volumeMin", self.volume_min)
         self.volumetric_shader.set_uniform3fv("volumeMax", self.volume_max)
@@ -856,10 +852,9 @@ class Renderer:
         self.volumetric_shader.set_uniform1f("glowFalloff", glow_falloff)
         self.volumetric_shader.set_uniform1f("godRayIntensity", god_ray_intensity)
         self.volumetric_shader.set_uniform1f("godRayDecay", god_ray_decay)
-        self.volumetric_shader.set_uniform1f("godRaySharpness", god_ray_sharpness)  # Pass the sharpness uniform
-        self.volumetric_shader.set_uniform1f("time", self.time)  # Pass the time uniform
+        self.volumetric_shader.set_uniform1f("godRaySharpness", god_ray_sharpness)
+        self.volumetric_shader.set_uniform1f("time", self.time)
 
-        # Set light positions and colors
         num_lights = len(self.light_positions)
         self.volumetric_shader.set_uniform1i("numLights", num_lights)
         for i, (pos, color) in enumerate(zip(self.light_positions, self.light_colors)):
@@ -897,6 +892,7 @@ class Renderer:
         glBindVertexArray(self.quadVAO)
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
         glBindVertexArray(0)
+
 
     def check_gl_state(self):
         depth_test_enabled = glIsEnabled(GL_DEPTH_TEST)
@@ -1002,41 +998,62 @@ class Renderer:
     def init_projectile_buffers(self):
         self.projectile_vao = glGenVertexArrays(1)
         self.projectile_vbo = glGenBuffers(1)
+
         glBindVertexArray(self.projectile_vao)
         glBindBuffer(GL_ARRAY_BUFFER, self.projectile_vbo)
-        # Assume a maximum of 10,000 points for projectile trajectories
-        glBufferData(GL_ARRAY_BUFFER, 30000 * sizeof(GLfloat), None, GL_DYNAMIC_DRAW)  # 3 floats per point, hence 30000
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, None)
+
+        # Allocate buffer memory, 10,000 points, 3 floats per point
+        glBufferData(GL_ARRAY_BUFFER, 30000 * ctypes.sizeof(ctypes.c_float), None, GL_DYNAMIC_DRAW)
+
+        # Define the vertex data layout
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, ctypes.c_void_p(0))
         glEnableVertexAttribArray(0)
+
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindVertexArray(0)
 
+        # Check for OpenGL errors during initialization
+        error = glGetError()
+        if error != GL_NO_ERROR:
+            raise RuntimeError(f"OpenGL error during buffer initialization: {gluErrorString(error).decode()}")
+
     def draw_tracers(self, tracers, view_matrix, projection_matrix):
+        self.tracer_shader.use()
+
         glDisable(GL_DEPTH_TEST)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        self.tracer_shader.use()
+
         self.tracer_shader.set_uniform_matrix4fv("model", glm.mat4(1.0))
         self.tracer_shader.set_uniform_matrix4fv("view", view_matrix)
         self.tracer_shader.set_uniform_matrix4fv("projection", projection_matrix)
-        self.tracer_shader.set_uniform3fv("tracerColor", glm.vec3(0.9, 1.0, 0.8))  # Tracer color
+        self.tracer_shader.set_uniform3fv("viewPos", self.camera.position)
+
+        num_tracers = len(tracers)
+        self.tracer_shader.set_uniform1i("numTracers", num_tracers)
+
         glBindVertexArray(self.projectile_vao)
         glBindBuffer(GL_ARRAY_BUFFER, self.projectile_vbo)
+        glLineWidth(5.0)
 
-        glLineWidth(1.0)  # Set line width for visibility
-
-        for tracer in tracers:
-            # Prepare the position data for the current tracer
+        for i, tracer in enumerate(tracers):
             positions = np.array([[pos.x, pos.y, pos.z] for pos in tracer[1:]], dtype=np.float32).flatten()
+            if len(positions) > 0:
+                light_pos = glm.vec3(positions[-3], positions[-2], positions[-1])
+                self.tracer_shader.set_uniform3fv(f"tracers[{i}].position", light_pos)
+                self.tracer_shader.set_uniform3fv(f"tracers[{i}].color", glm.vec3(1.0, 1.0, 1.0))  # Pure white color
+                self.tracer_shader.set_uniform1f(f"tracers[{i}].intensity", 1000000.0)  # High intensity for visibility
 
-            # Update the buffer data with the positions
-            glBufferData(GL_ARRAY_BUFFER, positions.nbytes, positions, GL_DYNAMIC_DRAW)
-
-            # Draw the tracer as a line strip
-            glDrawArrays(GL_LINE_STRIP, 0, len(tracer) - 1)
+                glBufferData(GL_ARRAY_BUFFER, positions.nbytes, positions, GL_DYNAMIC_DRAW)
+                glDrawArrays(GL_LINE_STRIP, 0, len(positions) // 3)
 
         glBindVertexArray(0)
         glBindBuffer(GL_ARRAY_BUFFER, 0)
+
         glEnable(GL_DEPTH_TEST)
         glDisable(GL_BLEND)
-        glLineWidth(1.0)  # Reset line width
+        glLineWidth(1.0)
+
+        error = glGetError()
+        if error != GL_NO_ERROR:
+            print(f"OpenGL error after drawing tracers: {gluErrorString(error).decode()}")
