@@ -2,13 +2,14 @@ import os
 import glm
 from src.composite_model import CompositeModel
 from model import Model
+from utils.file_utils import *
 
 
 class World(CompositeModel):
     def __init__(self, name, air_density, *args, **kwargs):
         # Construct the directory path
         self.air_density = air_density
-        directory = os.path.join('./res', name)
+        directory = os.path.join(get_project_root(), 'res', name)
 
         # Initialize lists to hold file paths and model parameters
         filepaths = []

@@ -12,7 +12,7 @@ from src.model import Model
 from player import Player
 from src.shader import Shader, ShaderManager
 from world import World
-import noise
+#import noise
 from opensimplex import OpenSimplex
 import ctypes
 from OpenGL.GL import *
@@ -272,7 +272,10 @@ class Renderer:
         # Final check for depth and blend states
         glEnable(GL_DEPTH_TEST)
         glDisable(GL_BLEND)
-        self.log_memory_usage()
+
+        # To be done: add debug wrapper
+        # Not available on all GPUs
+        #self.log_memory_usage()
 
     def render_lights(self, light_positions, light_colors, view_matrix, projection_matrix):
         self.light_positions = light_positions
