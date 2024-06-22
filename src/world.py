@@ -9,7 +9,6 @@ class World(CompositeModel):
     def __init__(self, name, air_density, *args, **kwargs):
         # Construct the directory path
         self.air_density = air_density
-        print(get_relative_path('res'))
         directory = os.path.join(get_project_root(), 'res', name)
 
         # Initialize lists to hold file paths and model parameters

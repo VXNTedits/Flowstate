@@ -136,7 +136,6 @@ class Components:
 
         self.input_handler = InputHandler(self.camera, self.player, self.physics)
         print("Input handler initialized")
-        print(get_relative_path(("shaders/vertex_shader.glsl")))
         self.shader = Shader(get_relative_path("shaders/vertex_shader.glsl"), get_relative_path("shaders/fragment_shader.glsl"))
         print("Shader initialized")
 
