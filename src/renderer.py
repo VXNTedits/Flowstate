@@ -77,6 +77,7 @@ class Renderer:
         self.procedural_shader = ShaderManager.get_shader("shaders/procedural_vertex.glsl",
                                                           "shaders/procedural_fragment.glsl")
         self.quad_shader = ShaderManager.get_shader("shaders/quad_vertex.glsl", "shaders/quad_fragment.glsl")
+        self.tracer_shader = ShaderManager.get_shader("shaders/tracer_vertex.glsl", "shaders/tracer_fragment.glsl")
 
         # Set up the offscreen buffer for shader compositing
         print("Set up the offscreen buffer for shader compositing...")
@@ -231,7 +232,6 @@ class Renderer:
 
         assert not glIsEnabled(GL_BLEND), "GL_BLEND should be disabled after depth map rendering"
         assert glIsEnabled(GL_DEPTH_TEST), "GL_DEPTH_TEST should be enabled after depth map rendering"
-        #print("Step 1: Depth map rendering complete.")
 
         # 2. Render the scene to the framebuffer
         self.render_scene_to_fbo(shader=self.shader,
@@ -258,14 +258,11 @@ class Renderer:
         # 4. Composite the scene and volumetric effects
         self.update_noise(delta_time)
         self.composite_scene_and_volumetrics()
-        #self.render_procedural_volumetrics(view_matrix, projection_matrix)
 
         # Ensure depth test is enabled for future operations
         glEnable(GL_DEPTH_TEST)
         assert not glIsEnabled(GL_BLEND), "GL_BLEND should be disabled for future operations"
         assert glIsEnabled(GL_DEPTH_TEST), "GL_DEPTH_TEST should be enabled for future operations"
-        #print("Final frame compositing complete.")
-
 
         self.log_memory_usage()
 
@@ -308,8 +305,9 @@ class Renderer:
             shader.set_uniform_matrix4fv("model", model_matrix)
             player_object.draw(self.camera)
 
-
         # Render world
+        # print("Render world...")
+        # print("view_matrix = \n", view_matrix, "\nprojection_matrix = \n", projection_matrix)
         model_loc = glGetUniformLocation(shader.program, "model")
         view_loc = glGetUniformLocation(shader.program, "view")
         projection_loc = glGetUniformLocation(shader.program, "projection")
@@ -348,9 +346,8 @@ class Renderer:
 
         # Render tracers
         for weapon in self.weapons:
-            self.draw_projectiles(weapon.active_trajectories)
-
-
+            # print("Rendering tracers for ", weapon.tracers)
+            self.draw_tracers(tracers=weapon.tracers, view_matrix=view_matrix, projection_matrix=projection_matrix)
 
     def render_world(self, shader, player_object, world, interactables, light_space_matrix, view_matrix=None,
                      projection_matrix=None):
@@ -1014,21 +1011,32 @@ class Renderer:
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindVertexArray(0)
 
-    def draw_projectiles(self, trajectories):
+    def draw_tracers(self, tracers, view_matrix, projection_matrix):
         glDisable(GL_DEPTH_TEST)
-        self.shader.use()
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        self.tracer_shader.use()
+        self.tracer_shader.set_uniform_matrix4fv("model", glm.mat4(1.0))
+        self.tracer_shader.set_uniform_matrix4fv("view", view_matrix)
+        self.tracer_shader.set_uniform_matrix4fv("projection", projection_matrix)
+        self.tracer_shader.set_uniform3fv("tracerColor", glm.vec3(0.9, 1.0, 0.8))  # Tracer color
         glBindVertexArray(self.projectile_vao)
         glBindBuffer(GL_ARRAY_BUFFER, self.projectile_vbo)
 
-        for trajectory in trajectories:
-            if trajectory['dirty']:  # Access 'dirty' as a dictionary key
-                projectile_positions = np.array([[p.x, p.y, p.z] for p in trajectory['positions']], dtype=np.float32)
-                # Only update the buffer data that's needed
-                glBufferSubData(GL_ARRAY_BUFFER, 0, projectile_positions.nbytes, projectile_positions.flatten())
-                trajectory['dirty'] = False  # Reset dirty flag
+        glLineWidth(1.0)  # Set line width for visibility
 
-            glDrawArrays(GL_LINE_STRIP, 0, len(trajectory['positions']))
+        for tracer in tracers:
+            # Prepare the position data for the current tracer
+            positions = np.array([[pos.x, pos.y, pos.z] for pos in tracer[1:]], dtype=np.float32).flatten()
+
+            # Update the buffer data with the positions
+            glBufferData(GL_ARRAY_BUFFER, positions.nbytes, positions, GL_DYNAMIC_DRAW)
+
+            # Draw the tracer as a line strip
+            glDrawArrays(GL_LINE_STRIP, 0, len(tracer) - 1)
 
         glBindVertexArray(0)
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glEnable(GL_DEPTH_TEST)
+        glDisable(GL_BLEND)
+        glLineWidth(1.0)  # Reset line width

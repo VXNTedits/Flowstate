@@ -24,9 +24,9 @@ class Player(Model):
         self.default_material = default_material
         self.camera = camera
 
-        self.local_hand_position = glm.vec3(-0.35, # +left
-                                            -0.8, # +back
-                                             1.0) # +up
+        self.local_hand_position = glm.vec3(-0.35,  # +left
+                                            -0.8,  # +back
+                                            1.0)  # +up
 
         self.torso = Model(body_path, mtl_path, player=True, translation=(0, 1, 0))
         self.head = Model(head_path, mtl_path, player=True, translation=(0, 1, 0))
@@ -38,7 +38,7 @@ class Player(Model):
         self.front = glm.vec3(0.0, 0.0, -1.0)
         self.up = glm.vec3(0.0, 1.0, 0.0)
         self.accelerator = 10
-        self.jump_force = glm.vec3(0,5,0)
+        self.jump_force = glm.vec3(0, 5, 0)
         self.max_speed = 10.0
         self.thrust = glm.vec3(0.0, 0.0, 0.0)
         self.velocity = glm.vec3(0, 0, 0)
@@ -56,7 +56,6 @@ class Player(Model):
         self.jump_cooldown = self.jump_cooldown_limit
         self.proposed_thrust = self.thrust
         self.bounding_box = self.calculate_player_bounding_box(self.previous_position, self.position)
-
 
     def update_player(self, delta_time: float, mouse_buttons: list, world: World):
         self.previous_position = self.position  # Update previous position before changing current position
@@ -79,10 +78,12 @@ class Player(Model):
             return
 
         if current_time - self.last_shot_time >= time_between_shots:
+            print("Player shot.")
             weapon.initialize_trajectory(
-                initial_position=self.position,
+                initial_position=self.right_hand_position,
                 player_pitch=self.pitch,
-                player_yaw=self.yaw
+                player_yaw=self.yaw,
+                delta_time=delta_time
             )
             self.last_shot_time = current_time
 
@@ -214,6 +215,8 @@ class Player(Model):
         self.right_hand_model_matrix[3] = glm.vec4(transformed_hand_position.x, transformed_hand_position.y,
                                                    transformed_hand_position.z, 1.0)
 
+        self.right_hand_position = glm.vec3(transformed_hand_position.x, transformed_hand_position.y, transformed_hand_position.z)
+
         #print(f"Torso model matrix:\n{self.torso.model_matrix}")
         #print(f"Right hand model matrix:\n{self.right_hand_model_matrix}")
 
@@ -232,7 +235,7 @@ class Player(Model):
     def update_combat(self, delta_time, mouse_buttons: list, world: World):
         if self.inventory:
             if mouse_buttons[0]:
-                self.shoot(self.inventory[0],delta_time,world)
+                self.shoot(self.inventory[0], delta_time, world)
             self.inventory[0].update_weapon(delta_time)
 
     def handle_left_click(self, is_left_mouse_button_pressed):
@@ -241,5 +244,5 @@ class Player(Model):
             self.mouse_buttons[0] = True
         elif not is_left_mouse_button_pressed:
             print("LMB not pressed.")
+            print()
             self.mouse_buttons[0] = False
-

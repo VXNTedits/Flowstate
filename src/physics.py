@@ -15,7 +15,7 @@ class Physics:
 
     def __init__(self, world_objects, player, interactables: list, world):
         self.max_velocity = 1
-        self.world = world_objects
+        # self.world = world_objects
         self.world = world
         self.player = player
         self.gravity = glm.vec3(0, -10, 0)
@@ -158,6 +158,7 @@ class Physics:
         Returns the exact collision point if a collision is detected, otherwise None.
         """
         for i in range(len(projectile_positions) - 1):
+            #print("Checking collisions on arc: ", projectile_positions)
             start_pos = projectile_positions[i]
             end_pos = projectile_positions[i + 1]
             for obj in self.world.get_world_objects():
@@ -167,7 +168,6 @@ class Physics:
 
                 if is_intersecting:
                     collision_point = self.calculate_collision_point(start_pos, end_pos, nearest_face_vectors)
-                    print("Checking collisions on arc: ", projectile_positions)
                     print("Projectile collision detected at: ", collision_point)
                     return collision_point
 
@@ -625,36 +625,64 @@ class Physics:
         self.player.reset_thrust()
         self.update_projectile_trajectory(delta_time=delta_time, weapons=weapons)
 
-    def update_projectile_trajectory(self, delta_time, weapons, gravity=10, air_density=1.3, time_to_live=1.0):
+    def update_projectile_trajectory(self, delta_time, weapons):
         for weapon in weapons:
-            for trajectory in weapon.active_trajectories[:]:
-                elapsed_time = trajectory['elapsed_time'] + delta_time
-                velocity = trajectory['velocity']
-                position = trajectory['position']
+            # Age existing tracers and remove expired ones
+            self.age_and_remove_expired_tracers(delta_time, weapon)
 
-                # Calculate drag force
-                speed = glm.length(velocity) * weapon.bullet_velocity_modifier
-                epsilon = 1e-6
-                drag_force_magnitude = 0.5 * air_density * weapon.caliber.drag_coefficient * weapon.caliber.bullet_area * speed ** 2
-                drag_force = -drag_force_magnitude * (velocity / (speed + epsilon))
+            new_tracers = []
+            for trajectory in weapon.active_trajectories[:]:  # Safe iteration with a shallow copy
+                trajectory['elapsed_time'] += delta_time
 
-                # Update velocity and position
-                acceleration = drag_force / weapon.caliber.mass
-                acceleration.y -= gravity
-                new_velocity = velocity + acceleration * delta_time
-                new_position = position + new_velocity * delta_time
+                current_position = trajectory['positions'][-1]
+                current_velocity = trajectory['velocity']
+                drag_force = self.calculate_drag_force(current_velocity, weapon.caliber)
+                acceleration = drag_force / weapon.caliber.mass - self.gravity
+                new_velocity = current_velocity + acceleration * delta_time
+                new_position = current_position + new_velocity * delta_time
 
-                # Check for collisions
-                trajectory['positions'].append(new_position)
                 trajectory['velocity'] = new_velocity
-                trajectory['position'] = new_position
-                trajectory['elapsed_time'] = elapsed_time
-                trajectory['dirty'] = True
+                trajectory['positions'].append(new_position)  # Append new position to trajectory
 
-                collision_point = self.check_projectile_collision(trajectory['positions'])
-                if collision_point:
-                    print("Projectile collision detected at: ", collision_point)
+                # Create or update the tracer for this trajectory
+                if trajectory['elapsed_time'] <= weapon.tracer_lifetime:
+                    new_tracers.append([trajectory['elapsed_time']] + trajectory['positions'])
+
+                if self.check_projectile_collision(trajectory['positions']):
+                    print("Projectile collision detected at:", new_position)
                     weapon.active_trajectories.remove(trajectory)
-                elif elapsed_time > time_to_live:
+                elif trajectory['elapsed_time'] > weapon.tracer_lifetime:
                     print("Removing trajectory due to time expiration.")
                     weapon.active_trajectories.remove(trajectory)
+
+            # Append new tracers to the existing ones
+            weapon.tracers += new_tracers
+
+    def age_and_remove_expired_tracers(self, delta_time, weapon):
+        for tracer in weapon.tracers:
+            if tracer:  # Ensure tracer is not empty
+                tracer[0] += delta_time  # Increment age of each tracer's first element (elapsed time)
+
+        # Remove tracers that have exceeded their lifetime
+        updated_tracers = []
+        for tracer in weapon.tracers:
+            if tracer[0] < weapon.tracer_lifetime:
+                updated_tracers.append(tracer)
+        weapon.tracers = updated_tracers
+
+        # Debugging prints to verify tracer positions
+        for tracer in weapon.tracers:
+            if tracer:
+                print("Tracer ID:", id(tracer), "Number of positions:", len(tracer) - 1,
+                      "Last known position:", tracer[-1], "Elapsed Time:", tracer[0])
+
+    def calculate_drag_force(self, velocity, caliber):
+        speed = glm.length(velocity)
+        return -0.5 * self.world.air_density * caliber.drag_coefficient * caliber.bullet_area * speed ** 2 * glm.normalize(velocity)
+
+    def is_out_of_bounds(self, position):
+        # print("Projectile displacement = ", glm.length(position))
+        if glm.length(position) > 1000:
+            print("Projectile out of bounds.")
+            return True
+        return False
