@@ -26,7 +26,7 @@ class Weapon(InteractableObject):
         self.shoot = False
         self.physics = physics
         self.initial_position = glm.vec3(0, 0, 0)
-        self.tracer_lifetime = 1.0
+        self.tracer_lifetime = 0.1
         self.tracers = []
 
     def update_weapon(self, delta_time):
