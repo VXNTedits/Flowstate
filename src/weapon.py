@@ -1,3 +1,5 @@
+import numpy as np
+
 from src.caliber import Caliber
 from src.interactable import InteractableObject
 import glm
@@ -30,7 +32,7 @@ class Weapon(InteractableObject):
     def update_weapon(self, delta_time):
         pass
 
-    def initialize_trajectory(self, initial_position, player_pitch, player_yaw, delta_time):
+    def initialize_trajectory(self, initial_position, player_pitch, player_yaw):
         print("Initializing trajectory...")
         if not self.physics:
             print("Physics context is not available. Skipping trajectory initialization.")
@@ -47,25 +49,18 @@ class Weapon(InteractableObject):
         trajectory = {
             'position': glm.vec3(initial_position),  # Ensure a copy is made if glm.vec3 isn't automatically one
             'velocity': velocity,
-            'positions': [glm.vec3(initial_position)],  # Copy here as well
+            'positions': [{'position': glm.vec3(initial_position), 'lifetime': 0.0}],  # Initial position with lifetime
             'elapsed_time': 0.0,
             'dirty': True  # Mark trajectory as dirty for initial buffer update
         }
         self.active_trajectories.append(trajectory)
         self.initial_position = glm.vec3(initial_position)  # Copy to ensure it remains unchanged
-        # print("Trajectory origin = ", self.initial_position)
         self.instantaneous_bullet_position = glm.vec3(initial_position)  # Make a copy here
         self.instantaneous_bullet_velocity = velocity
 
-        while not self.physics.is_out_of_bounds(self.instantaneous_bullet_position):
-            # print(
-            #    f"Trajectory origin = {self.initial_position}, Current position = {self.instantaneous_bullet_position}")
-            drag_force = self.physics.calculate_drag_force(self.instantaneous_bullet_velocity, self.caliber)
-            acceleration = drag_force / self.caliber.mass - self.physics.gravity
-            self.instantaneous_bullet_velocity += acceleration * delta_time
-            self.instantaneous_bullet_position += self.instantaneous_bullet_velocity * delta_time
-            trajectory['positions'].append(
-                glm.vec3(self.instantaneous_bullet_position))  # Copy the position to the list
-            if self.physics.check_projectile_collision(trajectory['positions']):
-                print("Projectile collision detected!")
-                break
+    def get_tracer_positions(self):
+        positions = []
+        for tracer in self.tracers:
+            positions.extend(tracer['position'])
+        return np.array(positions, dtype=np.float32)
+

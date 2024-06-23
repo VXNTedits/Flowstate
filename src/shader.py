@@ -9,10 +9,10 @@ class ShaderManager:
     _instances = {}
 
     @staticmethod
-    def get_shader(vertex_path, fragment_path, use_glsl_430=False):
-        key = (vertex_path, fragment_path, use_glsl_430)
+    def get_shader(vertex_path, fragment_path):
+        key = (vertex_path, fragment_path)
         if key not in ShaderManager._instances:
-            ShaderManager._instances[key] = Shader(vertex_path, fragment_path, use_glsl_430)
+            ShaderManager._instances[key] = Shader(vertex_path, fragment_path)
         return ShaderManager._instances[key]
 
 
@@ -21,7 +21,8 @@ class Shader:
     current_program = None
 
     def __init__(self, vertex_path, fragment_path):
-        self.name = vertex_path.split('/')[-1]
+        self.name_vertex = vertex_path.split('/')[-1]
+        self.name_fragment = fragment_path.split('/')[-1]
         self.vertex_path = get_relative_path(vertex_path)
         self.fragment_path = get_relative_path(fragment_path)
         self.program = self.create_shader_program(self.vertex_path, self.fragment_path)
@@ -105,7 +106,8 @@ class Shader:
         self.use()
         location = glGetUniformLocation(self.program, name)
         if location == -1:
-            print(f"Uniform '{name}' not found in shader program {self.program}: {self.name}.")
+            print(f"Uniform '{name}' not found in shader program {self.program}. \n"
+                  f"    (Associated fragment shader: {self.name_fragment}.)")
         else:
             glUniformMatrix4fv(location, 1, GL_FALSE, glm.value_ptr(matrix))
 
@@ -113,7 +115,8 @@ class Shader:
         self.use()
         location = glGetUniformLocation(self.program, name)
         if location == -1:
-            print(f"Uniform '{name}' not found in shader program {self.program}: {self.name}.")
+            print(f"Uniform '{name}' not found in shader program {self.program}. \n"
+                  f"    (Associated fragment shader: {self.name_fragment}.)")
         else:
             glUniform3f(location, vec3.x, vec3.y, vec3.z)
 
@@ -121,7 +124,8 @@ class Shader:
         self.use()
         location = glGetUniformLocation(self.program, name)
         if location == -1:
-            print(f"Uniform '{name}' not found in shader program {self.program}.")
+            print(f"Uniform '{name}' not found in shader program {self.program}. \n"
+                  f"    (Associated fragment shader: {self.name_fragment}.)")
         else:
             glUniform3fv(location, 1, glm.value_ptr(vec3))
             # Debug information
@@ -135,7 +139,8 @@ class Shader:
         self.use()
         location = glGetUniformLocation(self.program, name)
         if location == -1:
-            print(f"Uniform '{name}' not found in shader program {self.program}.")
+            print(f"Uniform '{name}' not found in shader program {self.program}. \n"
+                  f"    (Associated fragment shader: {self.name_fragment}.)")
         else:
             glUniform1f(location, value)
             # Debug information
@@ -145,12 +150,28 @@ class Shader:
         self.use()
         location = glGetUniformLocation(self.program, name)
         if location == -1:
-            print(f"Uniform '{name}' not found in shader program {self.program}: {self.name}.")
+            print(f"Uniform '{name}' not found in shader program {self.program}. \n"
+                  f"    (Associated fragment shader: {self.name_fragment}.)")
         else:
             glUniform1i(location, value)
 
+    def set_uniform_sampler2D(self, name, texture_unit):
+        self.use()
+        location = glGetUniformLocation(self.program, name)
+        if location == -1:
+            print(f"Uniform '{name}' not found in shader program {self.program}. \n"
+                  f"    (Associated fragment shader: {self.name_fragment}.)")
+        else:
+            glUniform1i(location, texture_unit)
+
     def set_uniform_bool(self, name, value):
-        glUniform1i(glGetUniformLocation(self.program, name), value)
+        self.use()
+        location = glGetUniformLocation(self.program, name)
+        if location == -1:
+            print(f"Uniform '{name}' not found in shader program {self.program}. \n"
+                  f"    (Associated fragment shader: {self.name_fragment}.)")
+        else:
+            glUniform1i(location, int(value))
 
     def set_tracers_uniform(self, tracers):
 

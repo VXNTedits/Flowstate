@@ -435,12 +435,7 @@ class Model:
 
         self.model_matrix = translation_matrix * rotation_matrix * scale_matrix
 
-    def update_uniforms(self, shader):
-        shader.set_uniform3f("objectColor", glm.vec3(*self.default_material['diffuse']))
-        shader.set_uniform3f("specularColor", glm.vec3(*self.default_material['specular']))
-        shader.set_uniform1f("shininess", self.default_material['shininess'])
-        shader.set_roughness(self.default_material['roughness'])
-
+    # TODO: Implement this
     def add_crater(self, impact_point, crater_radius, crater_depth):
         self.impact = True
         vertices_2d = self.vertices.reshape(-1, 3)

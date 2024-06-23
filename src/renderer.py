@@ -19,9 +19,14 @@ from OpenGL.GL import *
 
 
 class Renderer:
-    def __init__(self, shader, camera, weapons):
+    def __init__(self, shader, camera, physics, weapons):
+        # Store the provided references
+        self.physics = physics
+        self.shader = shader
+        self.camera = camera
+        self.weapons = weapons
+
         # Initialization of light properties
-        # These lights will be used for various shading and rendering techniques
         print("Initialization of light properties...")
         self.light_intensity = 0.1
 
@@ -43,10 +48,6 @@ class Renderer:
         print("Volume bounds for volumetric rendering...")
         self.volume_min = glm.vec3(-1000, -1000, -1000)
         self.volume_max = glm.vec3(1000, 1000, 1000)
-
-        # Store the provided shader and camera references
-        self.shader = shader
-        self.camera = camera
 
         # Shadow map resolution
         self.shadow_width = 2048
@@ -87,7 +88,9 @@ class Renderer:
         self.quad_shader = ShaderManager.get_shader("shaders/quad_vertex.glsl",
                                                     "shaders/quad_fragment.glsl")
         self.tracer_shader = ShaderManager.get_shader("shaders/tracer_vertex.glsl",
-                                                      "shaders/tracer_fragment.glsl", use_glsl_430=False)
+                                                      "shaders/tracer_fragment.glsl")
+        self.blur_shader = ShaderManager.get_shader("shaders/blur_vertex.glsl",
+                                                    "shaders/blur_fragment.glsl")
 
         # Set up the offscreen buffer for shader compositing
         print("Set up the offscreen buffer for shader compositing...")
@@ -95,7 +98,7 @@ class Renderer:
 
         # Generate 3D noise texture for volumetric effects
         # This texture will be used in the volumetric rendering process
-        #print("Generate 3D noise texture for volumetric effects...")
+        print("Generate 3D noise texture for volumetric effects...")
         self.noise_size = 512  # Size of the 3D noise texture
         self.simplex = OpenSimplex(seed=np.random.randint(0, 10000))
         self.time = 0.0
@@ -108,8 +111,8 @@ class Renderer:
         # Configure the depth map texture used for shadow mapping
         print("Configure the depth map texture used for shadow mapping")
         glBindTexture(GL_TEXTURE_2D, self.depth_map)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, self.shadow_width, self.shadow_height, 0, GL_DEPTH_COMPONENT,
-                     GL_FLOAT, None)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, self.shadow_width, self.shadow_height, 0,
+                     GL_DEPTH_COMPONENT, GL_FLOAT, None)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER)
@@ -130,12 +133,10 @@ class Renderer:
         # Set up the vertex array and buffer objects for rendering a quad
         self.setup_quad()
 
-        print("Initialize projectile buffers...")
-        # Initialize projectile buffers
-        self.projectile_vao = glGenVertexArrays(1)
-        self.projectile_vbo = glGenBuffers(1)
-        self.init_projectile_buffers()
-        self.weapons = weapons
+        print(f"OpenGL version: {glGetString(GL_VERSION).decode()}")
+
+        # Initialize tracer rendering system
+        self.initialize_tracer_renderer(800, 600)
 
     def setup_volume_texture(self):
         # Create an empty 3D texture
@@ -259,7 +260,13 @@ class Renderer:
         glEnable(GL_DEPTH_TEST)
         assert glIsEnabled(GL_DEPTH_TEST), "GL_DEPTH_TEST should be enabled for future operations"
 
-        # 3. Render volumetric effects to the framebuffer
+        # 3. Render tracers to the framebuffer
+        for weapon in self.weapons:
+            tracer_positions = weapon.get_tracer_positions()
+            if tracer_positions.any():
+                self.draw_tracers(tracer_positions, view_matrix, projection_matrix, player_object)
+
+        # 4. Render volumetric effects to the framebuffer
         self.render_volumetric_effects_to_fbo(view_matrix,
                                               projection_matrix,
                                               glow_intensity=100.1,
@@ -358,8 +365,6 @@ class Renderer:
             self.update_uniforms(model_matrix, view_matrix, projection_matrix, wobj)
             shader.set_uniform_matrix4fv("model", model_matrix)
             wobj.draw()
-
-
 
     def render_world(self, shader, player_object, world, interactables, light_space_matrix, view_matrix=None,
                      projection_matrix=None):
@@ -521,10 +526,6 @@ class Renderer:
 
             glBindVertexArray(0)
 
-        # Use the quad shader
-        self.quad_shader.use()
-        self.quad_shader.set_uniform3f("quadColor", glm.vec3(0.0, 1.0, 0.0))  # Set color to green for testing
-
         glBindVertexArray(self.quadVAO)
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
         glBindVertexArray(0)
@@ -582,32 +583,6 @@ class Renderer:
 
         self.check_framebuffer_status()
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
-
-    # def setup_depth_framebuffer(self):
-    #     # Generate texture
-    #     self.depth_map = glGenTextures(1)
-    #     glBindTexture(GL_TEXTURE_2D, self.depth_map)
-    #
-    #     # Define texture storage and parameters
-    #     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 800, 600, 0, GL_DEPTH_COMPONENT, GL_FLOAT, None)
-    #     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-    #     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-    #     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER)
-    #     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER)
-    #     border_color = [1.0, 1.0, 1.0, 1.0]
-    #     glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color)
-    #
-    #     # Create and bind the framebuffer
-    #     self.depth_map_fbo = glGenFramebuffers(1)
-    #     glBindFramebuffer(GL_FRAMEBUFFER, self.depth_map_fbo)
-    #     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, self.depth_map, 0)
-    #     glDrawBuffer(GL_NONE)
-    #     glReadBuffer(GL_NONE)
-    #
-    #     # Check framebuffer completeness
-    #     if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
-    #         print("Framebuffer not complete")
-    #     glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
     def glm_to_numpy(self, mat):
         return np.array(mat, dtype=np.float32).flatten()
@@ -832,12 +807,7 @@ class Renderer:
         self.render_scene(shader, player_object, world, world_objects, interactables, light_space_matrix,
                           view_matrix, projection_matrix, enable_bump_mapping, bump_scale)
 
-        for weapon in self.weapons:
-            self.draw_tracers(tracers=weapon.tracers, view_matrix=view_matrix, projection_matrix=projection_matrix)
-
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
-
-
 
     def render_volumetric_effects_to_fbo(self, view_matrix, projection_matrix, glow_intensity, scattering_factor,
                                          glow_falloff, god_ray_intensity, god_ray_decay, god_ray_sharpness):
@@ -891,18 +861,31 @@ class Renderer:
         glViewport(0, 0, 800, 600)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
+        # 1. Bind the scene to texture unit 0
         self.composite_shader.use()
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, self.scene_texture)
-        self.composite_shader.set_uniform1i("sceneTexture", 0)
+        self.composite_shader.set_uniform_sampler2D("sceneTexture", 0)
 
+        # 2. Bind the volumetrics texture to texture unit 1
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, self.volumetric_texture)
-        self.composite_shader.set_uniform1i("volumetricTexture", 1)
+        self.composite_shader.set_uniform_sampler2D("volumetricTexture", 1)
 
-        glBindVertexArray(self.quadVAO)
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
-        glBindVertexArray(0)
+        # 3. Bind the tracers texture to texture unit 2
+        glActiveTexture(GL_TEXTURE2)
+        glBindTexture(GL_TEXTURE_2D, self.tracer_texture)
+        self.composite_shader.set_uniform_sampler2D("tracers", 2)
+
+        # 4. Render the quad
+        self.render_quad()
+
+        # 5. Unbind textures
+        glBindTexture(GL_TEXTURE_2D, 0)
+
+        # glBindVertexArray(self.quadVAO)
+        # glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
+        # glBindVertexArray(0)
 
     def check_gl_state(self):
         depth_test_enabled = glIsEnabled(GL_DEPTH_TEST)
@@ -1027,57 +1010,51 @@ class Renderer:
         if error != GL_NO_ERROR:
             raise RuntimeError(f"OpenGL error during buffer initialization: {gluErrorString(error).decode()}")
 
-    def draw_tracers(self, tracers, view_matrix, projection_matrix):
-        if len(tracers) > 0:
-            self.tracer_shader.use()
+    def draw_tracers(self, tracer_positions, view_matrix,
+                     projection_matrix, player):
+        print("Drawing tracers...")
+        # Update the VBO with new tracer positions
+        glBindBuffer(GL_ARRAY_BUFFER, self.tracer_vbo)
+        glBufferData(GL_ARRAY_BUFFER, tracer_positions.nbytes, tracer_positions, GL_DYNAMIC_DRAW)
 
-            # Set the tracers and trajectories using SSBOs
-            #self.tracer_shader.set_tracers_uniform(tracers)
+        # Bind framebuffer and render tracers
+        glBindFramebuffer(GL_FRAMEBUFFER, self.tracer_fbo)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        self.tracer_shader.use()
+        self.tracer_shader.set_uniform3fvec("lightPos", tracer_positions[-1])
+        self.tracer_shader.set_uniform1f("lightIntensity", 10.0)
+        self.tracer_shader.set_uniform_matrix4fv("model", glm.mat4(1))
+        self.tracer_shader.set_uniform_matrix4fv("view", view_matrix)
+        self.tracer_shader.set_uniform3fvec("viewPos", [player.pitch, player.yaw, 0.0])
+        self.tracer_shader.set_uniform_matrix4fv("projection", projection_matrix)
+        self.tracer_shader.set_uniform3fvec("tracerColor", [1.0, 0.5, 0.2])
+        self.tracer_shader.set_uniform3fvec("lightColor", [1.0, 1.0, 1.0])
+        glBindVertexArray(self.tracer_vao)
+        glDrawArrays(GL_LINE_STRIP, 0, len(tracer_positions) // 3)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
-            glDisable(GL_DEPTH_TEST)
-            glEnable(GL_BLEND)
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        # Apply blur effect
+        self.blur_shader.use()
+        self.blur_shader.set_uniform_sampler2D("image", 0)
+        self.blur_shader.set_uniform_bool("horizontal", True)
+        glBindTexture(GL_TEXTURE_2D, self.tracer_texture)
+        self.render_quad()  # Render quad here for horizontal blur
 
-            #self.tracer_shader.set_uniform_matrix4fv("view", view_matrix)
-            #self.tracer_shader.set_uniform_matrix4fv("projection", projection_matrix)
-            #self.tracer_shader.set_uniform3fv("viewPos", self.camera.position)
-            #self.tracer_shader.set_uniform3fvec("tracerColor", [1.0, 1.0, 1.0])
+        self.blur_shader.set_uniform_bool("horizontal", False)
+        glBindTexture(GL_TEXTURE_2D, self.tracer_texture)
+        self.render_quad()  # Render quad here for vertical blur
 
-            num_tracers = len(tracers)
-            #print("num_tracers = ", num_tracers)
-            #self.tracer_shader.set_uniform1i("numTracers", num_tracers)
-
-            # Calculate the total number of vertices
-            total_vertices = sum(len(tracer) * 2 for tracer in tracers)
-            #print("total vertices = ", total_vertices)
-            # Bind the VAO and VBO for drawing
-            glBindVertexArray(self.projectile_vao)
-            glBindBuffer(GL_ARRAY_BUFFER, self.projectile_vbo)
-            glLineWidth(5.0)
-
-            # Perform the draw call
-            glDrawArrays(GL_LINE_STRIP, 0, total_vertices)
-
-            # Unbind the VAO and VBO
-            glBindVertexArray(0)
-            glBindBuffer(GL_ARRAY_BUFFER, 0)
-
-            glEnable(GL_DEPTH_TEST)
-            glDisable(GL_BLEND)
-            glLineWidth(1.0)
-
-            error = glGetError()
-            if error != GL_NO_ERROR:
-                print(f"OpenGL error after drawing tracers: {gluErrorString(error).decode()}")
 
     def debug_render(self):
         # Create and bind the Vertex Array Object (VAO)
         vao = glGenVertexArrays(1)
         glBindVertexArray(vao)
+        self.check_opengl_errors()
 
         # Create and bind the Vertex Buffer Object (VBO)
         vbo = glGenBuffers(1)
         glBindBuffer(GL_ARRAY_BUFFER, vbo)
+        self.check_opengl_errors()
 
         # Define the vertex data for a triangle
         vertices = np.array([
@@ -1090,10 +1067,12 @@ class Renderer:
         glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * vertices.itemsize, ctypes.c_void_p(0))
         glEnableVertexAttribArray(0)
+        self.check_opengl_errors()
 
         # Unbind the VBO and VAO
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindVertexArray(0)
+        self.check_opengl_errors()
 
         # Set up the Shader Storage Buffer Object (SSBO) with colors for each vertex
         colors_data = np.array([
@@ -1103,32 +1082,43 @@ class Renderer:
         ], dtype=np.float32)
         self.ssbo = self.set_ssbo(0, colors_data)
 
+        # Bind the SSBO and retrieve data for debugging
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.ssbo)
+        buffer_data = np.zeros_like(colors_data, dtype=np.float32)
+        glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, buffer_data.nbytes, buffer_data)
+        print(f"Buffer data after binding: {buffer_data.tolist()}")
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0)
+        self.check_opengl_errors()
+
         # Clear the screen
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        self.check_opengl_errors()
 
         # Use the shader program
         self.tracer_shader.use()
+        self.check_opengl_errors()
 
         # Bind the SSBO
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, self.ssbo)
+        self.check_opengl_errors()
 
         # Bind the VAO
         glBindVertexArray(vao)
+        self.check_opengl_errors()
 
         # Draw the triangle
         total_vertices = 3  # Number of vertices to draw
         glDrawArrays(GL_TRIANGLES, 0, total_vertices)
+        self.check_opengl_errors()
 
         # Unbind the VAO
         glBindVertexArray(0)
+        self.check_opengl_errors()
 
-        # Unbind the SSBO
-        glBindBuffer(GL_ARRAY_BUFFER, 0)
-
-        # Check for and print any OpenGL errors
+    def check_opengl_errors(self):
         error = glGetError()
         if error != GL_NO_ERROR:
-            print(f"OpenGL error after drawing: {gluErrorString(error).decode()}")
+            print(f"OpenGL error: {gluErrorString(error).decode()}")
 
     def set_ssbo(self, binding, data, usage=GL_DYNAMIC_DRAW):
         ssbo = glGenBuffers(1)
@@ -1137,4 +1127,45 @@ class Renderer:
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, ssbo)
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0)
         print(f"SSBO Data (binding {binding}): {data.tolist()}")
+        self.check_opengl_errors()
         return ssbo
+
+    def initialize_tracer_renderer(self, screen_width, screen_height):
+        """Function to initialize the tracer renderer"""
+        # Create vbo and vao for tracers
+        vbo = glGenBuffers(1)
+        vao = glGenVertexArrays(1)
+
+        glBindVertexArray(vao)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo)
+        glBufferData(GL_ARRAY_BUFFER, 0, None, GL_DYNAMIC_DRAW)  # Initialize with no data
+
+        # Vertex position attribute
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * 4, ctypes.c_void_p(0))
+        glEnableVertexAttribArray(0)
+
+        # Framebuffer for rendering tracers
+        fbo = glGenFramebuffers(1)
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo)
+
+        # Texture to store framebuffer data
+        texture = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, texture)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, screen_width, screen_height, 0, GL_RGB,
+                     GL_UNSIGNED_BYTE, None)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0)
+
+        # Check framebuffer completeness
+        if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
+            raise Exception("Framebuffer is not complete!")
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+        self.tracer_vao = vao
+        self.tracer_vbo = vbo
+        self.tracer_fbo = fbo
+        self.tracer_texture = texture
+        print(f"Tracer renderer initialized. \n VAO = {self.tracer_vao} \n VBO = {self.tracer_vbo} \n FBO = {self.tracer_fbo}")
+        # return vao, fbo, texture

@@ -82,8 +82,7 @@ class Player(Model):
             weapon.initialize_trajectory(
                 initial_position=self.right_hand_position,
                 player_pitch=self.pitch,
-                player_yaw=self.yaw,
-                delta_time=delta_time
+                player_yaw=self.yaw
             )
             self.last_shot_time = current_time
 

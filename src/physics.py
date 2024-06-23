@@ -240,7 +240,7 @@ class Physics:
         (start_pos, end_pos) = line_segment
         (min_x, min_y, min_z), (max_x, max_y, max_z) = aabb
 
-        faces = {
+        collision_faces_world = {
             "left": (glm.vec3(min_x, min_y, min_z), glm.vec3(min_x, max_y, min_z), glm.vec3(min_x, min_y, max_z)),
             "right": (glm.vec3(max_x, min_y, min_z), glm.vec3(max_x, max_y, min_z), glm.vec3(max_x, min_y, max_z)),
             "bottom": (glm.vec3(min_x, min_y, min_z), glm.vec3(max_x, min_y, min_z), glm.vec3(min_x, min_y, max_z)),
@@ -249,7 +249,7 @@ class Physics:
             "back": (glm.vec3(min_x, min_y, max_z), glm.vec3(max_x, min_y, max_z), glm.vec3(min_x, max_y, max_z))
         }
 
-        for face, vertices in faces.items():
+        for face, vertices in collision_faces_world.items():
             if self.line_intersects_plane(glm.vec3(start_pos), glm.vec3(end_pos), vertices):
                 return True, face, vertices
 
@@ -630,11 +630,10 @@ class Physics:
             # Age existing tracers and remove expired ones
             self.age_and_remove_expired_tracers(delta_time, weapon)
 
-            new_tracers = []
             for trajectory in weapon.active_trajectories[:]:  # Safe iteration with a shallow copy
                 trajectory['elapsed_time'] += delta_time
 
-                current_position = trajectory['positions'][-1]
+                current_position = trajectory['positions'][-1]['position']
                 current_velocity = trajectory['velocity']
                 drag_force = self.calculate_drag_force(current_velocity, weapon.caliber)
                 acceleration = drag_force / weapon.caliber.mass - self.gravity
@@ -642,39 +641,29 @@ class Physics:
                 new_position = current_position + new_velocity * delta_time
 
                 trajectory['velocity'] = new_velocity
-                trajectory['positions'].append(new_position)  # Append new position to trajectory
+                trajectory['positions'].append(
+                    {'position': new_position, 'lifetime': 0.0})  # Append new position with initial lifetime
 
                 # Create or update the tracer for this trajectory
-                if trajectory['elapsed_time'] <= weapon.tracer_lifetime:
-                    new_tracers.append([trajectory['elapsed_time']] + trajectory['positions'])
+                weapon.tracers.append({'position': new_position, 'lifetime': 0.0})
 
-                if self.check_projectile_collision(trajectory['positions']):
+                if self.check_projectile_collision([pos['position'] for pos in trajectory['positions']]):
                     print("Projectile collision detected at:", new_position)
                     weapon.active_trajectories.remove(trajectory)
                 elif trajectory['elapsed_time'] > weapon.tracer_lifetime:
                     print("Removing trajectory due to time expiration.")
                     weapon.active_trajectories.remove(trajectory)
 
-            # Append new tracers to the existing ones
-            weapon.tracers += new_tracers
+            # if weapon.tracers:
+            #     print("active tracers = \n", weapon.tracers)
 
     def age_and_remove_expired_tracers(self, delta_time, weapon):
+        # Increment the lifetime of each tracer position
         for tracer in weapon.tracers:
-            if tracer:  # Ensure tracer is not empty
-                tracer[0] += delta_time  # Increment age of each tracer's first element (elapsed time)
+            tracer['lifetime'] += delta_time
 
-        # Remove tracers that have exceeded their lifetime
-        updated_tracers = []
-        for tracer in weapon.tracers:
-            if tracer[0] < weapon.tracer_lifetime:
-                updated_tracers.append(tracer)
-        weapon.tracers = updated_tracers
-
-        # Debugging prints to verify tracer positions
-        # for tracer in weapon.tracers:
-        #     if tracer:
-        #         print("Tracer ID:", id(tracer), "Number of positions:", len(tracer) - 1,
-        #               "Last known position:", tracer[-1], "Elapsed Time:", tracer[0])
+        # Remove tracers whose positions have exceeded their lifetime
+        weapon.tracers = [tracer for tracer in weapon.tracers if tracer['lifetime'] < weapon.tracer_lifetime]
 
     def calculate_drag_force(self, velocity, caliber):
         speed = glm.length(velocity)
