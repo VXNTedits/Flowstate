@@ -72,7 +72,7 @@ class Components:
                                           material_overrides,
                                           scales)
 
-        self.world = World("world4",air_density=1.3)
+        self.world = World("world2",air_density=1.3)
         print("World initialized")
 
         self.player = Player(get_relative_path("res/body.obj"),
@@ -138,7 +138,8 @@ class Components:
 
         self.input_handler = InputHandler(self.camera, self.player, self.physics)
         print("Input handler initialized")
-        self.shader = Shader(get_relative_path("shaders/vertex_shader.glsl"), get_relative_path("shaders/fragment_shader.glsl"))
+        self.shader = Shader(get_relative_path("shaders/vertex_shader.glsl"),
+                             get_relative_path("shaders/fragment_shader.glsl"))
         print("Shader manager initialized")
 
         self.renderer = Renderer(self.shader, self.camera, self.physics, self.weapons)
@@ -151,7 +152,9 @@ class Components:
         # --//--
 
     def set_input_callbacks(self):
-        self.window.set_callbacks(self.input_handler.key_callback, self.input_handler.mouse_callback, self.input_handler.mouse_button_callback)
+        self.window.set_callbacks(self.input_handler.key_callback,
+                                  self.input_handler.mouse_callback,
+                                  self.input_handler.mouse_button_callback)
 
     def update_components(self, delta_time: float):
         self.world_objects.update(delta_time)

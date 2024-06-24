@@ -28,7 +28,7 @@ class Renderer:
 
         # Initialization of light properties
         print("Initialization of light properties...")
-        self.light_intensity = 0.1
+        self.light_intensity = 1.0
 
         self.light_positions = [
             glm.vec3(50.2, 10.0, 2.0),
@@ -265,8 +265,10 @@ class Renderer:
         for weapon in self.weapons:
             tracer_positions = weapon.get_tracer_positions()
             if tracer_positions.any():
-                print("tracer_positions", tracer_positions)
-                #self.draw_tracers(tracer_positions, view_matrix, projection_matrix, player_object)
+                print("tracer_positions:")
+                for p in tracer_positions:
+                    print(p)
+                self.draw_tracers(tracer_positions, view_matrix, projection_matrix, player_object)
 
         # 4. Render volumetric effects to the framebuffer
         self.render_volumetric_effects_to_fbo(view_matrix,
@@ -286,9 +288,9 @@ class Renderer:
         glEnable(GL_DEPTH_TEST)
         glDisable(GL_BLEND)
 
-        # To be done: add debug wrapper
+        # TODO: add debug wrapper
         # Not available on all GPUs
-        #self.log_memory_usage()
+        # self.log_memory_usage()
 
     def render_lights(self, light_positions, light_colors, view_matrix, projection_matrix):
         self.light_positions = light_positions
@@ -1042,9 +1044,9 @@ class Renderer:
         if error != GL_NO_ERROR:
             raise RuntimeError(f"OpenGL error during buffer initialization: {gluErrorString(error).decode()}")
 
-    def draw_tracers(self, tracer_positions, view_matrix,
-                     projection_matrix, player):
+    def draw_tracers(self, tracer_positions, view_matrix, projection_matrix, player):
         print("Drawing tracers...")
+
         # Update the VBO with new tracer positions
         glBindBuffer(GL_ARRAY_BUFFER, self.tracer_vbo)
         glBufferData(GL_ARRAY_BUFFER, tracer_positions.nbytes, tracer_positions, GL_DYNAMIC_DRAW)
@@ -1053,30 +1055,41 @@ class Renderer:
         glBindFramebuffer(GL_FRAMEBUFFER, self.tracer_fbo)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         self.tracer_shader.use()
-        print(tracer_positions)
-        self.tracer_shader.set_uniform3fv("lightPos", glm.vec3(tracer_positions[-1], tracer_positions[-2], tracer_positions[-3]))
+        self.tracer_shader.set_uniform3f("lightPos", glm.vec3(tracer_positions[-1]))
         self.tracer_shader.set_uniform1f("lightIntensity", 10.0)
         self.tracer_shader.set_uniform_matrix4fv("model", glm.mat4(1))
         self.tracer_shader.set_uniform_matrix4fv("view", view_matrix)
-        self.tracer_shader.set_uniform3fvec("viewPos", [player.pitch, player.yaw, 0.0])
+        self.tracer_shader.set_uniform3f("viewPos", glm.vec3(player.pitch, player.yaw, 0.0))
         self.tracer_shader.set_uniform_matrix4fv("projection", projection_matrix)
-        self.tracer_shader.set_uniform3fvec("tracerColor", [1.0, 0.5, 0.2])
-        self.tracer_shader.set_uniform3fvec("lightColor", [1.0, 1.0, 1.0])
+        self.tracer_shader.set_uniform3f("tracerColor", glm.vec3(1.0, 0.5, 0.2))
+        self.tracer_shader.set_uniform3f("lightColor", glm.vec3(1.0, 1.0, 1.0))
         glBindVertexArray(self.tracer_vao)
         glDrawArrays(GL_LINE_STRIP, 0, len(tracer_positions) // 3)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
-        # Apply blur effect
+        # Apply horizontal blur
+        glBindFramebuffer(GL_FRAMEBUFFER, self.blur_fbo1)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         self.blur_shader.use()
         self.blur_shader.set_uniform_sampler2D("image", 0)
         self.blur_shader.set_uniform_bool("horizontal", True)
+        glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, self.tracer_texture)
         self.render_quad()  # Render quad here for horizontal blur
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
+        # Apply vertical blur
+        glBindFramebuffer(GL_FRAMEBUFFER, self.blur_fbo2)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         self.blur_shader.set_uniform_bool("horizontal", False)
-        glBindTexture(GL_TEXTURE_2D, self.tracer_texture)
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, self.blur_texture1)  # Use the result from the first blur pass
         self.render_quad()  # Render quad here for vertical blur
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
+        # Optionally: Use the final blurred texture for further rendering or post-processing
+        glBindTexture(GL_TEXTURE_2D, self.blur_texture2)
+        # Perform any additional rendering or post-processing with the final blurred texture
 
     def debug_render(self):
         # Create and bind the Vertex Array Object (VAO)
@@ -1200,5 +1213,27 @@ class Renderer:
         self.tracer_vbo = vbo
         self.tracer_fbo = fbo
         self.tracer_texture = texture
+
+        # Create and configure blur FBOs and textures
+        self.blur_fbo1 = glGenFramebuffers(1)
+        self.blur_texture1 = glGenTextures(1)
+        self.configure_blur_fbo(self.blur_fbo1, self.blur_texture1, 800, 600)
+
+        self.blur_fbo2 = glGenFramebuffers(1)
+        self.blur_texture2 = glGenTextures(1)
+        self.configure_blur_fbo(self.blur_fbo2, self.blur_texture2, 800, 600)
+
         print(f"Tracer renderer initialized. \n VAO = {self.tracer_vao} \n VBO = {self.tracer_vbo} \n FBO = {self.tracer_fbo}")
-        # return vao, fbo, texture
+
+    def configure_blur_fbo(self, fbo, texture, width, height):
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo)
+        glBindTexture(GL_TEXTURE_2D, texture)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, None)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0)
+
+        if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
+            print("Blur Framebuffer not complete!")
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)

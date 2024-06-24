@@ -26,7 +26,7 @@ class Weapon(InteractableObject):
         self.shoot = False
         self.physics = physics
         self.initial_position = glm.vec3(0, 0, 0)
-        self.tracer_lifetime = 0.1
+        self.tracer_lifetime = 1.0
         self.tracers = []
 
     def update_weapon(self, delta_time):
@@ -61,6 +61,5 @@ class Weapon(InteractableObject):
     def get_tracer_positions(self):
         positions = []
         for tracer in self.tracers:
-            positions.extend(tracer['position'])
+            positions.append(tracer['position'])
         return np.array(positions, dtype=np.float32)
-
