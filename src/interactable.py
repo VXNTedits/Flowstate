@@ -72,8 +72,8 @@ class InteractableObject(CompositeModel):
     def on_pickup(self, player):
         # Define what happens when the player picks up this object
         if self.interactable:
-            self.set_composite_position(glm.vec3(0,0,0))
-            self.set_composite_rotation(glm.vec3(90,0,-90))
+            self.set_composite_position(glm.vec3(0, 0, 0))
+            self.set_composite_rotation(glm.vec3(90, 0, -90))
             print(f"{self.name} picked up by {player.name}.")
             player.inventory.append(self)
             self.interactable = False
@@ -84,8 +84,8 @@ class InteractableObject(CompositeModel):
         if self.interactable:
             self.check_interactions(player, delta_time)
         if self.picked_up:
-            self.update_composite_model_matrix(player.right_hand_model_matrix)#right_hand_model_matrix)
-            #print(f"player.right_hand_model_matrix =\n{player.right_hand_model_matrix}")
+            # Do any other stuff upon pickup
+            self.update_composite_model_matrix(player.right_hand_model_matrix)
         else:
             self.update_composite_model_matrix()  # Ensure the model matrix is updated for non-picked objects
         player.interact = False

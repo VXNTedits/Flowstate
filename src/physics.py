@@ -609,7 +609,7 @@ class Physics:
         else:
             # No collision: Accept the proposed thrust
             self.player.velocity += self.player.thrust
-            #self.apply_gravity(delta_time)
+            # self.apply_gravity(delta_time)
 
         # Apply speed limiter
         self.limit_speed()

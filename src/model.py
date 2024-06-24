@@ -302,43 +302,12 @@ class Model:
         except Exception as e:
             raise RuntimeError(f"Failed to scale model_matrix: {e}")
 
-    def set_orientation(self, rotation_angles):
-        # Validate input
-        # assert len(rotation_angles) == 3, "rotation_angles must be a list or tuple of 3 elements"
-        # assert all(isinstance(angle, (int, float)) for angle in
-        #            rotation_angles), "All elements in rotation_angles must be numbers"
-
-        # Apply rotations around x, y, z axes respectively
-        rotation_matrix = glm.mat4(1.0)
-        rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_angles[0]), glm.vec3(1.0, 0.0, 0.0))
-        rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_angles[1]), glm.vec3(0.0, 1.0, 0.0))
-        rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_angles[2]), glm.vec3(0.0, 0.0, 1.0))
-
-        # Update orientation and model matrix
-        self.orientation = glm.vec3(rotation_angles)
-        self.model_matrix = rotation_matrix * self.model_matrix
-
-        # Post-conditions to verify the state
-        # assert glm.equal(self.orientation, glm.vec3(rotation_angles)), "Orientation was not set correctly"
-        # assert glm.determinant(rotation_matrix) != 0, "Rotation matrix is not valid (determinant should not be zero)"
-        # assert glm.length(self.orientation) <= 360 * glm.sqrt(
-        #     3), "Orientation angles are out of expected bounds (0 to 360 degrees for each axis)"
-
     def set_position(self, translation):
-        # Ensure the translation is a glm.vec3
-        translation_vec = glm.vec3(translation[0], translation[1], translation[2])
+        self.position = glm.vec3(translation[0], translation[1], translation[2])
 
-        # Create the translation matrix
-        translation_matrix = glm.translate(glm.mat4(1.0), translation_vec)
+    def set_orientation(self, rotation):
+        self.orientation = glm.vec3(rotation[0], rotation[1], rotation[2])
 
-        # Multiply the translation matrix with the current model matrix
-        # Note the order of multiplication may need to be reversed depending on the use case
-        self.position = translation
-        self.model_matrix = translation_matrix * self.model_matrix
-        # If you want to set an absolute position, you might need to reset or reinitialize the model matrix
-        # self.model_matrix = translation_matrix  # Uncomment this line for absolute positioning
-
-    # Implement other methods as required
     def calculate_bounding_box(self, bounding_margin=0.1) -> list:
         if self.is_player:
             # Return a point at the bottom center of the player model: the player's feet
@@ -399,15 +368,14 @@ class Model:
         print("Calculated AABB:", aabb)
         return aabb
 
-    def update_model_matrix(self, parent_matrix=None):
+    def update_model_matrix(self, parent_matrix=None, debug=False):
         # Create translation matrix for the object's position
-        translation_matrix = glm.translate(glm.mat4(1.0),
-                                           glm.vec3(self.position[0], self.position[1], self.position[2]))
+        translation_matrix = glm.translate(glm.mat4(1.0), self.position)
 
         # Create rotation matrices for the object's orientation
-        rotation_x = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[0]), glm.vec3(1.0, 0.0, 0.0))
-        rotation_y = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[1]), glm.vec3(0.0, 1.0, 0.0))
-        rotation_z = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[2]), glm.vec3(0.0, 0.0, 1.0))
+        rotation_x = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation.x), glm.vec3(1.0, 0.0, 0.0))
+        rotation_y = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation.y), glm.vec3(0.0, 1.0, 0.0))
+        rotation_z = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation.z), glm.vec3(0.0, 0.0, 1.0))
 
         # Combine rotations to form the object's rotation matrix
         rotation_matrix = rotation_z * rotation_y * rotation_x
@@ -423,6 +391,9 @@ class Model:
             self.model_matrix = local_model_matrix
         else:
             self.model_matrix = parent_matrix * local_model_matrix
+
+        if debug:
+            print("local model matrix: \n", local_model_matrix)
 
     def init_model_matrix(self, translation, rotation_angles):
         translation_matrix = glm.translate(glm.mat4(1.0), translation)

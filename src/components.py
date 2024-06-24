@@ -103,19 +103,21 @@ class Components:
         fifty_ae = Caliber(initial_velocity=470,mass=0.02,drag_coefficient=0.5, bullet_area=0.000127)
 
         deagle = Weapon(
+            name='deagle',
             fire_rate=1,
             bullet_velocity_modifier=1,
             caliber=fifty_ae,
             filepath=get_relative_path("res/deagle_main.obj"),
             mtl_filepath=get_relative_path("res/deagle_main.mtl"),
-            translation=glm.vec3(0, 0, 0),  # (3.0, 2.0, -3.0),
+            translation=glm.vec3(10, 2, -10),  # (3.0, 2.0, -3.0),
             rotation=glm.vec3(0, 0, 0),
             scale=1,  # TODO: Scaling doesn't work as expected between root and child
             is_collidable=False,
             material_overrides=MaterialOverride(None, glm.vec3(1, 1, 1), 500),
             use_composite=True,
             shift_to_centroid=False,
-            physics=self.physics
+            physics=self.physics,
+            player_owner=self.player
         )
 
         deagle_slide = Model(filepath=get_relative_path("res/deagle_slide.obj"),
@@ -126,15 +128,15 @@ class Components:
                               relative_position=glm.vec3(0.0, 0.0, 0.0),
                               relative_rotation=glm.vec3(0.0, 0.0, 0.0))
 
-        test_cube_interactable = InteractableObject(filepath=get_relative_path("res/10cube.obj"),
-                                                    mtl_filepath=get_relative_path("res/10cube.mtl"),
-                                                    use_composite=False,
-                                                    shift_to_centroid=False,
-                                                    translation=glm.vec3(20,5,-20))
+        # test_cube_interactable = InteractableObject(filepath=get_relative_path("res/10cube.obj"),
+        #                                             mtl_filepath=get_relative_path("res/10cube.mtl"),
+        #                                             use_composite=False,
+        #                                             shift_to_centroid=False,
+        #                                             translation=glm.vec3(20,5,-20))
 
          # TODO: Events are only polled for the first interactable in the list ???
         self.add_interactable(deagle)
-        self.add_interactable(test_cube_interactable)
+        #self.add_interactable(test_cube_interactable)
 
         self.input_handler = InputHandler(self.camera, self.player, self.physics)
         print("Input handler initialized")
@@ -167,7 +169,6 @@ class Components:
 
         if isinstance(interactable_object, Weapon):
             self.add_weapon(interactable_object)
-
 
     def add_weapon(self, weapon):
         self.weapons.append(weapon)

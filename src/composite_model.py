@@ -64,6 +64,27 @@ class CompositeModel(Model):
         # Return all models contained in this composite model
         return [model for model, _, _ in self.models]
 
+    # def update_composite_model_matrix(self, parent_matrix=None):
+    #     self.model_matrices.clear()
+    #
+    #     if parent_matrix is None:
+    #         parent_matrix = glm.mat4(1.0)
+    #
+    #     if not self.models:
+    #         return
+    #
+    #     root_model = self.models[0][0]
+    #     root_model.update_model_matrix(parent_matrix)
+    #     self.model_matrices.append(root_model.model_matrix)
+    #
+    #     current_root_model_matrix = root_model.model_matrix
+    #
+    #     for model, relative_pos, relative_rot in self.models[1:]:
+    #         model.position = relative_pos
+    #         model.orientation = relative_rot
+    #         model.update_model_matrix(current_root_model_matrix)
+    #         self.model_matrices.append(model.model_matrix)
+
     def update_composite_model_matrix(self, parent_matrix=None):
         self.model_matrices.clear()
 
@@ -80,10 +101,50 @@ class CompositeModel(Model):
         current_root_model_matrix = root_model.model_matrix
 
         for model, relative_pos, relative_rot in self.models[1:]:
-            model.position = relative_pos
-            model.orientation = relative_rot
-            model.update_model_matrix(current_root_model_matrix)
+            translation_matrix = glm.translate(glm.mat4(1.0), relative_pos)
+            rotation_x = glm.rotate(glm.mat4(1.0), glm.radians(relative_rot.x), glm.vec3(1.0, 0.0, 0.0))
+            rotation_y = glm.rotate(glm.mat4(1.0), glm.radians(relative_rot.y), glm.vec3(0.0, 1.0, 0.0))
+            rotation_z = glm.rotate(glm.mat4(1.0), glm.radians(relative_rot.z), glm.vec3(0.0, 0.0, 1.0))
+            rotation_matrix = rotation_z * rotation_y * rotation_x
+            relative_transform = translation_matrix * rotation_matrix
+            model.model_matrix = current_root_model_matrix * relative_transform
             self.model_matrices.append(model.model_matrix)
+
+    # def update_composite_model_matrix(self, parent_matrix=None):
+    #     self.model_matrices.clear()
+    #
+    #     if parent_matrix is None:
+    #         parent_matrix = glm.mat4(1.0)
+    #
+    #     if not self.models:
+    #         return
+    #
+    #     root_model = self.models[0][0]
+    #     root_model.update_model_matrix(parent_matrix)
+    #     self.model_matrices.append(root_model.model_matrix)
+    #
+    #     current_root_model_matrix = root_model.model_matrix
+    #
+    #     for model, relative_pos, relative_rot in self.models[1:]:
+    #         # Apply the parent's matrix to the relative position and rotation
+    #         # Calculate the translation matrix for the relative position
+    #         translation_matrix = glm.translate(glm.mat4(1.0), relative_pos)
+    #
+    #         # Create rotation matrices for the relative orientation
+    #         rotation_x = glm.rotate(glm.mat4(1.0), glm.radians(relative_rot.x), glm.vec3(1.0, 0.0, 0.0))
+    #         rotation_y = glm.rotate(glm.mat4(1.0), glm.radians(relative_rot.y), glm.vec3(0.0, 1.0, 0.0))
+    #         rotation_z = glm.rotate(glm.mat4(1.0), glm.radians(relative_rot.z), glm.vec3(0.0, 0.0, 1.0))
+    #         rotation_matrix = rotation_z * rotation_y * rotation_x
+    #
+    #         # Combine translation and rotation
+    #         relative_transform = translation_matrix * rotation_matrix
+    #
+    #         # Update model's matrix relative to the current root model matrix
+    #         model.model_matrix = current_root_model_matrix * relative_transform
+    #         self.model_matrices.append(model.model_matrix)
+    #
+    #         # Update current root model matrix for next iteration if needed
+    #         current_root_model_matrix = model.model_matrix
 
     def update_flat_model_matrix(self, parent_matrix=glm.mat4(1.0)):
         self.model_matrices.clear()
@@ -105,15 +166,25 @@ class CompositeModel(Model):
         self.update_composite_model_matrix(model.model_matrix)
 
     def set_relative_transform(self, model, relative_position: glm.vec3, relative_rotation: glm.vec3):
+        """Sets the pose of the specified model relative to the parent."""
+
         # Calculate the new position of the model relative to the parent model
-        new_model_position = self.composite_position + relative_position
+        new_model_position = self.position + relative_position
 
         # Calculate the new rotation of the model relative to the parent model
-        new_model_rotation = self.composite_rotation + relative_rotation
+        new_model_rotation = self.orientation + relative_rotation
 
-        # Update the model's position, orientation and matrix
+        # Update the model's position and orientation
         model.set_position(new_model_position)
         model.set_orientation(new_model_rotation)
+
+        # Update self.models with the new relative position and rotation
+        for i, (m, _, _) in enumerate(self.models):
+            if m == model:
+                self.models[i] = (m, relative_position, relative_rotation)
+                break
+
+        # Recalculate the model matrix
         model.update_model_matrix()
 
     def calculate_composite_centroid(self):

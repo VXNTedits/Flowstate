@@ -16,7 +16,6 @@ class ShaderManager:
         return ShaderManager._instances[key]
 
 
-
 class Shader:
     current_program = None
 

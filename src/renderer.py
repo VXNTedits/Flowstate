@@ -265,9 +265,6 @@ class Renderer:
         for weapon in self.weapons:
             tracer_positions = weapon.get_tracer_positions()
             if tracer_positions.any():
-                print("tracer_positions:")
-                for p in tracer_positions:
-                    print(p)
                 self.draw_tracers(tracer_positions, view_matrix, projection_matrix, player_object)
 
         # 4. Render volumetric effects to the framebuffer
@@ -827,10 +824,10 @@ class Renderer:
                 # Associate the intensity of the tracer light to its lifetime
                 tracer_light_intensities.append( (1-lifetime) if lifetime != 0 else 1.0)
 
-        print("\n tracer_light_positions = ", tracer_light_positions)
-        print("\n tracer_light_colors = ", tracer_light_colors)
-        print("\n tracer_light_intensities = ", tracer_light_intensities)
-        print("\n")
+        # print("\n tracer_light_positions = ", tracer_light_positions)
+        # print("\n tracer_light_colors = ", tracer_light_colors)
+        # print("\n tracer_light_intensities = ", tracer_light_intensities)
+        # print("\n")
 
         shader.set_uniform1i("numTracerLights", num_tracer_lights)
         shader.set_uniform3fvec("tracerLightPositions", tracer_light_positions)
@@ -1045,7 +1042,7 @@ class Renderer:
             raise RuntimeError(f"OpenGL error during buffer initialization: {gluErrorString(error).decode()}")
 
     def draw_tracers(self, tracer_positions, view_matrix, projection_matrix, player):
-        print("Drawing tracers...")
+        # print("Drawing tracers...")
 
         # Update the VBO with new tracer positions
         glBindBuffer(GL_ARRAY_BUFFER, self.tracer_vbo)

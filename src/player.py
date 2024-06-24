@@ -13,6 +13,7 @@ from src.world import World
 class Player(Model):
     def __init__(self, body_path: str, head_path: str, right_arm_path:
     str, mtl_path: str, camera, default_material, filepath: str, mtl_filepath: str):
+        self.is_shooting = False
         self.last_shot_time = 0
         self.mouse_buttons = [False, False]
         self.yaw = camera.yaw
@@ -69,6 +70,7 @@ class Player(Model):
         self.update_combat(delta_time, mouse_buttons, world)
 
     def shoot(self, weapon: Weapon, delta_time, world):
+        self.is_shooting = True
         current_time = time.time()
         fire_rate = weapon.fire_rate
         time_between_shots = 1.0 / fire_rate if fire_rate > 0 else float('inf')
@@ -79,12 +81,15 @@ class Player(Model):
 
         if current_time - self.last_shot_time >= time_between_shots:
             print("Player shot.")
+            weapon.animate_shoot(delta_time)
             weapon.initialize_trajectory(
                 initial_position=self.right_hand_position,
                 player_pitch=self.pitch,
-                player_yaw=self.yaw
+                player_yaw=self.yaw,
+                delta_time=delta_time
             )
             self.last_shot_time = current_time
+            #self.animate_hipfire_recoil(delta_time)
 
     def reset_thrust(self):
         self.thrust = glm.vec3(0.0, 0.0, 0.0)
@@ -245,3 +250,7 @@ class Player(Model):
             print("LMB not pressed.")
             print()
             self.mouse_buttons[0] = False
+
+    def animate_hipfire_recoil(self, delta_time):
+        # TODO
+        self.right_arm.set_orientation([0,0,45])

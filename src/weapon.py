@@ -13,9 +13,12 @@ class Weapon(InteractableObject):
                  bullet_velocity_modifier,
                  caliber: Caliber,
                  physics: Physics,
+                 name: str,
+                 player_owner,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.animation_accumulator = 0.0
         self.active_trajectories = []
         self.projectile_positions = []
         self.fire_rate = fire_rate
@@ -26,13 +29,17 @@ class Weapon(InteractableObject):
         self.shoot = False
         self.physics = physics
         self.initial_position = glm.vec3(0, 0, 0)
-        self.tracer_lifetime = 1.0
+        self.tracer_lifetime = 0.5
         self.tracers = []
+        self.name = name
+        self.player_owner = player_owner
 
     def update_weapon(self, delta_time):
-        pass
+        if self.shoot:
+            self.animate_shoot(delta_time)
 
-    def initialize_trajectory(self, initial_position, player_pitch, player_yaw):
+    def initialize_trajectory(self, initial_position, player_pitch, player_yaw, delta_time):
+        self.shoot = True
         print("Initializing trajectory...")
         if not self.physics:
             print("Physics context is not available. Skipping trajectory initialization.")
@@ -63,3 +70,26 @@ class Weapon(InteractableObject):
         for tracer in self.tracers:
             positions.append(tracer['position'])
         return np.array(positions, dtype=np.float32)
+
+    def animate_shoot(self, delta_time):
+        if self.name == 'deagle':
+            self.shoot_deagle(delta_time)
+
+    def shoot_deagle(self, delta_time):
+        models = super().get_objects()
+        root = models[0]
+        child = models[1]
+
+        if self.animation_accumulator <= 0.2:
+            root.set_relative_transform(child,
+                                        glm.vec3(-0.2 + self.animation_accumulator, 0, 0),
+                                        glm.vec3(0, 0, 0))
+            self.animation_accumulator += delta_time * 0.5
+            print("translating to:", -0.5 + self.animation_accumulator)
+        else:
+            root.set_relative_transform(child,
+                                        glm.vec3(0, 0, 0),
+                                        glm.vec3(0, 0, 0))
+            self.shoot = False
+            self.animation_accumulator = 0.0
+
