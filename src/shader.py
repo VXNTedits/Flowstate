@@ -132,8 +132,13 @@ class Shader:
             #print(f"Set uniform '{name}' to value {vec3} at location {location}.")
 
     def set_uniform3fvec(self, name, vector):
+        self.use()
         location = glGetUniformLocation(self.program, name)
-        glUniform3fv(location, 1, vector)
+        if location == -1:
+            print(f"Uniform '{name}' not found in shader program {self.program}.")
+        else:
+            flat_values = [val for vec in vector for val in vec]
+            glUniform3fv(location, len(vector), flat_values)
 
     def set_uniform1f(self, name, value):
         self.use()
@@ -145,6 +150,14 @@ class Shader:
             glUniform1f(location, value)
             # Debug information
             #print(f"Set uniform '{name}' to value {value} at location {location}.")
+
+    def set_uniform1fv(self, name, values):
+        self.use()
+        location = glGetUniformLocation(self.program, name)
+        if location == -1:
+            print(f"Uniform '{name}' not found in shader program {self.program}.")
+        else:
+            glUniform1fv(location, len(values), values)
 
     def set_uniform1i(self, name, value):
         self.use()

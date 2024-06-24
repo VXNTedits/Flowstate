@@ -23,7 +23,13 @@ uniform float bumpScale;
 uniform sampler2D shadowMap;
 uniform bool useTexture;
 uniform sampler2D texture1;
-uniform bool enableBumpMapping;  // New uniform to control bump mapping
+uniform bool enableBumpMapping;
+
+#define MAX_TRACER_LIGHTS 64
+uniform int numTracerLights;
+uniform vec3 tracerLightPositions[MAX_TRACER_LIGHTS];
+uniform vec3 tracerLightColors[MAX_TRACER_LIGHTS];
+uniform float tracerLightIntensities[MAX_TRACER_LIGHTS];
 
 float hash(float n) { return fract(sin(n) * 43758.5453); }
 
@@ -109,6 +115,24 @@ void main()
 
         float shadow = shadowCalculation(FragPosLightSpace[i], perturbedNormal, lightDir);
         result += (diffuse + specular) * (1.0 - shadow);
+    }
+
+    // Add contribution of tracer lights
+    float specularStrength = 0.1;
+    for (int i = 0; i < numTracerLights; ++i) {
+        vec3 tracerLightPos = tracerLightPositions[i];
+        vec3 tracerLightColor = tracerLightColors[i];
+        float tracerLightIntensity = tracerLightIntensities[i];
+
+        vec3 tracerLightDir = normalize(tracerLightPos - FragPos);
+        float tracerDiff = max(dot(norm, tracerLightDir), 0.0);
+        vec3 tracerDiffuse = tracerDiff * tracerLightColor * tracerLightIntensity;
+
+        vec3 tracerReflectDir = reflect(-tracerLightDir, norm);
+        float tracerSpec = pow(max(dot(viewDir, tracerReflectDir), 0.0), 32);
+        vec3 tracerSpecular = specularStrength * tracerSpec * tracerLightColor * tracerLightIntensity;
+
+        result += tracerDiffuse + tracerSpecular;
     }
 
     FragColor = vec4(result, 1.0);

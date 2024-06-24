@@ -254,7 +254,8 @@ class Renderer:
                                  view_matrix=view_matrix,
                                  projection_matrix=projection_matrix,
                                  enable_bump_mapping=False,
-                                 bump_scale=5)
+                                 bump_scale=5,
+                                 weapons=self.weapons)
 
         # Ensure depth test is enabled for future operations
         glEnable(GL_DEPTH_TEST)
@@ -264,7 +265,8 @@ class Renderer:
         for weapon in self.weapons:
             tracer_positions = weapon.get_tracer_positions()
             if tracer_positions.any():
-                self.draw_tracers(tracer_positions, view_matrix, projection_matrix, player_object)
+                print("tracer_positions", tracer_positions)
+                #self.draw_tracers(tracer_positions, view_matrix, projection_matrix, player_object)
 
         # 4. Render volumetric effects to the framebuffer
         self.render_volumetric_effects_to_fbo(view_matrix,
@@ -782,7 +784,7 @@ class Renderer:
         self.check_gl_state()
 
     def render_scene_to_fbo(self, shader, player_object, world, world_objects, interactables, light_space_matrix,
-                            view_matrix, projection_matrix, enable_bump_mapping=False, bump_scale=0.0):
+                            view_matrix, projection_matrix, enable_bump_mapping=False, bump_scale=0.0, weapons=None):
         glBindFramebuffer(GL_FRAMEBUFFER, self.scene_fbo)
         glViewport(0, 0, 800, 600)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -802,6 +804,36 @@ class Renderer:
         self.check_opengl_error()
 
         self.shader.set_roughness(0.1)
+
+        # Set tracer lights
+        num_tracer_lights = 0
+        tracer_light_positions = []
+        tracer_light_colors = []
+        tracer_light_intensities = []
+
+        for weapon in weapons:
+            num_tracer_lights += len(weapon.tracers)
+            for tracer in weapon.tracers:
+                # Retrieve the latest position for this tracer and add it to tracer_light_positions
+                tracer_light_positions.append(tracer['position'])
+                # Retrieve the lifetime associated with the latest position
+                lifetime = tracer['lifetime']
+                tracer_light_colors.append( #[1.0, 0.5, 0.2]
+                    (1.0,
+                     (0.5 - lifetime)**2 if lifetime != 0 else 1.0,
+                     (0.2 - lifetime)**2 if lifetime != 0 else 1.0))
+                # Associate the intensity of the tracer light to its lifetime
+                tracer_light_intensities.append( (1-lifetime) if lifetime != 0 else 1.0)
+
+        print("\n tracer_light_positions = ", tracer_light_positions)
+        print("\n tracer_light_colors = ", tracer_light_colors)
+        print("\n tracer_light_intensities = ", tracer_light_intensities)
+        print("\n")
+
+        shader.set_uniform1i("numTracerLights", num_tracer_lights)
+        shader.set_uniform3fvec("tracerLightPositions", tracer_light_positions)
+        shader.set_uniform3fvec("tracerLightColors", tracer_light_colors)
+        shader.set_uniform1fv("tracerLightIntensities", tracer_light_intensities)
 
         self.render_lights(self.light_positions, self.light_colors, view_matrix, projection_matrix)
         self.render_scene(shader, player_object, world, world_objects, interactables, light_space_matrix,
@@ -1021,7 +1053,8 @@ class Renderer:
         glBindFramebuffer(GL_FRAMEBUFFER, self.tracer_fbo)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         self.tracer_shader.use()
-        self.tracer_shader.set_uniform3fvec("lightPos", tracer_positions[-1])
+        print(tracer_positions)
+        self.tracer_shader.set_uniform3fv("lightPos", glm.vec3(tracer_positions[-1], tracer_positions[-2], tracer_positions[-3]))
         self.tracer_shader.set_uniform1f("lightIntensity", 10.0)
         self.tracer_shader.set_uniform_matrix4fv("model", glm.mat4(1))
         self.tracer_shader.set_uniform_matrix4fv("view", view_matrix)
