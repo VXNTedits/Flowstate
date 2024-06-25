@@ -824,11 +824,6 @@ class Renderer:
                 # Associate the intensity of the tracer light to its lifetime
                 tracer_light_intensities.append( (1-lifetime) if lifetime != 0 else 1.0)
 
-        # print("\n tracer_light_positions = ", tracer_light_positions)
-        # print("\n tracer_light_colors = ", tracer_light_colors)
-        # print("\n tracer_light_intensities = ", tracer_light_intensities)
-        # print("\n")
-
         shader.set_uniform1i("numTracerLights", num_tracer_lights)
         shader.set_uniform3fvec("tracerLightPositions", tracer_light_positions)
         shader.set_uniform3fvec("tracerLightColors", tracer_light_colors)

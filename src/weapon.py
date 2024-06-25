@@ -84,8 +84,7 @@ class Weapon(InteractableObject):
             root.set_relative_transform(child,
                                         glm.vec3(-0.2 + self.animation_accumulator, 0, 0),
                                         glm.vec3(0, 0, 0))
-            self.animation_accumulator += delta_time * 0.5
-            print("translating to:", -0.5 + self.animation_accumulator)
+            self.animation_accumulator += delta_time * 1.0
         else:
             root.set_relative_transform(child,
                                         glm.vec3(0, 0, 0),

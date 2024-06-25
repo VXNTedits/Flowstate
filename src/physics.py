@@ -23,15 +23,17 @@ class Physics:
         self.pid_controller = PIDController(kp=0.8, ki=0.0, kd=0.0)
         self.offset = 0.1
         self.set_gravity = True
+        self.toggle_gravity = False
         self.active_trajectories = []
 
     def apply_gravity(self, delta_time: float):
-        if not self.player.is_grounded:
-            self.player.velocity += self.gravity * delta_time
-            self.player.position += self.player.velocity * delta_time + 0.5 * self.gravity * delta_time ** 2
-            self.set_gravity = True
-        elif self.player.is_grounded:
-            self.set_gravity = False
+        if self.toggle_gravity:
+            if not self.player.is_grounded:
+                self.player.velocity += self.gravity * delta_time
+                self.player.position += self.player.velocity * delta_time + 0.5 * self.gravity * delta_time ** 2
+                self.set_gravity = True
+            elif self.player.is_grounded:
+                self.set_gravity = False
 
     def resolve_player_collision(self, obstacle_face, delta_time, penetration_threshold=0.1, correction_velocity=0.5):
         # Define player's bounding box corners
@@ -170,7 +172,6 @@ class Physics:
                     collision_point = self.calculate_collision_point(start_pos, end_pos, nearest_face_vectors)
                     print("Projectile collision detected at: ", collision_point)
                     return collision_point
-
         return None
 
     def check_linear_collision(self):
@@ -190,7 +191,7 @@ class Physics:
 
             if is_intersecting:
                 collisions.append((nearest_face_name, nearest_face_vectors))
-
+        return collisions
 
     def handle_collisions(self, player_thrust, delta_time):
         #self.adjust_velocity_based_on_wall_collision(player_thrust,delta_time)
@@ -609,7 +610,7 @@ class Physics:
         else:
             # No collision: Accept the proposed thrust
             self.player.velocity += self.player.thrust
-            # self.apply_gravity(delta_time)
+            self.apply_gravity(delta_time)
 
         # Apply speed limiter
         self.limit_speed()
@@ -648,14 +649,12 @@ class Physics:
                 weapon.tracers.append({'position': new_position, 'lifetime': 0.0})
 
                 if self.check_projectile_collision([pos['position'] for pos in trajectory['positions']]):
-                    print("Projectile collision detected at:", new_position)
-                    weapon.active_trajectories.remove(trajectory)
+                   print("Projectile collision detected at:", new_position)
+                   weapon.active_trajectories.remove(trajectory)
                 elif trajectory['elapsed_time'] > weapon.tracer_lifetime:
-                    print("Removing trajectory due to time expiration.")
-                    weapon.active_trajectories.remove(trajectory)
+                   print("Removing trajectory due to time expiration.")
+                   weapon.active_trajectories.remove(trajectory)
 
-            # if weapon.tracers:
-            #     print("active tracers = \n", weapon.tracers)
 
     def age_and_remove_expired_tracers(self, delta_time, weapon):
         # Increment the lifetime of each tracer position
