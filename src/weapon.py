@@ -67,9 +67,11 @@ class Weapon(InteractableObject):
 
     def get_tracer_positions(self):
         positions = []
+        lifetimes = []
         for tracer in self.tracers:
             positions.append(tracer['position'])
-        return np.array(positions, dtype=np.float32)
+            lifetimes.append(tracer['lifetime'])
+        return np.array(positions, dtype=np.float32), np.array(lifetimes, dtype=np.float32)
 
     def animate_shoot(self, delta_time):
         if self.name == 'deagle':

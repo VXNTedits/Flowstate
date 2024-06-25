@@ -58,7 +58,6 @@ class Game:
                                                 view_matrix=view_matrix,
                                                 projection_matrix=self.projection_matrix,
                                                 delta_time=delta_time)
-                #self.components.renderer.debug_render()
 
             imgui.render()
             self.impl.render(imgui.get_draw_data())

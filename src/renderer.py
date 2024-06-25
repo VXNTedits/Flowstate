@@ -22,7 +22,7 @@ class Renderer:
     def __init__(self, shader, camera, physics, weapons):
         # Store the provided references
         self.physics = physics
-        self.shader = shader
+        self.main_shader = shader
         self.camera = camera
         self.weapons = weapons
 
@@ -31,9 +31,9 @@ class Renderer:
         self.light_intensity = 1.0
 
         self.light_positions = [
-            glm.vec3(50.2, 10.0, 2.0),
-            glm.vec3(10.2, 20.0, 2.0),
-            glm.vec3(0.0, 20.0, -20.0)
+            glm.vec3(50.2, -10.0, 2.0),
+            glm.vec3(10.2, -20.0, 2.0),
+            glm.vec3(0.0, -20.0, -20.0)
         ]
         self.light_count = len(self.light_positions)
 
@@ -71,8 +71,8 @@ class Renderer:
                                                      'shaders/depth_fragment.glsl')
         self.shadow_shader = ShaderManager.get_shader('shaders/shadow_vertex.glsl',
                                                       'shaders/shadow_fragment.glsl')
-        self.shader = ShaderManager.get_shader('shaders/vertex_shader.glsl',
-                                               'shaders/fragment_shader.glsl')
+        self.main_shader = ShaderManager.get_shader('shaders/vertex_shader.glsl',
+                                                    'shaders/fragment_shader.glsl')
         self.volumetric_shader = ShaderManager.get_shader('shaders/volumetric_vertex.glsl',
                                                           'shaders/volumetric_fragment.glsl')
         self.emissive_shader = ShaderManager.get_shader('shaders/emissive_vertex.glsl',
@@ -245,7 +245,7 @@ class Renderer:
         assert glIsEnabled(GL_DEPTH_TEST), "GL_DEPTH_TEST should be enabled after depth map rendering"
 
         # 2. Render the scene to the framebuffer
-        self.render_scene_to_fbo(shader=self.shader,
+        self.render_scene_to_fbo(shader=self.main_shader,
                                  player_object=player_object,
                                  world=world,
                                  interactables=interactables,
@@ -261,21 +261,21 @@ class Renderer:
         glEnable(GL_DEPTH_TEST)
         assert glIsEnabled(GL_DEPTH_TEST), "GL_DEPTH_TEST should be enabled for future operations"
 
-        # 3. Render tracers to the framebuffer
-        for weapon in self.weapons:
-            tracer_positions = weapon.get_tracer_positions()
-            if tracer_positions.any():
-                self.draw_tracers(tracer_positions, view_matrix, projection_matrix, player_object)
-
         # 4. Render volumetric effects to the framebuffer
         self.render_volumetric_effects_to_fbo(view_matrix,
                                               projection_matrix,
                                               glow_intensity=100.1,
                                               scattering_factor=0.8,
-                                              glow_falloff=10,
+                                              glow_falloff=100,
                                               god_ray_intensity=100000,
                                               god_ray_decay=0.001,
                                               god_ray_sharpness=100000)
+
+        # 3. Render tracers to the framebuffer
+        for weapon in self.weapons:
+            tracer_pos, tracer_lifetime = weapon.get_tracer_positions()
+            if tracer_pos.any():
+                self.draw_tracers(tracer_pos, view_matrix, projection_matrix, player_object, tracer_lifetime)
 
         # 5. Composite the scene and volumetric effects
         self.update_noise(delta_time)
@@ -329,8 +329,6 @@ class Renderer:
             player_object.draw(self.camera)
 
         # Render world
-        # print("Render world...")
-        # print("view_matrix = \n", view_matrix, "\nprojection_matrix = \n", projection_matrix)
         model_loc = glGetUniformLocation(shader.program, "model")
         view_loc = glGetUniformLocation(shader.program, "view")
         projection_loc = glGetUniformLocation(shader.program, "projection")
@@ -441,10 +439,10 @@ class Renderer:
             glDeleteBuffers(1, [self.light_ebo])
 
     def update_uniforms(self, model_matrix, view_matrix, projection_matrix, model: Model = None):
-        self.shader.use()
-        self.shader.set_uniform_matrix4fv("model", model_matrix)
-        self.shader.set_uniform_matrix4fv("view", view_matrix)
-        self.shader.set_uniform_matrix4fv("projection", projection_matrix)
+        self.main_shader.use()
+        self.main_shader.set_uniform_matrix4fv("model", model_matrix)
+        self.main_shader.set_uniform_matrix4fv("view", view_matrix)
+        self.main_shader.set_uniform_matrix4fv("projection", projection_matrix)
 
         if model:
             kd = model.default_material['diffuse']
@@ -453,11 +451,11 @@ class Renderer:
             roughness = model.default_material.get('roughness', 0.5)
             bump_scale = model.default_material.get('bumpScale', 1.0)
 
-            self.shader.set_uniform3f("objectColor", glm.vec3(*kd))
-            self.shader.set_uniform3f("specularColor", glm.vec3(*ks))
-            self.shader.set_uniform1f("shininess", ns)
-            self.shader.set_roughness(roughness)
-            self.shader.set_bump_scale(bump_scale)
+            self.main_shader.set_uniform3f("objectColor", glm.vec3(*kd))
+            self.main_shader.set_uniform3f("specularColor", glm.vec3(*ks))
+            self.main_shader.set_uniform1f("shininess", ns)
+            self.main_shader.set_roughness(roughness)
+            self.main_shader.set_bump_scale(bump_scale)
 
     def init_volumetric_fbo(self):
         """Sets up a framebuffer specifically for volumetric effects,
@@ -491,44 +489,30 @@ class Renderer:
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
     def render_quad(self):
-        if not hasattr(self, 'quadVAO'):
-            self.quadVertices = [
-                # Positions        # Texture Coords
-                -1.0, 1.0, 0.0, 0.0, 1.0,
-                -1.0, -1.0, 0.0, 0.0, 0.0,
-                1.0, -1.0, 0.0, 1.0, 0.0,
-                1.0, 1.0, 0.0, 1.0, 1.0,
-            ]
-            self.quadIndices = [
-                0, 1, 2,
-                0, 2, 3
-            ]
+        # Example implementation of a full-screen quad rendering
+        if not hasattr(self, 'quad_vao'):
+            self.quad_vao = glGenVertexArrays(1)
+            self.quad_vbo = glGenBuffers(1)
+            quad_vertices = np.array([
+                -1.0, 1.0, 0.0, 1.0,
+                -1.0, -1.0, 0.0, 0.0,
+                1.0, 1.0, 1.0, 1.0,
+                1.0, -1.0, 1.0, 0.0,
+            ], dtype=np.float32)
 
-            quadVertices = np.array(self.quadVertices, dtype=np.float32)
-            quadIndices = np.array(self.quadIndices, dtype=np.uint32)
-
-            self.quadVAO = glGenVertexArrays(1)
-            self.quadVBO = glGenBuffers(1)
-            self.quadEBO = glGenBuffers(1)
-
-            glBindVertexArray(self.quadVAO)
-            glBindBuffer(GL_ARRAY_BUFFER, self.quadVBO)
-            glBufferData(GL_ARRAY_BUFFER, quadVertices.nbytes, quadVertices, GL_STATIC_DRAW)
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.quadEBO)
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, quadIndices.nbytes, quadIndices, GL_STATIC_DRAW)
-
-            # Position attribute
+            glBindVertexArray(self.quad_vao)
+            glBindBuffer(GL_ARRAY_BUFFER, self.quad_vbo)
+            glBufferData(GL_ARRAY_BUFFER, quad_vertices.nbytes, quad_vertices, GL_STATIC_DRAW)
             glEnableVertexAttribArray(0)
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * quadVertices.itemsize, ctypes.c_void_p(0))
-            # TexCoord attribute
+            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * quad_vertices.itemsize, ctypes.c_void_p(0))
             glEnableVertexAttribArray(1)
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * quadVertices.itemsize,
-                                  ctypes.c_void_p(3 * quadVertices.itemsize))
-
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * quad_vertices.itemsize,
+                                  ctypes.c_void_p(2 * quad_vertices.itemsize))
+            glBindBuffer(GL_ARRAY_BUFFER, 0)
             glBindVertexArray(0)
 
-        glBindVertexArray(self.quadVAO)
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
+        glBindVertexArray(self.quad_vao)
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
         glBindVertexArray(0)
 
     def render_depth_map(self, player, world, interactables):
@@ -788,21 +772,21 @@ class Renderer:
         glViewport(0, 0, 800, 600)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        self.shader.use()
-        self.shader.set_uniform_matrix4fv("view", view_matrix)
-        self.shader.set_uniform_matrix4fv("projection", projection_matrix)
+        self.main_shader.use()
+        self.main_shader.set_uniform_matrix4fv("view", view_matrix)
+        self.main_shader.set_uniform_matrix4fv("projection", projection_matrix)
 
         for i, (pos, color) in enumerate(zip(self.light_positions, self.light_colors)):
-            self.shader.set_uniform_matrix4fv(f"lightSpaceMatrix[{i}]", self.calculate_light_space_matrix(pos))
-            self.shader.set_uniform3f(f"lights[{i}].position", pos)
-            self.shader.set_uniform3f(f"lights[{i}].color", color)
+            self.main_shader.set_uniform_matrix4fv(f"lightSpaceMatrix[{i}]", self.calculate_light_space_matrix(pos))
+            self.main_shader.set_uniform3f(f"lights[{i}].position", pos)
+            self.main_shader.set_uniform3f(f"lights[{i}].color", color)
 
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, self.depth_map)
-        self.shader.set_uniform1i("shadowMap", 1)
+        self.main_shader.set_uniform1i("shadowMap", 1)
         self.check_opengl_error()
 
-        self.shader.set_roughness(0.1)
+        self.main_shader.set_roughness(0.1)
 
         # Set tracer lights
         num_tracer_lights = 0
@@ -817,12 +801,13 @@ class Renderer:
                 tracer_light_positions.append(tracer['position'])
                 # Retrieve the lifetime associated with the latest position
                 lifetime = tracer['lifetime']
-                tracer_light_colors.append( #[1.0, 0.5, 0.2]
+                tracer_light_colors.append(
                     (1.0,
-                     (0.5 - lifetime)**2 if lifetime != 0 else 1.0,
-                     (0.2 - lifetime)**2 if lifetime != 0 else 1.0))
+                     (0.5 * (glm.e() ** (-lifetime * 50))),  #if lifetime != 0 else 0.5, # 0.5
+                     (0.2 * (glm.e() ** (-lifetime * 50)))  #if lifetime != 0 else 0.2 )# 0.2
+                     ))
                 # Associate the intensity of the tracer light to its lifetime
-                tracer_light_intensities.append( (1-lifetime) if lifetime != 0 else 1.0)
+                tracer_light_intensities.append((glm.e() ** (-lifetime * 50)))  #if lifetime != 0 else 1.0)
 
         shader.set_uniform1i("numTracerLights", num_tracer_lights)
         shader.set_uniform3fvec("tracerLightPositions", tracer_light_positions)
@@ -908,10 +893,6 @@ class Renderer:
 
         # 5. Unbind textures
         glBindTexture(GL_TEXTURE_2D, 0)
-
-        # glBindVertexArray(self.quadVAO)
-        # glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
-        # glBindVertexArray(0)
 
     def check_gl_state(self):
         depth_test_enabled = glIsEnabled(GL_DEPTH_TEST)
@@ -1036,9 +1017,7 @@ class Renderer:
         if error != GL_NO_ERROR:
             raise RuntimeError(f"OpenGL error during buffer initialization: {gluErrorString(error).decode()}")
 
-    def draw_tracers(self, tracer_positions, view_matrix, projection_matrix, player):
-        # print("Drawing tracers...")
-
+    def draw_tracers(self, tracer_positions, view_matrix, projection_matrix, player, lifetimes):
         # Update the VBO with new tracer positions
         glBindBuffer(GL_ARRAY_BUFFER, self.tracer_vbo)
         glBufferData(GL_ARRAY_BUFFER, tracer_positions.nbytes, tracer_positions, GL_DYNAMIC_DRAW)
@@ -1053,11 +1032,24 @@ class Renderer:
         self.tracer_shader.set_uniform_matrix4fv("view", view_matrix)
         self.tracer_shader.set_uniform3f("viewPos", glm.vec3(player.pitch, player.yaw, 0.0))
         self.tracer_shader.set_uniform_matrix4fv("projection", projection_matrix)
-        self.tracer_shader.set_uniform3f("tracerColor", glm.vec3(1.0, 0.5, 0.2))
-        self.tracer_shader.set_uniform3f("lightColor", glm.vec3(1.0, 1.0, 1.0))
+        self.tracer_shader.set_uniform3f("tracerColor", glm.vec3(
+            1.0,
+            glm.exp(-lifetimes[-1] * 50),  # Exponential decay
+            glm.exp(-lifetimes[-1] * 20)  # Exponential decay
+        ))
+        self.tracer_shader.set_uniform3f("lightColor", glm.vec3(
+            1.0,
+            glm.exp(-lifetimes[-1] * 2),  # Exponential decay
+            glm.exp(-lifetimes[-1] * 5)  # Exponential decay
+        ))
         glBindVertexArray(self.tracer_vao)
         glDrawArrays(GL_LINE_STRIP, 0, len(tracer_positions) // 3)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+        # Debugging: Check if tracer framebuffer is complete
+        status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
+        if status != GL_FRAMEBUFFER_COMPLETE:
+            print("Tracer framebuffer not complete:", status)
 
         # Apply horizontal blur
         glBindFramebuffer(GL_FRAMEBUFFER, self.blur_fbo1)
@@ -1070,6 +1062,11 @@ class Renderer:
         self.render_quad()  # Render quad here for horizontal blur
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
+        # Debugging: Check if first blur framebuffer is complete
+        status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
+        if status != GL_FRAMEBUFFER_COMPLETE:
+            print("First blur framebuffer not complete:", status)
+
         # Apply vertical blur
         glBindFramebuffer(GL_FRAMEBUFFER, self.blur_fbo2)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -1078,6 +1075,11 @@ class Renderer:
         glBindTexture(GL_TEXTURE_2D, self.blur_texture1)  # Use the result from the first blur pass
         self.render_quad()  # Render quad here for vertical blur
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+        # Debugging: Check if second blur framebuffer is complete
+        status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
+        if status != GL_FRAMEBUFFER_COMPLETE:
+            print("Second blur framebuffer not complete:", status)
 
         # Optionally: Use the final blurred texture for further rendering or post-processing
         glBindTexture(GL_TEXTURE_2D, self.blur_texture2)
@@ -1209,13 +1211,14 @@ class Renderer:
         # Create and configure blur FBOs and textures
         self.blur_fbo1 = glGenFramebuffers(1)
         self.blur_texture1 = glGenTextures(1)
-        self.configure_blur_fbo(self.blur_fbo1, self.blur_texture1, 800, 600)
+        self.configure_blur_fbo(self.blur_fbo1, self.blur_texture1, screen_width, screen_height)
 
         self.blur_fbo2 = glGenFramebuffers(1)
         self.blur_texture2 = glGenTextures(1)
-        self.configure_blur_fbo(self.blur_fbo2, self.blur_texture2, 800, 600)
+        self.configure_blur_fbo(self.blur_fbo2, self.blur_texture2, screen_width, screen_height)
 
-        print(f"Tracer renderer initialized. \n VAO = {self.tracer_vao} \n VBO = {self.tracer_vbo} \n FBO = {self.tracer_fbo}")
+        print(
+            f"Tracer renderer initialized. \n VAO = {self.tracer_vao} \n VBO = {self.tracer_vbo} \n FBO = {self.tracer_fbo}")
 
     def configure_blur_fbo(self, fbo, texture, width, height):
         glBindFramebuffer(GL_FRAMEBUFFER, fbo)
@@ -1226,6 +1229,6 @@ class Renderer:
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0)
 
         if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
-            print("Blur Framebuffer not complete!")
+            raise Exception("Blur Framebuffer is not complete!")
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
