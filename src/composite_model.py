@@ -166,3 +166,41 @@ class CompositeModel(Model):
         for model in self.get_objects():
             # print("set composite rotation for ", model.name + " to ", model.orientation)
             model.set_orientation(rotation)
+
+    def define_joint_locations(self, child_index, joint_position, joint_axis):
+        """
+        Define the joint locations for child models relative to the parent model.
+
+        :param child_index: Index of the child model in the self.models list.
+        :param joint_position: Position of the joint relative to the parent model.
+        :param joint_axis: Axis of rotation of the joint.
+        """
+        if child_index <= 0 or child_index >= len(self.models):
+            raise ValueError("Child index must be greater than 0 and less than the number of models")
+
+        parent_model, _, _ = self.models[0]
+        child_model, _, _ = self.models[child_index]
+
+        # Define the position and axis of the joint relative to the parent model
+        child_model.position = joint_position
+        child_model.rotation_axis = joint_axis
+
+        print(f"Joint for child model '{child_model.name}' defined at position {joint_position} "
+              f"with rotation axis {joint_axis} relative to parent model '{parent_model.name}'.")
+
+    def rotate_child_model(self, child_index, rotation_angle):
+        """
+        Rotate the child model around its joint axis by the given rotation angle.
+
+        :param child_index: Index of the child model in the self.models list.
+        :param rotation_angle: Rotation angle in radians.
+        """
+        if child_index <= 0 or child_index >= len(self.models):
+            raise ValueError("Child index must be greater than 0 and less than the number of models")
+
+        child_model, _, _ = self.models[child_index]
+        print(rotation_angle, child_model.rotation_axis)
+        child_model.update_transformation_matrix(rotation_angle, child_model.rotation_axis)
+
+        print(f"Child model '{child_model.name}' rotated by {rotation_angle} radians around its joint axis.")
+

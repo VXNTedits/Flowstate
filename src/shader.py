@@ -36,7 +36,7 @@ class Shader:
         version_present = any(line.lstrip().startswith('#version') for line in lines)
 
         if version_present:
-            print(f"#version directive found in source:\n{source}\n")
+            # print(f"#version directive found in source:\n{source}\n")
             preprocessed_source = source
         else:
             if self.use_glsl_430 or 'gl_VertexID' in source or 'layout(binding = 0) buffer' in source:
@@ -46,7 +46,7 @@ class Shader:
             preprocessed_source = version_directive + source
 
         shader_type_str = "GL_VERTEX_SHADER" if shader_type == GL_VERTEX_SHADER else "GL_FRAGMENT_SHADER"
-        print(f"Compiling {shader_type_str} with source...\n__________________\n{preprocessed_source}\n")
+        # print(f"Compiling {shader_type_str} with source...\n__________________\n{preprocessed_source}\n")
 
         glShaderSource(shader, preprocessed_source)
         glCompileShader(shader)

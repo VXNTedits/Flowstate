@@ -67,9 +67,14 @@ class Player(CompositeModel):
 
         # Composite model setup. The head is the composite's root. It _is_ the instance CompositeModel.
         super().__init__(filepath=head_path, mtl_filepath=mtl_path, player=True, *args, **kwargs)
+        print("initial vertices\n", self.vertices)
+        self.translate_vertices(glm.vec3(0, -1.7, 0))
+        print("translated vertices\n", self.vertices)
 
         self.add_comp_model(Model(body_path, mtl_path, player=True, translation=(0, 0, 0)))
         self.add_comp_model(Model(right_arm_path, mtl_path, player=True, translation=(0, 0, 0)))
+        self.define_joint_locations(1, (0.0, -1.8, 0.0), (0, 1, 0))
+        self.define_joint_locations(2, (0.0, -1.5, 0.5), (1, 0, 0))
 
     def update_player(self, delta_time: float, mouse_buttons: list, world: World):
         # Updates camera position
@@ -238,42 +243,57 @@ class Player(CompositeModel):
             print()
             self.mouse_buttons[0] = False
 
-    # def update_composite_player_model(self, right_shoulder_pos=glm.vec3(0.4, -0.1, 1.1), neck_pos=glm.vec3(0, 0, 1.4)):
-    def update_composite_player_model(self, right_shoulder_pos=(0.0, -0.0, 0.0), neck_pos=(0, 0, 0.0)):
+    def update_composite_player_model(self, right_shoulder_pos=(0.0, 1.5, 0.5), neck_pos=(0, -1.7, 0)):
         """Updates all player models"""
-
+        initial_position = self.position
         """# 0. First update all component's positions"""
         self.get_objects()[0].position = self.position  # Head
         self.get_objects()[1].position = self.position  # Torso
         self.get_objects()[2].position = self.position  # Right arm
 
         """# 1. Update the head to exactly follow the camera's pitch and yaw"""
-        self.get_objects()[0].set_orientation(rotation=glm.vec3(-self.pitch - 90, -self.yaw + 90, 0),
-                                              pivot_point=None)
+        self.update_transformation_matrix(glm.radians(-self.pitch - 90), glm.vec3(1, 0, 0))
+        self.update_transformation_matrix(glm.radians(-self.yaw + 90), glm.vec3(0, 1, 0))
+
         # Update the head in the models list
         self.models[0] = (self.get_objects()[0], glm.vec3(0, 0, 0), glm.vec3(0, 0, 0))
 
-        """# 2. Update the right arm to quickly lerp the camera's pitch and yaw"""
+        """# 2. Update the right arm to lerp the camera's pitch and yaw"""
         target_orientation = self.get_objects()[0].orientation  # Target orientation: the head
-        self.get_objects()[2].set_orientation(
-            rotation=glm.mix(self.get_objects()[2].orientation, target_orientation, 0.5),
-            pivot_point=None)
+        self.rotate_child_model(2, glm.mix(glm.radians(self.get_objects()[2].orientation.x),
+                                                     glm.radians(target_orientation.x), 0.1))
+
+        self.rotate_child_model(2, glm.mix(glm.radians(self.get_objects()[2].orientation.y),
+                                                     glm.radians(target_orientation.y), 0.1))
+
+        self.rotate_child_model(2, glm.mix(glm.radians(self.get_objects()[2].orientation.z),
+                                                     glm.radians(target_orientation.z), 0.1))
+
         # Determine the relative pose of the right arm
-        right_arm_relative_pos = self.get_objects()[2].position - self.get_objects()[0].position
+        right_arm_relative_pos = glm.vec3(0, 0, 0)
         right_arm_relative_rot = self.get_objects()[2].orientation - self.get_objects()[0].orientation
+
         # Update the right arm in the models list
         self.models[2] = (self.get_objects()[2], right_arm_relative_pos, right_arm_relative_rot)  # Right Arm
 
-        """# 3. Update the torso to slowly lerp the camera's yaw"""
-        torso_target_orientation = glm.vec3(-90, -self.yaw + 90, 0)  # Only yaw for the torso
-        self.get_objects()[1].set_orientation(
-            rotation=glm.mix(self.get_objects()[1].orientation, torso_target_orientation, 0.1),
-            pivot_point=None)
+        """# 3. Update the torso to lerp the camera's yaw"""
+        torso_target_orientation = glm.vec3(0, -self.yaw + 90, 0)  # Only yaw for the torso
+        self.rotate_child_model(1, glm.mix(glm.radians(self.get_objects()[1].orientation.x),
+                                             glm.radians(torso_target_orientation.x), 0.1))
+        self.rotate_child_model(1, glm.mix(glm.radians(self.get_objects()[1].orientation.y),
+                                             glm.radians(torso_target_orientation.y), 0.1))
+        self.rotate_child_model(1, glm.mix(glm.radians(self.get_objects()[1].orientation.z),
+                                             glm.radians(torso_target_orientation.z), 0.1))
+
         # Determine the relative pose of the torso
-        torso_relative_pos = self.get_objects()[1].position - self.get_objects()[0].position
+        torso_relative_pos = glm.vec3(0, 0, 0)
         torso_relative_rot = self.get_objects()[1].orientation - self.get_objects()[0].orientation
+
         # Update the torso in the models list
         self.models[1] = (self.get_objects()[1], torso_relative_pos, torso_relative_rot)
 
         """# 4. Updates composite model matrices for all parts relative to the root: the head"""
+        self.get_objects()[0].position = initial_position  # Head
+        self.get_objects()[1].position = initial_position  # Torso
+        self.get_objects()[2].position = initial_position  # Right arm
         self.update_composite_model_matrix()

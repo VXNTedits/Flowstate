@@ -41,6 +41,7 @@ class Model:
                  roughness_override=None,
                  bump_scale_override=None):
 
+        self.initial_position = translation
         self.impact = False
         self.script_dir = os.path.dirname(os.path.dirname(__file__))
 
@@ -315,7 +316,7 @@ class Model:
             pivot = glm.vec3(pivot_point[0], pivot_point[1], pivot_point[2])
 
             # Step 1: Translate to origin (relative to pivot)
-            translation_to_origin = self.position - pivot
+            translation_to_origin = glm.translate(glm.mat4(1.0), -pivot)
 
             # Step 2: Apply rotation (using glm to handle rotations)
             rotation_matrix = glm.mat4(1.0)
@@ -323,17 +324,23 @@ class Model:
             rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_vec[1]), glm.vec3(0, 1, 0))
             rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_vec[2]), glm.vec3(0, 0, 1))
 
-            # Apply the rotation
-            translated_position = glm.vec3(rotation_matrix * glm.vec4(translation_to_origin, 1.0))
-
             # Step 3: Translate back
-            new_position = translated_position + pivot
+            translation_back = glm.translate(glm.mat4(1.0), pivot)
 
-            # Update the object's position
+            # Combine transformations
+            transformation_matrix = translation_back * rotation_matrix * translation_to_origin
+
+            # Apply the transformation to the position
+            new_position = glm.vec3(transformation_matrix * glm.vec4(self.position, 1.0))
+
+            # Update the position
             self.position = new_position
 
-        # Update the object's orientation
+        # Apply the rotation to the orientation
         self.orientation = rotation_vec
+
+        # Update the model matrix to reflect new position and orientation
+        # self.update_model_matrix()
 
     def calculate_bounding_box(self, bounding_margin=0.1) -> list:
         if self.is_player:
@@ -512,3 +519,39 @@ class Model:
         assert self.indices.size % 3 == 0, "Indices size is not a multiple of 3 after crater addition."
 
         self.update_buffers(self.vao, self.vbo, self.ebo)
+
+    def translate_vertices(self, translation: glm.vec3):
+        """
+        Translate the vertices of the model by the given translation vector.
+
+        :param translation: A glm.vec3 vector representing the translation.
+        """
+        translation_array = np.array([translation.x, translation.y, translation.z], dtype=np.float32)
+
+        # Reshape the vertices array to (N, 3) to apply the translation
+        reshaped_vertices = self.vertices.reshape(-1, 3)
+        reshaped_vertices += translation_array
+
+        # Flatten back to 1D array
+        self.vertices = reshaped_vertices.flatten()
+        print(f"Vertices translated by {translation_array}")
+        self.update_buffers(self.vao, self.vbo, self.ebo)
+
+    def update_transformation_matrix(self, rotation_angle, rotation_axis):
+        """
+        Update the transformation (model) matrix based on the rotation angle around the rotation axis.
+        """
+
+        # Normalize the rotation axis
+        axis = glm.normalize(rotation_axis)
+
+        # Create the rotation matrix
+        rotation_matrix = glm.rotate(glm.mat4(1.0), rotation_angle, axis)
+
+        # Create the translation matrices
+        translation_matrix = glm.translate(glm.mat4(1.0), self.position)
+        inverse_translation_matrix = glm.translate(glm.mat4(1.0), -self.position)
+
+        # Combine translation and rotation into the transformation matrix
+        self.model_matrix = translation_matrix * rotation_matrix * inverse_translation_matrix
+        self.orientation = rotation_angle * glm.vec3(rotation_axis)
