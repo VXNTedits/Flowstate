@@ -159,19 +159,21 @@ class Physics:
         Checks if the projectile intersects with any object in the world.
         Returns the exact collision point if a collision is detected, otherwise None.
         """
+        world_objects = self.world.get_world_objects()
+
         for i in range(len(projectile_positions) - 1):
-            #print("Checking collisions on arc: ", projectile_positions)
             start_pos = projectile_positions[i]
             end_pos = projectile_positions[i + 1]
-            for obj in self.world.get_world_objects():
+            for obj in world_objects:
                 aabb = obj.aabb
-                is_intersecting, nearest_face_name, nearest_face_vectors = (
-                    self.is_bounding_box_intersecting_aabb((start_pos, end_pos), aabb))
+                is_intersecting, nearest_face_name, nearest_face_vectors = self.is_bounding_box_intersecting_aabb(
+                    (start_pos, end_pos), aabb)
 
                 if is_intersecting:
                     collision_point = self.calculate_collision_point(start_pos, end_pos, nearest_face_vectors)
                     print("Projectile collision detected at: ", collision_point)
                     return collision_point
+
         return None
 
     def check_linear_collision(self):
@@ -241,6 +243,14 @@ class Physics:
         (start_pos, end_pos) = line_segment
         (min_x, min_y, min_z), (max_x, max_y, max_z) = aabb
 
+        # Quick broad phase check
+        if not (min_x <= end_pos[0] <= max_x or min_x <= start_pos[0] <= max_x):
+            return False, None, None
+        if not (min_y <= end_pos[1] <= max_y or min_y <= start_pos[1] <= max_y):
+            return False, None, None
+        if not (min_z <= end_pos[2] <= max_z or min_z <= start_pos[2] <= max_z):
+            return False, None, None
+
         collision_faces_world = {
             "left": (glm.vec3(min_x, min_y, min_z), glm.vec3(min_x, max_y, min_z), glm.vec3(min_x, min_y, max_z)),
             "right": (glm.vec3(max_x, min_y, min_z), glm.vec3(max_x, max_y, min_z), glm.vec3(max_x, min_y, max_z)),
@@ -257,9 +267,6 @@ class Physics:
         return False, None, None
 
     def line_intersects_plane(self, start, end, plane_vertices):
-        """
-        Check if a line segment intersects a plane and return the intersection point.
-        """
         p0, p1, p2 = plane_vertices
         plane_normal = glm.normalize(glm.cross(p1 - p0, p2 - p0))
         plane_d = -glm.dot(plane_normal, p0)
@@ -282,9 +289,6 @@ class Physics:
         return False
 
     def point_in_plane_bounds(self, point, plane_vertices):
-        """
-        Check if a point is within the bounds of the plane's rectangular area.
-        """
         p0, p1, p2 = plane_vertices
         u = p1 - p0
         v = p2 - p0
@@ -649,12 +653,11 @@ class Physics:
                 weapon.tracers.append({'position': new_position, 'lifetime': 0.0})
 
                 if self.check_projectile_collision([pos['position'] for pos in trajectory['positions']]):
-                   print("Projectile collision detected at:", new_position)
-                   weapon.active_trajectories.remove(trajectory)
+                    print("Projectile collision detected at:", new_position)
+                    weapon.active_trajectories.remove(trajectory)
                 elif trajectory['elapsed_time'] > weapon.tracer_lifetime:
-                   print("Removing trajectory due to time expiration.")
-                   weapon.active_trajectories.remove(trajectory)
-
+                    print("Removing trajectory due to time expiration.")
+                    weapon.active_trajectories.remove(trajectory)
 
     def age_and_remove_expired_tracers(self, delta_time, weapon):
         # Increment the lifetime of each tracer position

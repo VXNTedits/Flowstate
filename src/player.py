@@ -186,7 +186,7 @@ class Player(CompositeModel):
         self.torso = models[0]
         arm_right = models[2]
         if self.animation_accumulator <= 45:
-            print("self.is_shooting: ", self.is_shooting)
+            # print("self.is_shooting: ", self.is_shooting)
             recoil_rotation = glm.vec3(0, 0, 45-self.animation_accumulator)
             self.torso.set_relative_transform(arm_right, self.right_arm_offset, recoil_rotation)
             self.animation_accumulator += delta_time * 20
