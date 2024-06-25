@@ -37,7 +37,7 @@ class Camera:
 
     def get_projection_matrix(self):
         # Return the projection matrix
-        return glm.perspective(glm.radians(self.zoom), self.aspect_ratio, 0.1, 100.0)
+        return glm.perspective(glm.radians(self.zoom), self.aspect_ratio, 0.01, 1000.0)
 
     def update_camera_vectors(self):
         front = glm.vec3()
@@ -49,22 +49,22 @@ class Camera:
         self.up = glm.normalize(glm.cross(self.right, self.front))
 
 
-    def toggle_view(self, player_position, player_rotation_matrix):
+    def toggle_view(self, player_position):
         if self.first_person:
-            self.set_third_person(player_position, player_rotation_matrix)
+            self.set_third_person(player_position)
         else:
-            self.set_first_person(player_position, player_rotation_matrix)
+            self.set_first_person(player_position)
         self.first_person = not self.first_person
 
-    def set_first_person(self, player_position, player_rotation_matrix):
+    def set_first_person(self, head_position):
         offset = glm.vec3(0.0, 1.8, 0.0)  # Adjust offset as needed for correct eye level
-        self.position = player_position + offset
+        self.position = head_position + offset
 
-    def set_third_person(self, player_position, player_rotation_matrix):
-        offset = glm.vec3(2, 5, 2)  # Adjust offset for third-person view
-        self.position = player_position + offset
+    def set_third_person(self, head_position):
+        offset = glm.vec3(2, 0, 2)  # Adjust offset for third-person view
+        self.position = head_position + offset
 
-    def set_position(self, position):
+    def set_camera_position(self, position):
         self.position = position
         self.update_camera_vectors()
 

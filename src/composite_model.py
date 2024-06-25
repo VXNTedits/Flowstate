@@ -71,10 +71,11 @@ class CompositeModel(Model):
             parent_matrix = glm.mat4(1.0)
 
         if not self.models:
+            print("Warning: no self.models found!")
             return
 
         root_model = self.models[0][0]
-        root_model.update_model_matrix(parent_matrix)
+        root_model.update_model_matrix(parent_matrix, debug=False)
         self.model_matrices.append(root_model.model_matrix)
 
         current_root_model_matrix = root_model.model_matrix
@@ -86,9 +87,12 @@ class CompositeModel(Model):
             rotation_z = glm.rotate(glm.mat4(1.0), glm.radians(relative_rot.z), glm.vec3(0.0, 0.0, 1.0))
             rotation_matrix = rotation_z * rotation_y * rotation_x
             relative_transform = translation_matrix * rotation_matrix
-            model.model_matrix = current_root_model_matrix * relative_transform
-            self.model_matrices.append(model.model_matrix)
 
+            model.model_matrix = current_root_model_matrix * relative_transform
+
+            self.model_matrices.append(model.model_matrix)
+            model.position = self.position + relative_pos
+            model.set_orientation(self.orientation + relative_rot)
 
     def update_flat_model_matrix(self, parent_matrix=glm.mat4(1.0)):
         self.model_matrices.clear()
@@ -105,8 +109,8 @@ class CompositeModel(Model):
 
     def add_comp_model(self, model, relative_position=glm.vec3(0.0, 0.0, 0.0),
                        relative_rotation=glm.vec3(0.0, 0.0, 0.0)):
-        self.models.append((model, relative_position, relative_rotation))
         self.set_relative_transform(model, relative_position, relative_rotation)
+        self.models.append((model, relative_position, relative_rotation))
         self.update_composite_model_matrix(model.model_matrix)
 
     def set_relative_transform(self, model, relative_position: glm.vec3, relative_rotation: glm.vec3):

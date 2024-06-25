@@ -13,7 +13,7 @@ from src.world import World
 
 class Player(CompositeModel):
     def __init__(self, body_path: str, head_path: str, right_arm_path: str, mtl_path: str, camera, default_material,
-                 filepath: str, mtl_filepath: str):
+                 filepath: str, mtl_filepath: str, *args, **kwargs):
         # Player attributes
         self.is_player = True
         self.player_height = 2
@@ -55,53 +55,44 @@ class Player(CompositeModel):
 
         # Models and transformations
         self.local_hand_position = glm.vec3(-0.35, -0.8, 1.0)
-        self.torso = CompositeModel(body_path, mtl_path, player=True, translation=(0, 0, 0))
-        self.head = Model(head_path, mtl_path, player=True, translation=(0, 0, 0))
-        self.right_arm = Model(right_arm_path, mtl_path, player=True, translation=(0, 0, 0))
         self.right_arm_offset = glm.vec3(0.0, 0.0, 0.0)  # In case right arm needs an offset (+x: +left)
-        self.vertices, self.indices = Model.load_obj(self, body_path)
 
         # Initial model matrix
         self.model_matrix = glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
-        self.rotation = glm.vec3(camera.pitch, camera.yaw, 0)
-        self.initialize_player_model_matrix()
-        self.set_right_hand_model_matrix()
+        self.rotation = glm.vec3(self.camera.pitch, self.camera.yaw, 0)
+        # self.set_right_hand_model_matrix()
 
         # Bounding box
         self.bounding_box = self.calculate_player_bounding_box(self.previous_position, self.position)
 
-        # Composite model setup
-        # super().__init__(filepath, mtl_filepath)
-        self.torso.add_comp_model(self.head)
-        self.torso.add_comp_model(self.right_arm)
+        # Composite model setup. The head is the composite's root. It _is_ the instance CompositeModel.
+        super().__init__(filepath=head_path, mtl_filepath=mtl_path, player=True, *args, **kwargs)
+
+        self.add_comp_model(Model(body_path, mtl_path, player=True, translation=(0, 0, 0)))
+        self.add_comp_model(Model(right_arm_path, mtl_path, player=True, translation=(0, 0, 0)))
 
     def update_player(self, delta_time: float, mouse_buttons: list, world: World):
-        # Update previous position before changing current position
-        self.previous_position = self.position
-
-        # Update position based on velocity and delta_time
-        self.position += self.velocity * delta_time
-
-        # Update camera position
+        # Updates camera position
         self.update_camera_position()
 
-        # Update the player's model matrix (torso, head, right arm) based on the new position
-        self.initialize_player_model_matrix()
+        # Updates previous position before changing current position
+        self.previous_position = self.position
 
-        # Update composite model matrices for all parts relative to the torso
-        self.torso.update_composite_model_matrix(self.torso.model_matrix)
+        # Updates position based on velocity and delta_time. The head _is_ the player's position.
+        self.position += self.velocity * delta_time
+        self.update_composite_player_model()
 
-        # Calculate the new trajectory based on the updated position
+        # Calculates the new trajectory based on the updated position
         self.trajectory = glm.normalize(self.position - self.previous_position)
 
-        # Update jumping status
+        # Updates jumping status
         if self.velocity.y <= -0.01:
             self.is_jumping = False
 
-        # Calculate the player's bounding box based on the new position
+        # Calculates the player's bounding box based on the new position
         self.calculate_player_bounding_box(self.previous_position, self.position)
 
-        # Update combat logic (e.g., handling shooting)
+        # Updates combat logic (e.g., handling shooting)
         self.update_combat(delta_time, mouse_buttons, world)
 
     def shoot(self, weapon: Weapon, delta_time, world):
@@ -154,31 +145,19 @@ class Player(CompositeModel):
 
         self.proposed_thrust = proposed_thrust
 
-    def initialize_player_model_matrix(self):
-        model_rotation = glm.rotate(glm.mat4(1.0), glm.radians(-self.yaw), glm.vec3(0.0, 1.0, 0.0))
-        model_rotation *= glm.rotate(glm.mat4(1.0), glm.radians(90), glm.vec3(0.0, 1.0, 0.0))
-        model_rotation *= glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
-
-        translation = glm.translate(glm.mat4(1.0), self.position)
-        final_model_matrix = translation * model_rotation
-
-        self.torso.model_matrix = final_model_matrix
-        right_arm_translation = glm.translate(glm.mat4(1.0), self.right_arm_offset)
-        self.right_arm.model_matrix = final_model_matrix * right_arm_translation
-        self.head.model_matrix = final_model_matrix
-
-        self.rotation = model_rotation
-        self.model_matrix = self.torso.model_matrix
-        self.set_right_hand_model_matrix()
-
-
     def set_right_hand_model_matrix(self):
+        # TODO: update this method
         local_hand_vec4 = glm.vec4(self.local_hand_position, 1.0)
         transformed_hand_position = self.right_arm.model_matrix * local_hand_vec4
+
         self.right_hand_model_matrix = glm.mat4(self.right_arm.model_matrix)
-        self.right_hand_model_matrix[3] = glm.vec4(transformed_hand_position.x, transformed_hand_position.y,
+
+        self.right_hand_model_matrix[3] = glm.vec4(transformed_hand_position.x,
+                                                   transformed_hand_position.y,
                                                    transformed_hand_position.z, 1.0)
-        self.right_hand_position = glm.vec3(transformed_hand_position.x, transformed_hand_position.y,
+
+        self.right_hand_position = glm.vec3(transformed_hand_position.x,
+                                            transformed_hand_position.y,
                                             transformed_hand_position.z)
 
     def animate_hipfire_recoil(self, delta_time):
@@ -186,13 +165,13 @@ class Player(CompositeModel):
         self.torso = models[0]
         arm_right = models[2]
         if self.animation_accumulator <= 45:
-            # print("self.is_shooting: ", self.is_shooting)
-            recoil_rotation = glm.vec3(0, 0, 45-self.animation_accumulator)
+            # print("self.is_shooting: ", 45-self.animation_accumulator)
+            recoil_rotation = glm.vec3(0, 0, 45 - self.animation_accumulator)
             self.torso.set_relative_transform(arm_right, self.right_arm_offset, recoil_rotation)
             self.animation_accumulator += delta_time * 20
             #root.update_composite_model_matrix()
         else:
-            self.torso.set_relative_transform(arm_right, self.right_arm_offset, glm.vec3(0,0,0))
+            self.torso.set_relative_transform(arm_right, self.right_arm_offset, glm.vec3(0, 0, 0))
             self.animation_accumulator = 0.0
             self.is_shooting = False
 
@@ -201,16 +180,16 @@ class Player(CompositeModel):
 
     def set_position(self, position):
         self.position = position
-        self.initialize_player_model_matrix()
+        self.update_composite_model_matrix()
+        # self.initialize_player_model_matrix()
 
-    def draw(self, camera: Camera):
+    def draw_player(self, camera: Camera):
         if not camera.first_person:
-            self.head.draw()
-            self.torso.draw()
-            self.right_arm.draw()
+            for model in self.get_objects():
+                model.draw()
         else:
-            self.torso.draw()
-            self.right_arm.draw()
+            self.get_objects()[1].draw()
+            self.get_objects()[2].draw()
 
     def process_mouse_movement(self, xoffset, yoffset):
         self.camera.process_mouse_movement(xoffset, yoffset)
@@ -223,9 +202,9 @@ class Player(CompositeModel):
         self.camera.pitch = self.pitch
         self.camera.update_camera_vectors()
         if self.camera.first_person:
-            self.camera.set_first_person(self.position, self.get_rotation_matrix())
+            self.camera.set_first_person(self.get_objects()[0].position)
         else:
-            self.camera.set_third_person(self.position, self.get_rotation_matrix())
+            self.camera.set_third_person(self.get_objects()[0].position)
 
     def pick_up(self, interactable_object):
         if isinstance(interactable_object, InteractableObject):
@@ -258,3 +237,43 @@ class Player(CompositeModel):
             print("LMB not pressed.")
             print()
             self.mouse_buttons[0] = False
+
+    # def update_composite_player_model(self, right_shoulder_pos=glm.vec3(0.4, -0.1, 1.1), neck_pos=glm.vec3(0, 0, 1.4)):
+    def update_composite_player_model(self, right_shoulder_pos=(0.0, -0.0, 0.0), neck_pos=(0, 0, 0.0)):
+        """Updates all player models"""
+
+        """# 0. First update all component's positions"""
+        self.get_objects()[0].position = self.position  # Head
+        self.get_objects()[1].position = self.position  # Torso
+        self.get_objects()[2].position = self.position  # Right arm
+
+        """# 1. Update the head to exactly follow the camera's pitch and yaw"""
+        self.get_objects()[0].set_orientation(rotation=glm.vec3(-self.pitch - 90, -self.yaw + 90, 0),
+                                              pivot_point=None)
+        # Update the head in the models list
+        self.models[0] = (self.get_objects()[0], glm.vec3(0, 0, 0), glm.vec3(0, 0, 0))
+
+        """# 2. Update the right arm to quickly lerp the camera's pitch and yaw"""
+        target_orientation = self.get_objects()[0].orientation  # Target orientation: the head
+        self.get_objects()[2].set_orientation(
+            rotation=glm.mix(self.get_objects()[2].orientation, target_orientation, 0.5),
+            pivot_point=None)
+        # Determine the relative pose of the right arm
+        right_arm_relative_pos = self.get_objects()[2].position - self.get_objects()[0].position
+        right_arm_relative_rot = self.get_objects()[2].orientation - self.get_objects()[0].orientation
+        # Update the right arm in the models list
+        self.models[2] = (self.get_objects()[2], right_arm_relative_pos, right_arm_relative_rot)  # Right Arm
+
+        """# 3. Update the torso to slowly lerp the camera's yaw"""
+        torso_target_orientation = glm.vec3(-90, -self.yaw + 90, 0)  # Only yaw for the torso
+        self.get_objects()[1].set_orientation(
+            rotation=glm.mix(self.get_objects()[1].orientation, torso_target_orientation, 0.1),
+            pivot_point=None)
+        # Determine the relative pose of the torso
+        torso_relative_pos = self.get_objects()[1].position - self.get_objects()[0].position
+        torso_relative_rot = self.get_objects()[1].orientation - self.get_objects()[0].orientation
+        # Update the torso in the models list
+        self.models[1] = (self.get_objects()[1], torso_relative_pos, torso_relative_rot)
+
+        """# 4. Updates composite model matrices for all parts relative to the root: the head"""
+        self.update_composite_model_matrix()

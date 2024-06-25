@@ -322,11 +322,10 @@ class Renderer:
                 mod.draw()
 
         # Render player
-        model_matrix = player_object.model_matrix
-        if view_matrix and projection_matrix:
-            self.update_uniforms(model_matrix, view_matrix, projection_matrix, player_object)
-            shader.set_uniform_matrix4fv("model", model_matrix)
-            player_object.draw(self.camera)
+        for player_model in player_object.get_objects():
+            self.update_uniforms(player_model.model_matrix, view_matrix, projection_matrix, player_model)
+            shader.set_uniform_matrix4fv("model", player_model.model_matrix)
+            player_model.draw(self.camera)
 
         # Render world
         model_loc = glGetUniformLocation(shader.program, "model")

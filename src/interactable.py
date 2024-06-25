@@ -85,7 +85,7 @@ class InteractableObject(CompositeModel):
             self.check_interactions(player, delta_time)
         if self.picked_up:
             # Do any other stuff upon pickup
-            self.update_composite_model_matrix(player.right_hand_model_matrix)
+            self.update_composite_model_matrix(player.right_arm.model_matrix)
         else:
             self.update_composite_model_matrix()  # Ensure the model matrix is updated for non-picked objects
         player.interact = False

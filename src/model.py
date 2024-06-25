@@ -49,7 +49,6 @@ class Model:
         self.orientation = rotation_angles
         self.init_model_matrix(translation, rotation_angles)
 
-
         self.is_collidable = is_collidable
         print(f"Initializing Model with filepath: {filepath}")
         self.name = filepath.split('/')[-1].split('.')[0]
@@ -175,7 +174,7 @@ class Model:
                 if line.startswith('newmtl'):
                     current_material = line.split()[1]
                     materials[current_material] = {'diffuse': [1.0, 0.0, 0.0], 'specular': [0.1, 0.5, 1.0],
-                                                   'shininess': 10.0, 'roughness':0.2, 'bumpScale':0.0}
+                                                   'shininess': 10.0, 'roughness': 0.2, 'bumpScale': 0.0}
                 elif current_material:
                     if line.startswith('Kd '):
                         parts = line.split()
@@ -274,11 +273,13 @@ class Model:
 
         print(self.name, "vao = ", self.vao, " vbo = ", self.vbo, " ebo = ", self.ebo)
 
-
     def draw(self, camera=None):
         assert self.vao is not None, "VAO should not be None."
         assert len(self.indices) > 0, "Indices should not be empty."
-
+        # if camera:
+        #     if camera.first_person:
+        #         if self.name == 'head':
+        #             return
         glBindVertexArray(self.vao)
         glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, None)
         glBindVertexArray(0)
@@ -305,8 +306,34 @@ class Model:
     def set_position(self, translation):
         self.position = glm.vec3(translation[0], translation[1], translation[2])
 
-    def set_orientation(self, rotation):
-        self.orientation = glm.vec3(rotation[0], rotation[1], rotation[2])
+    def set_orientation(self, rotation, pivot_point=None):
+        # Convert rotation to glm.vec3
+        rotation_vec = glm.vec3(rotation[0], rotation[1], rotation[2])
+
+        if pivot_point is not None:
+            # Convert pivot_point to glm.vec3
+            pivot = glm.vec3(pivot_point[0], pivot_point[1], pivot_point[2])
+
+            # Step 1: Translate to origin (relative to pivot)
+            translation_to_origin = self.position - pivot
+
+            # Step 2: Apply rotation (using glm to handle rotations)
+            rotation_matrix = glm.mat4(1.0)
+            rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_vec[0]), glm.vec3(1, 0, 0))
+            rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_vec[1]), glm.vec3(0, 1, 0))
+            rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_vec[2]), glm.vec3(0, 0, 1))
+
+            # Apply the rotation
+            translated_position = glm.vec3(rotation_matrix * glm.vec4(translation_to_origin, 1.0))
+
+            # Step 3: Translate back
+            new_position = translated_position + pivot
+
+            # Update the object's position
+            self.position = new_position
+
+        # Update the object's orientation
+        self.orientation = rotation_vec
 
     def calculate_bounding_box(self, bounding_margin=0.1) -> list:
         if self.is_player:
@@ -393,7 +420,8 @@ class Model:
             self.model_matrix = parent_matrix * local_model_matrix
 
         if debug:
-            print("local model matrix: \n", local_model_matrix)
+            # print("local model matrix: \n", local_model_matrix)
+            print(f"{self.name}'s model matrix updated to:\n{self.model_matrix}")
 
     def init_model_matrix(self, translation, rotation_angles):
         translation_matrix = glm.translate(glm.mat4(1.0), translation)
@@ -484,6 +512,3 @@ class Model:
         assert self.indices.size % 3 == 0, "Indices size is not a multiple of 3 after crater addition."
 
         self.update_buffers(self.vao, self.vbo, self.ebo)
-
-
-

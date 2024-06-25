@@ -82,10 +82,11 @@ class Components:
                              camera=self.camera,
                              default_material=Model.default_material,
                              filepath=get_relative_path("res/body.obj"),
-                             mtl_filepath=get_relative_path("res/body.mtl"))
+                             mtl_filepath=get_relative_path("res/body.mtl"),
+                             rotation_angles=glm.vec3(0, 0, 0))
         print("Player initialized")
 
-        self.models = [self.player.torso, self.player.right_arm]
+        self.models = self.player.get_objects()
         self.models += self.world.get_world_objects()
         self.models += self.world_objects.objects
         self.models += self.interactables
@@ -134,7 +135,7 @@ class Components:
         #                                             translation=glm.vec3(20,5,-20))
 
         # TODO: Events are only polled for the first interactable in the list ???
-        self.add_interactable(deagle)
+        # self.add_interactable(deagle)
         #self.add_interactable(test_cube_interactable)
 
         self.input_handler = InputHandler(self.camera, self.player, self.physics)

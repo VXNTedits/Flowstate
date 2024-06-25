@@ -21,7 +21,7 @@ class InputHandler:
             if key == glfw.KEY_ESCAPE:
                 glfw.set_window_should_close(window, True)
             elif key == glfw.KEY_V:
-                self.camera.toggle_view(self.player.position, self.player.get_rotation_matrix())
+                self.camera.toggle_view(self.player.position)
             if key in self.keys:
                 self.keys[key] = True
         elif action == glfw.RELEASE:
