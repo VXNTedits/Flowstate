@@ -15,6 +15,7 @@ class InputHandler:
             glfw.KEY_F: False
         }
         self.left_mouse_button_pressed = False
+        self.right_mouse_button_pressed = False
 
     def key_callback(self, window, key, scancode, action, mods):
         if action == glfw.PRESS:
@@ -51,6 +52,13 @@ class InputHandler:
             elif action == glfw.RELEASE:
                 self.left_mouse_button_pressed = False
                 self.player.handle_left_click(self.left_mouse_button_pressed)
+        if button == glfw.MOUSE_BUTTON_RIGHT:
+            if action == glfw.PRESS:
+                self.right_mouse_button_pressed = True
+                self.player.handle_right_click(self.right_mouse_button_pressed)
+            elif action == glfw.RELEASE:
+                self.right_mouse_button_pressed = False
+                self.player.handle_right_click(self.right_mouse_button_pressed)
 
     def is_left_mouse_button_pressed(self):
         return self.left_mouse_button_pressed

@@ -57,12 +57,26 @@ class Camera:
         self.first_person = not self.first_person
 
     def set_first_person(self, head_position):
-        offset = glm.vec3(0.0, 1.8, 0.0)  # Adjust offset as needed for correct eye level
-        self.position = head_position # + offset
+        self.position = head_position
 
-    def set_third_person(self, head_position):
-        offset = glm.vec3(4, 2, 4)  # Adjust offset for third-person view
-        self.position = head_position + offset
+    def set_third_person(self, head_position, distance=5.0):
+        """
+        Set the camera to orbit around the head position.
+
+        :param head_position: The position of the head as a glm.vec3
+        :param distance: The distance from the head to the camera
+        """
+        # Compute the offset from the head position based on the yaw and pitch
+        offset = glm.vec3()
+        offset.x = glm.cos(glm.radians(self.yaw)) * glm.cos(glm.radians(self.pitch)) * distance
+        offset.y = glm.sin(glm.radians(self.pitch)) * distance
+        offset.z = glm.sin(glm.radians(self.yaw)) * glm.cos(glm.radians(self.pitch)) * distance
+
+        # Set the new camera position
+        self.position = head_position - offset
+
+        # Update the camera's front vector
+        self.update_camera_vectors()
 
     def set_camera_position(self, position):
         self.position = position

@@ -96,7 +96,7 @@ class Player(CompositeModel):
         # Calculates the player's bounding box based on the new position
         self.calculate_player_bounding_box(self.previous_position, self.position)
 
-        # Updates combat logic (e.g., handling shooting)
+        # Updates combat logic (shooting, animations, etc)
         self.update_combat(delta_time, mouse_buttons, world)
 
     def shoot(self, weapon: Weapon, delta_time, world):
@@ -173,16 +173,22 @@ class Player(CompositeModel):
 
         if self.animation_accumulator <= self.RECOIL_DURATION:
             recoil_angle = -self.MAX_RECOIL_ANGLE * (
-                        self.RECOIL_DURATION - self.animation_accumulator) / self.RECOIL_DURATION
+                    self.RECOIL_DURATION - self.animation_accumulator) / self.RECOIL_DURATION
             recoil_rotation = glm.vec3(recoil_angle, 0, 0)
             #self.set_relative_transform(arm_right, self.right_arm_offset, recoil_rotation)
             print(recoil_rotation)
-            arm_right.set_orientation(arm_right.orientation+recoil_rotation)
+            arm_right.set_orientation(arm_right.orientation + recoil_rotation)
             self.animation_accumulator += delta_time * self.ANIMATION_SPEED
         else:
             # arm_right.set_orientation(arm_right.orientation)
             self.animation_accumulator = 0.0
             self.is_shooting = False
+
+    def ads(self, delta_time):
+        models = self.get_objects()
+        arm_right = models[2]
+        self.set_relative_transform(arm_right, glm.vec3(0.1,0.1,0.25),glm.vec3(90,0,0))
+        self.update_right_hand_model_matrix()
 
     def get_rotation_matrix(self):
         return glm.rotate(glm.mat4(1.0), glm.radians(self.yaw), glm.vec3(0.0, 1.0, 0.0))
@@ -237,6 +243,9 @@ class Player(CompositeModel):
             self.inventory[0].update_weapon(delta_time)
             if self.is_shooting:
                 self.animate_hipfire_recoil(delta_time)
+            if mouse_buttons[1]:
+                print("ADS active")
+                self.ads(delta_time)
 
     def handle_left_click(self, is_left_mouse_button_pressed):
         if is_left_mouse_button_pressed:
@@ -246,6 +255,15 @@ class Player(CompositeModel):
             print("LMB not pressed.")
             print()
             self.mouse_buttons[0] = False
+
+    def handle_right_click(self, is_right_mouse_button_pressed):
+        if is_right_mouse_button_pressed:
+            print("RMB pressed.")
+            self.mouse_buttons[1] = True
+        elif not is_right_mouse_button_pressed:
+            print("RMB not pressed.")
+            print()
+            self.mouse_buttons[1] = False
 
     def update_composite_player_model(self, neck_pos=(0, 1.5, 0), shoulder_pos=(0.5, 1.5, 0)):
         """ Responsible for animating and updating individual body parts """

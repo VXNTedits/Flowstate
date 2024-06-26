@@ -608,6 +608,7 @@ class Physics:
         # Manage collisions
         nearest_face_vectors = self.check_linear_collision()
         if nearest_face_vectors:
+            print("Collision detected!")
             # Collision: Resolve by projecting player onto collision face.
             #            Reject proposed thrust: Restrict entry velocity, but allow player to have exit velocity.
             self.handle_collisions(self.player.thrust, delta_time)
