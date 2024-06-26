@@ -74,7 +74,7 @@ class InteractableObject(CompositeModel):
         if self.interactable:
             self.set_composite_position(glm.vec3(0, 0, 0))
             self.update_composite_model_matrix()
-            self.set_composite_rotation(glm.vec3(90, 0, -90))
+            self.set_composite_rotation(glm.vec3(0, -90, 0))
             self.update_composite_model_matrix()
             print(f"{self.name} picked up by {player.name}.")
             player.inventory.append(self)
@@ -99,9 +99,6 @@ class InteractableObject(CompositeModel):
                 print("Player interacted.")
                 self.interact(player)
                 player.pick_up(self)
-                self.set_composite_rotation(player.right_hand_orientation)
-                self.set_composite_position(player.right_hand_position)
-                self.update_composite_model_matrix(player.right_hand_model_matrix)
 
     def highlight(self, delta_time):
         # Rotate around the y-axis

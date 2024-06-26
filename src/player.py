@@ -53,8 +53,8 @@ class Player(CompositeModel):
         self.mouse_buttons = [False, False]
         self.animation_accumulator = 0.0
 
-        # Models and transformations
-        self.local_hand_position = glm.vec3(0.0, 0.0, 0.0)#glm.vec3(-0.35, -0.8, 1.0)
+        # Models and transformations      # +left +up  +fwd
+        self.local_hand_position = glm.vec3(-0.25, -0.3, 0.6)
         self.right_arm_offset = glm.vec3(0.0, 0.0, 0.0)  # In case right arm needs an offset (+x: +left)
 
         # Bounding box
