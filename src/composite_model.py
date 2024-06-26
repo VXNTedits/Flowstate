@@ -91,8 +91,6 @@ class CompositeModel(Model):
             model.model_matrix = current_root_model_matrix * relative_transform
 
             self.model_matrices.append(model.model_matrix)
-            model.set_position(self.position + relative_pos)
-            model.set_orientation(self.orientation + relative_rot)
             # print(f"Updated {model.name} to {model.position}")
 
     def update_flat_model_matrix(self, parent_matrix=glm.mat4(1.0)):
