@@ -54,13 +54,8 @@ class Player(CompositeModel):
         self.animation_accumulator = 0.0
 
         # Models and transformations
-        self.local_hand_position = glm.vec3(-0.35, -0.8, 1.0)
+        self.local_hand_position = glm.vec3(0.0, 0.0, 0.0)#glm.vec3(-0.35, -0.8, 1.0)
         self.right_arm_offset = glm.vec3(0.0, 0.0, 0.0)  # In case right arm needs an offset (+x: +left)
-
-        # Initial model matrix
-        # self.model_matrix = glm.rotate(glm.mat4(1.0), glm.radians(-90), glm.vec3(1.0, 0.0, 0.0))
-        # self.rotation = glm.vec3(self.camera.pitch, self.camera.yaw, 0)
-        # self.set_right_hand_model_matrix()
 
         # Bounding box
         self.bounding_box = self.calculate_player_bounding_box(self.previous_position, self.position)
@@ -69,11 +64,9 @@ class Player(CompositeModel):
         super().__init__(filepath=head_path, mtl_filepath=mtl_path, translation=glm.vec3(0, 0, 1.7),
                          rotation_angles=glm.vec3(-90, 180, 0), player=True,
                          *args, **kwargs)
-        print("initial vertices\n", self.vertices)
         self.translate_vertices(glm.vec3(0, 0, -1.7))
-        print("translated vertices\n", self.vertices)
-
-        self.add_comp_model(Model(body_path, mtl_path, player=True, translation=(0, 0, 0)))
+        self.add_comp_model(
+            Model(body_path, mtl_path, player=True, translation=(0, 0, 0)))
         self.add_comp_model(
             Model(right_arm_path, mtl_path, player=True), relative_position=glm.vec3(0, 1.4, 0),
             relative_rotation=glm.vec3(90, 0, 0))
@@ -153,11 +146,11 @@ class Player(CompositeModel):
 
         self.proposed_thrust = proposed_thrust
 
-    def set_right_hand_model_matrix(self):
+    def update_right_hand_model_matrix(self):
         local_hand_vec4 = glm.vec4(self.local_hand_position, 1.0)
-        transformed_hand_position = self.models[1][0].model_matrix * local_hand_vec4
+        transformed_hand_position = self.models[2][0].model_matrix * local_hand_vec4
 
-        self.right_hand_model_matrix = glm.mat4(self.models[1][0].model_matrix)
+        self.right_hand_model_matrix = glm.mat4(self.models[2][0].model_matrix)
 
         self.right_hand_model_matrix[3] = glm.vec4(transformed_hand_position.x,
                                                    transformed_hand_position.y,
@@ -166,6 +159,10 @@ class Player(CompositeModel):
         self.right_hand_position = glm.vec3(transformed_hand_position.x,
                                             transformed_hand_position.y,
                                             transformed_hand_position.z)
+
+        self.right_hand_orientation = glm.vec3(self.models[2][0].orientation) + glm.vec3(0, 90, 0)
+
+        # print(self.right_hand_orientation, self.orientation)
 
     def animate_hipfire_recoil(self, delta_time):
         models = self.get_objects()
@@ -277,9 +274,10 @@ class Player(CompositeModel):
         #    and its position must be updated according to the head
         right_arm_model = self.models[2][0]
         arm_rotation = (-self.pitch, -self.yaw + 90, 0)
-        right_arm_model.set_orientation(glm.mix(right_arm_model.orientation, arm_rotation, 0.1), pivot_point=initial_position + shoulder_pos)
+        right_arm_model.set_orientation(glm.mix(right_arm_model.orientation, arm_rotation, 0.1),
+                                        pivot_point=initial_position + shoulder_pos)
 
         # Interpolating position for right arm model based on chest position
         arm_pos = glm.vec3(chest_model.position) + glm.vec3(0, 1.4, 0)  # Adjust position relative to the chest
         right_arm_model.set_position(arm_pos)
-        self.set_right_hand_model_matrix()
+        self.update_right_hand_model_matrix()

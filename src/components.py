@@ -131,7 +131,7 @@ class Components:
                                                     mtl_filepath=get_relative_path("res/10cube.mtl"),
                                                     use_composite=False,
                                                     shift_to_centroid=False,
-                                                    translation=glm.vec3(20,5,-20))
+                                                    translation=glm.vec3(20, 5, -20))
 
         # TODO: Events are only polled for the first interactable in the list ???
         self.add_interactable(deagle)

@@ -311,7 +311,7 @@ class Renderer:
 
         # Render interactables
         for interactable in interactables:
-            for mod, pos, dir in interactable.models:
+            for mod, _, _ in interactable.models:
                 model_matrix = mod.model_matrix
                 self.update_uniforms(model_matrix, view_matrix, projection_matrix, mod)
 
