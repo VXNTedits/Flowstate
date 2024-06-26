@@ -15,6 +15,9 @@ class Player(CompositeModel):
     def __init__(self, body_path: str, head_path: str, right_arm_path: str, mtl_path: str, camera, default_material,
                  filepath: str, mtl_filepath: str, *args, **kwargs):
         # Player attributes
+        self.MAX_RECOIL_ANGLE = 5
+        self.ANIMATION_SPEED = 2.5
+        self.RECOIL_DURATION = 1.0
         self.is_player = True
         self.player_height = 2
         self.player_width = 1
@@ -166,16 +169,18 @@ class Player(CompositeModel):
 
     def animate_hipfire_recoil(self, delta_time):
         models = self.get_objects()
-        torso = models[1]
         arm_right = models[2]
-        if self.animation_accumulator <= 45:
-            # print("self.is_shooting: ", 45-self.animation_accumulator)
-            recoil_rotation = glm.vec3(0, 0, 45 - self.animation_accumulator)
-            torso.set_relative_transform(arm_right, self.right_arm_offset, recoil_rotation)
-            self.animation_accumulator += delta_time * 20
-            #root.update_composite_model_matrix()
+
+        if self.animation_accumulator <= self.RECOIL_DURATION:
+            recoil_angle = -self.MAX_RECOIL_ANGLE * (
+                        self.RECOIL_DURATION - self.animation_accumulator) / self.RECOIL_DURATION
+            recoil_rotation = glm.vec3(recoil_angle, 0, 0)
+            #self.set_relative_transform(arm_right, self.right_arm_offset, recoil_rotation)
+            print(recoil_rotation)
+            arm_right.set_orientation(arm_right.orientation+recoil_rotation)
+            self.animation_accumulator += delta_time * self.ANIMATION_SPEED
         else:
-            torso.set_relative_transform(arm_right, self.right_arm_offset, glm.vec3(0, 0, 0))
+            # arm_right.set_orientation(arm_right.orientation)
             self.animation_accumulator = 0.0
             self.is_shooting = False
 
@@ -231,8 +236,7 @@ class Player(CompositeModel):
                 self.shoot(self.inventory[0], delta_time, world)
             self.inventory[0].update_weapon(delta_time)
             if self.is_shooting:
-                pass
-                #self.animate_hipfire_recoil(delta_time)
+                self.animate_hipfire_recoil(delta_time)
 
     def handle_left_click(self, is_left_mouse_button_pressed):
         if is_left_mouse_button_pressed:
