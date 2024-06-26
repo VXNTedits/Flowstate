@@ -127,15 +127,15 @@ class Components:
                               relative_position=glm.vec3(0.0, 0.0, 0.0),
                               relative_rotation=glm.vec3(0.0, 0.0, 0.0))
 
-        # test_cube_interactable = InteractableObject(filepath=get_relative_path("res/10cube.obj"),
-        #                                             mtl_filepath=get_relative_path("res/10cube.mtl"),
-        #                                             use_composite=False,
-        #                                             shift_to_centroid=False,
-        #                                             translation=glm.vec3(20,5,-20))
+        test_cube_interactable = InteractableObject(filepath=get_relative_path("res/10cube.obj"),
+                                                    mtl_filepath=get_relative_path("res/10cube.mtl"),
+                                                    use_composite=False,
+                                                    shift_to_centroid=False,
+                                                    translation=glm.vec3(20,5,-20))
 
         # TODO: Events are only polled for the first interactable in the list ???
-        # self.add_interactable(deagle)
-        #self.add_interactable(test_cube_interactable)
+        self.add_interactable(deagle)
+        self.add_interactable(test_cube_interactable)
 
         self.input_handler = InputHandler(self.camera, self.player, self.physics)
         print("Input handler initialized")

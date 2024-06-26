@@ -154,11 +154,10 @@ class Player(CompositeModel):
         self.proposed_thrust = proposed_thrust
 
     def set_right_hand_model_matrix(self):
-        # TODO: update this method
         local_hand_vec4 = glm.vec4(self.local_hand_position, 1.0)
-        transformed_hand_position = self.right_arm.model_matrix * local_hand_vec4
+        transformed_hand_position = self.models[1][0].model_matrix * local_hand_vec4
 
-        self.right_hand_model_matrix = glm.mat4(self.right_arm.model_matrix)
+        self.right_hand_model_matrix = glm.mat4(self.models[1][0].model_matrix)
 
         self.right_hand_model_matrix[3] = glm.vec4(transformed_hand_position.x,
                                                    transformed_hand_position.y,
@@ -169,17 +168,17 @@ class Player(CompositeModel):
                                             transformed_hand_position.z)
 
     def animate_hipfire_recoil(self, delta_time):
-        models = self.torso.get_objects()
-        self.torso = models[0]
+        models = self.get_objects()
+        torso = models[1]
         arm_right = models[2]
         if self.animation_accumulator <= 45:
             # print("self.is_shooting: ", 45-self.animation_accumulator)
             recoil_rotation = glm.vec3(0, 0, 45 - self.animation_accumulator)
-            self.torso.set_relative_transform(arm_right, self.right_arm_offset, recoil_rotation)
+            torso.set_relative_transform(arm_right, self.right_arm_offset, recoil_rotation)
             self.animation_accumulator += delta_time * 20
             #root.update_composite_model_matrix()
         else:
-            self.torso.set_relative_transform(arm_right, self.right_arm_offset, glm.vec3(0, 0, 0))
+            torso.set_relative_transform(arm_right, self.right_arm_offset, glm.vec3(0, 0, 0))
             self.animation_accumulator = 0.0
             self.is_shooting = False
 
@@ -235,7 +234,8 @@ class Player(CompositeModel):
                 self.shoot(self.inventory[0], delta_time, world)
             self.inventory[0].update_weapon(delta_time)
             if self.is_shooting:
-                self.animate_hipfire_recoil(delta_time)
+                pass
+                #self.animate_hipfire_recoil(delta_time)
 
     def handle_left_click(self, is_left_mouse_button_pressed):
         if is_left_mouse_button_pressed:
@@ -245,62 +245,6 @@ class Player(CompositeModel):
             print("LMB not pressed.")
             print()
             self.mouse_buttons[0] = False
-
-    # def update_composite_player_model(self, right_shoulder_pos=(0.0, 1.5, 0.5), neck_pos=(0, 1.7, 0)):
-    #     """Updates all player models"""
-    #     initial_position = self.position
-    #     """# 0. First update all component's positions"""
-    #     self.get_objects()[0].position = self.position  # Head
-    #     self.get_objects()[1].position = self.position  # Torso
-    #     self.get_objects()[2].position = self.position  # Right arm
-    #
-    #     """# 1. Update the head to exactly follow the camera's pitch and yaw"""
-    #     self.update_transformation_matrix(glm.radians(-self.pitch - 90), glm.vec3(1, 0, 0))
-    #     self.update_transformation_matrix(glm.radians(-self.yaw + 90), glm.vec3(0, 1, 0))
-    #     # self.set_orientation((-self.pitch - 90, -self.yaw + 90, 0))
-    #
-    #     # Update the head in the models list
-    #     self.models[0] = (self.get_objects()[0], glm.vec3(0, 0, 0), glm.vec3(0, 0, 0))
-    #
-    #     """# 2. Update the right arm to lerp the camera's pitch and yaw"""
-    #     target_orientation = self.get_objects()[0].orientation  # Target orientation: the head
-    #     self.rotate_child_model(2, glm.mix(glm.radians(self.get_objects()[2].orientation.x),
-    #                                        glm.radians(target_orientation.x), 0.1))
-    #
-    #     self.rotate_child_model(2, glm.mix(glm.radians(self.get_objects()[2].orientation.y),
-    #                                        glm.radians(target_orientation.y), 0.1))
-    #
-    #     self.rotate_child_model(2, glm.mix(glm.radians(self.get_objects()[2].orientation.z),
-    #                                        glm.radians(target_orientation.z), 0.1))
-    #
-    #     # Determine the relative pose of the right arm
-    #     right_arm_relative_pos = glm.vec3(0, 0, 0)
-    #     right_arm_relative_rot = self.get_objects()[2].orientation - self.get_objects()[0].orientation
-    #
-    #     # Update the right arm in the models list
-    #     self.models[2] = (self.get_objects()[2], right_arm_relative_pos, right_arm_relative_rot)  # Right Arm
-    #
-    #     """# 3. Update the torso to lerp the camera's yaw"""
-    #     torso_target_orientation = glm.vec3(0, -self.yaw + 90, 0)  # Only yaw for the torso
-    #     self.rotate_child_model(1, glm.mix(glm.radians(self.get_objects()[1].orientation.x),
-    #                                        glm.radians(torso_target_orientation.x), 0.1))
-    #     self.rotate_child_model(1, glm.mix(glm.radians(self.get_objects()[1].orientation.y),
-    #                                        glm.radians(torso_target_orientation.y), 0.1))
-    #     self.rotate_child_model(1, glm.mix(glm.radians(self.get_objects()[1].orientation.z),
-    #                                        glm.radians(torso_target_orientation.z), 0.1))
-    #
-    #     # Determine the relative pose of the torso
-    #     torso_relative_pos = glm.vec3(0, 0, 0)
-    #     torso_relative_rot = self.get_objects()[1].orientation - self.get_objects()[0].orientation
-    #
-    #     # Update the torso in the models list
-    #     self.models[1] = (self.get_objects()[1], torso_relative_pos, torso_relative_rot)
-    #
-    #     """# 4. Updates composite model matrices for all parts relative to the root: the head"""
-    #     self.get_objects()[0].position = initial_position  # Head
-    #     self.get_objects()[1].position = initial_position  # Torso
-    #     self.get_objects()[2].position = initial_position  # Right arm
-    #     self.update_composite_model_matrix()
 
     def update_composite_player_model(self, neck_pos=(0, 1.5, 0), shoulder_pos=(0.5, 1.5, 0)):
         """ Responsible for animating and updating individual body parts """
@@ -338,7 +282,4 @@ class Player(CompositeModel):
         # Interpolating position for right arm model based on chest position
         arm_pos = glm.vec3(chest_model.position) + glm.vec3(0, 1.4, 0)  # Adjust position relative to the chest
         right_arm_model.set_position(arm_pos)
-
-        # Finally, correct positions in case of drift
-        # for m, rp, rr in self.models:
-        #     m.set_position(initial_position)
+        self.set_right_hand_model_matrix()
