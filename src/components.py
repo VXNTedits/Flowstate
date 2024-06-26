@@ -82,8 +82,7 @@ class Components:
                              camera=self.camera,
                              default_material=Model.default_material,
                              filepath=get_relative_path("res/body.obj"),
-                             mtl_filepath=get_relative_path("res/body.mtl"),
-                             rotation_angles=glm.vec3(0, 0, 0))
+                             mtl_filepath=get_relative_path("res/body.mtl"))
         print("Player initialized")
 
         self.models = self.player.get_objects()

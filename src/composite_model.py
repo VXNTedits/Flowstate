@@ -109,6 +109,8 @@ class CompositeModel(Model):
 
     def add_comp_model(self, model, relative_position=glm.vec3(0.0, 0.0, 0.0),
                        relative_rotation=glm.vec3(0.0, 0.0, 0.0)):
+        model.position=relative_position
+        model.orientation=relative_rotation
         self.set_relative_transform(model, relative_position, relative_rotation)
         self.models.append((model, relative_position, relative_rotation))
         self.update_composite_model_matrix(model.model_matrix)

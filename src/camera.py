@@ -58,7 +58,7 @@ class Camera:
 
     def set_first_person(self, head_position):
         offset = glm.vec3(0.0, 1.8, 0.0)  # Adjust offset as needed for correct eye level
-        self.position = head_position + offset
+        self.position = head_position # + offset
 
     def set_third_person(self, head_position):
         offset = glm.vec3(4, 0, 0)  # Adjust offset for third-person view
