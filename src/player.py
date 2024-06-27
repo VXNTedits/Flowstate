@@ -228,7 +228,7 @@ class Player(CompositeModel):
     def calculate_player_bounding_box(self, start_pos, end_pos, bounding_margin=0.1):
         min_x = min(start_pos.x, end_pos.x) - self.player_width / 2 - bounding_margin
         max_x = max(start_pos.x, end_pos.x) + self.player_width / 2 + bounding_margin
-        min_y = min(start_pos.y, end_pos.y) - bounding_margin
+        min_y = min(start_pos.y, end_pos.y) - (bounding_margin/10)
         max_y = max(start_pos.y, end_pos.y) + self.player_height + bounding_margin
         min_z = min(start_pos.z, end_pos.z) - self.player_width / 2 - bounding_margin
         max_z = max(start_pos.z, end_pos.z) + self.player_width / 2 + bounding_margin
