@@ -327,7 +327,9 @@ class Physics:
         return intersection_point
 
     def apply_forces(self, delta_time: float):
+        """ Translates proposed thrust to actual thrust by smoothing the input and finally applies it to velocity """
         # Apply lateral thrust for movement
+        """ Horizontal forces"""
         if self.player.proposed_thrust.x != 0.0 or self.player.proposed_thrust.z != 0.0:
             # Calculate desired lateral thrust
             max_thrust = self.player.max_speed * glm.normalize(
@@ -357,6 +359,7 @@ class Physics:
                 self.player.thrust.x = 0.0
                 self.player.thrust.z = 0.0
 
+        """ Vertical forces """
         self.player.thrust.y = self.player.proposed_thrust.y
 
         # Ensure vertical velocity does not invert due to overshooting the deceleration

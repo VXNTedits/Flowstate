@@ -149,7 +149,7 @@ class Player(CompositeModel):
 
         self.proposed_thrust = proposed_thrust
 
-    def update_right_hand_model_matrix(self):
+    def update_right_hand_model_matrix(self, ads=False):
         local_hand_vec4 = glm.vec4(self.local_hand_position, 1.0)
         transformed_hand_position = self.models[2][0].model_matrix * local_hand_vec4
 
@@ -163,9 +163,12 @@ class Player(CompositeModel):
                                             transformed_hand_position.y,
                                             transformed_hand_position.z)
 
-        self.right_hand_orientation = glm.vec3(self.models[2][0].orientation) + glm.vec3(0, 90, 0)
+        if ads:
+            # TODO: Compensate for arm's rotation to align the hand model matrix with the view
+            self.right_hand_orientation = glm.vec3(self.models[0][0].orientation) + glm.vec3(0, 90, 0)
 
-        # print(self.right_hand_orientation, self.orientation)
+        else:
+            self.right_hand_orientation = glm.vec3(self.models[2][0].orientation) + glm.vec3(0, 90, 0)
 
     def animate_hipfire_recoil(self, delta_time):
         models = self.get_objects()
@@ -184,19 +187,85 @@ class Player(CompositeModel):
             self.animation_accumulator = 0.0
             self.is_shooting = False
 
+    # def ads(self, delta_time):
+    #     """Rotates the right arm such that the right hand is positioned at the view center"""
+    #     self.camera.zoom = 1.1
+    #
+    #     # The parameter to be adjusted
+    #     right_arm_model = self.models[2][0]
+    #
+    #     # Calculate the view direction vector
+    #     view_direction = glm.vec3(
+    #         glm.cos(glm.radians(-self.yaw-90)) * glm.cos(glm.radians(-self.pitch)),
+    #         glm.sin(glm.radians(-self.pitch)),
+    #         glm.sin(glm.radians(-self.yaw-90)) * glm.cos(glm.radians(-self.pitch))
+    #     )
+    #
+    #     # Calculate the desired position of the right hand in world space
+    #     shoulder_position = right_arm_model.position
+    #     desired_hand_position = shoulder_position + view_direction * 0.795
+    #
+    #     # Use IK to calculate the necessary rotation for the right arm
+    #     current_hand_position = self.right_hand_position
+    #     direction_to_target = glm.normalize(desired_hand_position - current_hand_position)
+    #     current_direction = glm.vec3(1, 0, 0)  # Assuming the arm points along the X axis
+    #
+    #     # Calculate the quaternion rotation required to align the arm with the target direction
+    #     rotation_quaternion = glm.quatLookAt(direction_to_target, glm.vec3(0, 1, 0))  # Up vector is Y
+    #
+    #     # Convert quaternion to Euler angles for the arm model
+    #     rotation_euler = glm.eulerAngles(rotation_quaternion) + glm.vec3(90, 0, 0)
+    #
+    #     # Apply the rotation to the right arm model
+    #     self.set_relative_transform(right_arm_model, glm.vec3(0, 0, 0), rotation_euler)
+    #
+    #     # Rotates the right hand model matrix to align its orientation with the view direction
+    #     self.update_right_hand_model_matrix(ads=True)
+
+    # def ads(self, delta_time):
+    #     """Rotates the right arm such that the right hand is positioned at the view center"""
+    #     self.camera.zoom = 1.1
+    #
+    #     # The parameter to be adjusted
+    #     right_arm_model = self.models[2][0]  # Can also be directly written to right_arm_model.model_matrix
+    #
+    #     # Calculate the rotation correction required based on player's pitch and yaw.
+    #     # When the player pitches, the end of the arm does not remain in the center of the view
+    #     # because the shoulder and the camera are offset from each other.
+    #     pitch_correction_function = -1 * glm.sin(glm.radians(self.pitch))
+    #     yaw_correction_function = 25 * glm.sin(glm.radians(self.yaw))
+    #     roll_corrector_function = 1 * glm.sin(glm.radians(self.pitch))
+    #
+    #     correction_vector = glm.vec3(pitch_correction_function, yaw_correction_function, roll_corrector_function)
+    #
+    #     # At zero pitch, the values glm.vec3(90, 25, 0) apply the correct rotation.
+    #     base_rotation = glm.vec3(90, 25, 0)
+    #     rotation = correction_vector + base_rotation
+    #
+    #     # Applies a relative rotation to the right arm w.r.t. the camera
+    #     self.set_relative_transform(right_arm_model, glm.vec3(0, 0, 0), rotation)
+    #
+    #     # Rotates the right hand model matrix to align its orientation with the view direction
+    #     self.update_right_hand_model_matrix(ads=True)
+
     def ads(self, delta_time):
-        models = self.get_objects()
-        arm_right = models[2]
-        self.set_relative_transform(arm_right, glm.vec3(0.1,0.1,0.25),glm.vec3(90,0,0))
-        self.update_right_hand_model_matrix()
+        """Rotates the right arm such that the right hand is positioned at the view center"""
+        self.camera.zoom = 1.1
+
+        right_arm_model = self.models[2][0]
+
+        pitch_angle = -glm.degrees(glm.tan(0.3 / 0.795)) + (-self.pitch)
+        yaw_angle = glm.degrees(glm.sin(0.25/0.795)) + (-self.yaw+90)
+
+        right_arm_model.set_orientation(glm.vec3(pitch_angle, yaw_angle, 0))
+        # Rotates the right hand model matrix to align its orientation with the view direction
+        self.update_right_hand_model_matrix(ads=True)
 
     def get_rotation_matrix(self):
         return glm.rotate(glm.mat4(1.0), glm.radians(self.yaw), glm.vec3(0.0, 1.0, 0.0))
 
     def set_player_position(self, position):
         self.position = position
-        # self.update_composite_model_matrix()
-        # self.initialize_player_model_matrix()
 
     def draw_player(self, camera: Camera):
         if not camera.first_person:
@@ -244,8 +313,9 @@ class Player(CompositeModel):
             if self.is_shooting:
                 self.animate_hipfire_recoil(delta_time)
             if mouse_buttons[1]:
-                print("ADS active")
                 self.ads(delta_time)
+            elif not mouse_buttons[1]:
+                self.camera.zoom = 1.0
 
     def handle_left_click(self, is_left_mouse_button_pressed):
         if is_left_mouse_button_pressed:
@@ -265,7 +335,7 @@ class Player(CompositeModel):
             print()
             self.mouse_buttons[1] = False
 
-    def update_composite_player_model(self, neck_pos=(0, 1.5, 0), shoulder_pos=(0.5, 1.5, 0)):
+    def update_composite_player_model(self, neck_pos=(0, 1.5, 0), shoulder_pos=(0.5, 1.4, 0)):
         """ Responsible for animating and updating individual body parts """
         # First, update all positions.
         initial_position = self.position

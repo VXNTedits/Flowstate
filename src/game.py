@@ -18,7 +18,7 @@ class Game:
         self.window = Window(800, 600, "3D Game", fullscreen)
         print('Window initialized')
         self.components = Components(self.window)
-        self.projection_matrix = glm.perspective(glm.radians(90.0), self.window.width / self.window.height, 0.001, 10000.0)
+        # self.projection_matrix = glm.perspective(glm.radians(90.0), self.window.width / self.window.height, 0.001, 10000.0)
         self.tick_rate = 1.0 / 144
         self.state = GameState.MAIN_MENU
 
@@ -56,7 +56,7 @@ class Game:
                                                 interactables=self.components.interactables,
                                                 world_objects=self.components.world_objects.get_objects(),
                                                 view_matrix=view_matrix,
-                                                projection_matrix=self.projection_matrix,
+                                                projection_matrix=self.components.camera.get_projection_matrix(),
                                                 delta_time=delta_time)
 
             imgui.render()

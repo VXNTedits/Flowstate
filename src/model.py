@@ -416,7 +416,6 @@ class Model:
         rotation_y = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[1]), glm.vec3(0.0, 1.0, 0.0))
         rotation_z = glm.rotate(glm.mat4(1.0), glm.radians(self.orientation[2]), glm.vec3(0.0, 0.0, 1.0))
 
-
         # Combine rotations to form the object's rotation matrix
         rotation_matrix = rotation_z * rotation_y * rotation_x
 
@@ -447,8 +446,8 @@ class Model:
 
         self.model_matrix = translation_matrix * rotation_matrix * scale_matrix
 
-    # TODO: Implement this
     def add_crater(self, impact_point, crater_radius, crater_depth):
+        # TODO: Implement this
         self.impact = True
         vertices_2d = self.vertices.reshape(-1, 3)
 
