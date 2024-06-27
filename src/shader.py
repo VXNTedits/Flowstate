@@ -108,7 +108,12 @@ class Shader:
             print(f"Uniform '{name}' not found in shader program {self.program}. \n"
                   f"    (Associated fragment shader: {self.name_fragment}.)")
         else:
-            glUniformMatrix4fv(location, 1, GL_FALSE, glm.value_ptr(matrix))
+            if isinstance(matrix, glm.mat4):
+                glUniformMatrix4fv(location, 1, GL_FALSE, glm.value_ptr(matrix))
+            elif isinstance(matrix, np.ndarray) and matrix.shape == (4, 4):
+                glUniformMatrix4fv(location, 1, GL_FALSE, matrix)
+            else:
+                print(f"Error: The provided matrix is not a valid glm.mat4 or numpy.ndarray of shape (4, 4).")
 
     def set_uniform3f(self, name, vec3):
         self.use()

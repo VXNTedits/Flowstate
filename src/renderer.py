@@ -2,15 +2,19 @@ import glm
 import numpy as np
 import ctypes
 from OpenGL.GL import *
+from OpenGL.GL import *
+from OpenGL.GLUT import *
+from OpenGL.GLU import *
 from OpenGL.raw.GL.NVX.gpu_memory_info import GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, \
     GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX
 from OpenGL.raw.GLU import gluErrorString
-
+from PIL import Image
 import model
 from interactable import InteractableObject
 from src.model import Model
 from player import Player
 from src.shader import Shader, ShaderManager
+from src.utils.file_utils import get_relative_path
 from world import World
 #import noise
 from opensimplex import OpenSimplex
@@ -91,6 +95,8 @@ class Renderer:
                                                       "shaders/tracer_fragment.glsl")
         self.blur_shader = ShaderManager.get_shader("shaders/blur_vertex.glsl",
                                                     "shaders/blur_fragment.glsl")
+        self.hud_shader = ShaderManager.get_shader("shaders/hud_vertex_shader.glsl",
+                                                   "shaders/hud_fragment_shader.glsl")
 
         # Set up the offscreen buffer for shader compositing
         print("Set up the offscreen buffer for shader compositing...")
@@ -137,6 +143,10 @@ class Renderer:
 
         # Initialize tracer rendering system
         self.initialize_tracer_renderer(800, 600)
+
+        # Initialize HUD
+        self.hud_texture = self.load_hud(get_relative_path("res/hud.png"))
+        self.hud_vao, self.hud_vbo = self.create_hud_buffers()
 
     def setup_volume_texture(self):
         # Create an empty 3D texture
@@ -363,6 +373,8 @@ class Renderer:
             self.update_uniforms(model_matrix, view_matrix, projection_matrix, wobj)
             shader.set_uniform_matrix4fv("model", model_matrix)
             wobj.draw()
+
+        self.render_hud()
 
     def render_world(self, shader, player_object, world, interactables, light_space_matrix, view_matrix=None,
                      projection_matrix=None):
@@ -1084,76 +1096,6 @@ class Renderer:
         glBindTexture(GL_TEXTURE_2D, self.blur_texture2)
         # Perform any additional rendering or post-processing with the final blurred texture
 
-    def debug_render(self):
-        # Create and bind the Vertex Array Object (VAO)
-        vao = glGenVertexArrays(1)
-        glBindVertexArray(vao)
-        self.check_opengl_errors()
-
-        # Create and bind the Vertex Buffer Object (VBO)
-        vbo = glGenBuffers(1)
-        glBindBuffer(GL_ARRAY_BUFFER, vbo)
-        self.check_opengl_errors()
-
-        # Define the vertex data for a triangle
-        vertices = np.array([
-            -0.5, -0.5, 0.0,  # Vertex 1: x, y, z
-            0.5, -0.5, 0.0,  # Vertex 2: x, y, z
-            0.0, 0.5, 0.0  # Vertex 3: x, y, z
-        ], dtype=np.float32)
-
-        # Upload the vertex data to the GPU
-        glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * vertices.itemsize, ctypes.c_void_p(0))
-        glEnableVertexAttribArray(0)
-        self.check_opengl_errors()
-
-        # Unbind the VBO and VAO
-        glBindBuffer(GL_ARRAY_BUFFER, 0)
-        glBindVertexArray(0)
-        self.check_opengl_errors()
-
-        # Set up the Shader Storage Buffer Object (SSBO) with colors for each vertex
-        colors_data = np.array([
-            [1.0, 0.0, 0.0, 1.0],  # Color for Vertex 1: Red
-            [0.0, 1.0, 0.0, 1.0],  # Color for Vertex 2: Green
-            [0.0, 0.0, 1.0, 1.0],  # Color for Vertex 3: Blue
-        ], dtype=np.float32)
-        self.ssbo = self.set_ssbo(0, colors_data)
-
-        # Bind the SSBO and retrieve data for debugging
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.ssbo)
-        buffer_data = np.zeros_like(colors_data, dtype=np.float32)
-        glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, buffer_data.nbytes, buffer_data)
-        print(f"Buffer data after binding: {buffer_data.tolist()}")
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0)
-        self.check_opengl_errors()
-
-        # Clear the screen
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        self.check_opengl_errors()
-
-        # Use the shader program
-        self.tracer_shader.use()
-        self.check_opengl_errors()
-
-        # Bind the SSBO
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, self.ssbo)
-        self.check_opengl_errors()
-
-        # Bind the VAO
-        glBindVertexArray(vao)
-        self.check_opengl_errors()
-
-        # Draw the triangle
-        total_vertices = 3  # Number of vertices to draw
-        glDrawArrays(GL_TRIANGLES, 0, total_vertices)
-        self.check_opengl_errors()
-
-        # Unbind the VAO
-        glBindVertexArray(0)
-        self.check_opengl_errors()
-
     def check_opengl_errors(self):
         error = glGetError()
         if error != GL_NO_ERROR:
@@ -1231,3 +1173,89 @@ class Renderer:
             raise Exception("Blur Framebuffer is not complete!")
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+    def load_hud(self, filename):
+        image = Image.open(filename).convert("RGBA")
+        image = image.transpose(Image.FLIP_TOP_BOTTOM)
+        img_data = image.tobytes()
+
+        texture_id = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, texture_id)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img_data)
+        glBindTexture(GL_TEXTURE_2D, 0)
+
+        return texture_id
+
+    def render_hud(self):
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        self.hud_shader.use()
+
+        glActiveTexture(GL_TEXTURE0)  # Ensure the correct texture unit is active
+        glBindTexture(GL_TEXTURE_2D, self.hud_texture)  # Bind the HUD texture
+
+        projection = self.np_ortho(0, 800, 0, 600, -1, 1)
+        self.hud_shader.set_uniform_matrix4fv('projection', projection)
+        self.hud_shader.set_uniform_sampler2D('overlayTexture', 0)  # Set to texture unit 0
+
+        glBindVertexArray(self.hud_vao)
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
+        glBindVertexArray(0)
+
+    def np_ortho(self, left, right, bottom, top, near, far):
+        return np.array([
+            [2.0 / (right - left), 0, 0, 0],
+            [0, 2.0 / (top - bottom), 0, 0],
+            [0, 0, -2.0 / (far - near), 0],
+            [-(right + left) / (right - left), -(top + bottom) / (top - bottom), -(far + near) / (far - near), 1]
+        ], dtype=np.float32)
+
+    def glm_ortho(self, left, right, bottom, top, near, far):
+        return glm.mat4(
+            [2.0 / (right - left), 0, 0, 0],
+            [0, 2.0 / (top - bottom), 0, 0],
+            [0, 0, -2.0 / (far - near), 0],
+            [-(right + left) / (right - left), -(top + bottom) / (top - bottom), -(far + near) / (far - near), 1])
+
+    def create_hud_buffers(self):
+        vertices = np.array([
+            # Positions    # TexCoords
+            0.0, 0.0, 0.0, 0.0,
+            800.0, 0.0, 1.0, 0.0,
+            800.0, 600.0, 1.0, 1.0,
+            0.0, 600.0, 0.0, 1.0
+        ], dtype=np.float32)
+
+        indices = np.array([
+            0, 1, 2,
+            2, 3, 0
+        ], dtype=np.uint32)
+
+        vao = glGenVertexArrays(1)
+        vbo = glGenBuffers(1)
+        ebo = glGenBuffers(1)
+
+        glBindVertexArray(vao)
+
+        glBindBuffer(GL_ARRAY_BUFFER, vbo)
+        glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.nbytes, indices, GL_STATIC_DRAW)
+
+        # Position attribute
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * vertices.itemsize, ctypes.c_void_p(0))
+        glEnableVertexAttribArray(0)
+        # TexCoord attribute
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * vertices.itemsize, ctypes.c_void_p(2 * vertices.itemsize))
+        glEnableVertexAttribArray(1)
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindVertexArray(0)
+
+        return vao, vbo
