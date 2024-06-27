@@ -31,6 +31,11 @@ uniform vec3 tracerLightPositions[MAX_TRACER_LIGHTS];
 uniform vec3 tracerLightColors[MAX_TRACER_LIGHTS];
 uniform float tracerLightIntensities[MAX_TRACER_LIGHTS];
 
+uniform vec3 fogColor;
+uniform float fogDensity;
+uniform float fogHeightFalloff;
+
+
 float hash(float n) { return fract(sin(n) * 43758.5453); }
 
 float noise(vec3 x) {
@@ -135,5 +140,16 @@ void main()
         result += tracerDiffuse + tracerSpecular;
     }
 
-    FragColor = vec4(result, 1.0);
+    // FragColor = vec4(result, 1.0);
+
+    // Calculate fog factor based on the y-coordinate of FragPos
+    float fogFactor = exp(-fogDensity * (1.0 - exp(-FragPos.y * fogHeightFalloff)));
+    fogFactor = clamp(fogFactor, 0.0, 1.0);
+
+    // Blend the fog color with the result color
+    vec3 finalColor = mix(fogColor, result, fogFactor);
+
+    FragColor = vec4(finalColor, 1.0);
+
+
 }
