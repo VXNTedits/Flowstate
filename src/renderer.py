@@ -1,13 +1,13 @@
 import glm
 import numpy as np
 import ctypes
-from OpenGL import *
-from OpenGL import *
-from OpenGLUT import *
-from OpenGLU import *
-from Openraw.NVX.gpu_memory_info import GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, \
+from OpenGL.GL import *
+from OpenGL.GL import *
+from OpenGL.GLUT import *
+from OpenGL.GLU import *
+from OpenGL.raw.GL.NVX.gpu_memory_info import GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, \
     GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX
-from Openraw.GLU import gluErrorString
+from OpenGL.raw.GLU import gluErrorString
 from PIL import Image
 import model
 from interactable import InteractableObject
@@ -19,7 +19,7 @@ from world import World
 #import noise
 from opensimplex import OpenSimplex
 import ctypes
-from OpenGL import *
+from OpenGL.GL import *
 
 
 class Renderer:
@@ -152,6 +152,7 @@ class Renderer:
 
         # Initialize fog renderer
         self.initialize_fog()
+        self.create_fog_quad()
 
     def setup_volume_texture(self):
         # Create an empty 3D texture
@@ -232,6 +233,36 @@ class Renderer:
         # Unbind VAO
         glBindVertexArray(0)
 
+    def create_fog_quad(self):
+        quad_vertices = np.array([
+            # Positions    # TexCoords
+            -1.0, 1.0, 0.0, 1.0,
+            -1.0, -1.0, 0.0, 0.0,
+            1.0, -1.0, 1.0, 0.0,
+
+            -1.0, 1.0, 0.0, 1.0,
+            1.0, -1.0, 1.0, 0.0,
+            1.0, 1.0, 1.0, 1.0,
+        ], dtype=np.float32)
+
+        VAO = glGenVertexArrays(1)
+        VBO = glGenBuffers(1)
+
+        glBindVertexArray(VAO)
+        glBindBuffer(GL_ARRAY_BUFFER, VBO)
+        glBufferData(GL_ARRAY_BUFFER, quad_vertices.nbytes, quad_vertices, GL_STATIC_DRAW)
+
+        glEnableVertexAttribArray(0)
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * quad_vertices.itemsize, ctypes.c_void_p(0))
+        glEnableVertexAttribArray(1)
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * quad_vertices.itemsize,
+                                 ctypes.c_void_p(2 * quad_vertices.itemsize))
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindVertexArray(0)
+
+        self.fog_quad_vao = VAO
+
     def check_framebuffer_status(self):
         status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
         if status != GL_FRAMEBUFFER_COMPLETE:
@@ -294,7 +325,9 @@ class Renderer:
 
         # 5. Composite the scene and volumetric effects
         self.update_noise(delta_time)
-        self.composite_scene_and_volumetrics()
+        self.composite_scene_and_volumetrics(projection_matrix)
+
+        # 6. Render fog
 
         # Final check for depth and blend states
         glEnable(GL_DEPTH_TEST)
@@ -825,9 +858,9 @@ class Renderer:
         shader.set_uniform3fvec("tracerLightColors", tracer_light_colors)
         shader.set_uniform1fv("tracerLightIntensities", tracer_light_intensities)
 
-        shader.set_uniform3fv("fogColor", glm.vec3(1, 1, 1))
-        shader.set_uniform1f("fogDensity", 0)
-        shader.set_uniform1f("fogHeightFalloff", 1)
+        shader.set_uniform3fv("fogColor", glm.vec3(1, 0.1, 0.1))
+        shader.set_uniform1f("fogDensity", 0.5)
+        shader.set_uniform1f("fogHeightFalloff", 0.1)
 
         self.render_lights(self.light_positions, self.light_colors, view_matrix, projection_matrix)
         self.render_scene(shader, player_object, world, world_objects, interactables, light_space_matrix,
@@ -835,7 +868,7 @@ class Renderer:
 
         glEnable(GL_DEPTH_TEST)
 
-        self.render_fog(projection_matrix)
+        # self.render_fog(projection_matrix)
 
         self.render_hud()
 
@@ -888,7 +921,7 @@ class Renderer:
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
-    def composite_scene_and_volumetrics(self):
+    def composite_scene_and_volumetrics(self, projection_matrix):
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glViewport(0, 0, 800, 600)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -909,10 +942,16 @@ class Renderer:
         glBindTexture(GL_TEXTURE_2D, self.tracer_texture)
         self.composite_shader.set_uniform_sampler2D("tracers", 2)
 
-        # 4. Render the quad
+        # 4. Render the quad for the volumetrics
         self.render_quad()
 
-        # 5. Unbind textures
+        # 5. Render the quad for the fog
+        self.render_fog_quad(self.fog_shader.program,
+                             self.fog_texture_color_buffer,
+                             self.fog_texture_depth_buffer,
+                             glm.inverse(projection_matrix), projection_matrix)
+
+        # 6. Unbind textures
         glBindTexture(GL_TEXTURE_2D, 0)
 
     def check_gl_state(self):
@@ -1056,7 +1095,7 @@ class Renderer:
         self.tracer_shader.set_uniform3f("tracerColor", glm.vec3(
             1.0,
             glm.exp(-lifetimes[-1] * 50),  # Exponential decay TODO: Tweak
-            glm.exp(-lifetimes[-1] * 20)   # Exponential decay
+            glm.exp(-lifetimes[-1] * 20)  # Exponential decay
         ))
         self.tracer_shader.set_uniform3f("lightColor", glm.vec3(
             1.0,
@@ -1280,7 +1319,7 @@ class Renderer:
         # Bind textures, set uniforms
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, self.fog_texture_color_buffer)
-        self.fog_shader.set_uniform1i("sceneColor", 0)  #TODO: check which objects to bind to these uniforms!
+        self.fog_shader.set_uniform1i("sceneColor", 0)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, self.fog_texture_depth_buffer)
         self.fog_shader.set_uniform1i("sceneDepth", 1)
@@ -1291,19 +1330,21 @@ class Renderer:
         self.fog_shader.set_uniform1f("near", 0.01)
         self.fog_shader.set_uniform1f("far", 10000)
 
-    def render_fullscreen_quad(self, post_processing_program, texture_colorbuffer, texture_depthbuffer, inv_proj_matrix):
+    def render_fog_quad(self, post_processing_program, texture_colorbuffer, texture_depthbuffer,
+                               inv_proj_matrix, projection_matrix):
+        self.render_fog(projection_matrix)
         glUseProgram(post_processing_program)
 
         # Set uniforms
-        fog_color = np.array([0.5, 0.5, 0.5], dtype=np.float32)
-        fog_density = 0.1
-        fog_height_falloff = 0.1
+        fog_color = np.array([1, 0.0, 0.5], dtype=np.float32)
+        fog_density = 1
+        fog_height_falloff = 1
 
         glUniform3fv(glGetUniformLocation(post_processing_program, "fogColor"), 1, fog_color)
         glUniform1f(glGetUniformLocation(post_processing_program, "fogDensity"), fog_density)
         glUniform1f(glGetUniformLocation(post_processing_program, "fogHeightFalloff"), fog_height_falloff)
         glUniformMatrix4fv(glGetUniformLocation(post_processing_program, "invProj"), 1, GL_FALSE,
-                              inv_proj_matrix)
+                           glm.value_ptr(inv_proj_matrix))
         glUniform1f(glGetUniformLocation(post_processing_program, "near"), 0.01)
         glUniform1f(glGetUniformLocation(post_processing_program, "far"), 1000.0)
 
@@ -1317,7 +1358,7 @@ class Renderer:
         glUniform1i(glGetUniformLocation(post_processing_program, "sceneDepth"), 1)
 
         # Render quad
-        glBindVertexArray(quad_VAO)
+        glBindVertexArray(self.fog_quad_vao)
         glDrawArrays(GL_TRIANGLES, 0, 6)
         glBindVertexArray(0)
         glUseProgram(0)

@@ -24,10 +24,10 @@ void main()
 {
     vec4 color = texture(sceneColor, TexCoords); // Fetch the color of the current fragment from the scene color texture
     float depth = texture(sceneDepth, TexCoords).r; // Fetch the depth of the current fragment from the scene depth texture
-    //float linearDepth = getLinearDepth(depth); // Convert the non-linear depth to linear depth
+    float linearDepth = getLinearDepth(depth); // Convert the non-linear depth to linear depth
 
     // Reconstruct world position from depth
-    vec4 clipSpacePos = vec4((TexCoords * 2.0 - 1.0), depth, 1.0); // Reconstruct the clip space position using TexCoords and depth
+    vec4 clipSpacePos = vec4((TexCoords * 2.0 - 1.0), linearDepth, 1.0); // Reconstruct the clip space position using TexCoords and depth
     vec4 viewSpacePos = invProj * clipSpacePos; // Transform clip space position to view space position using the inverse projection matrix
     viewSpacePos /= viewSpacePos.w; // Perform perspective division to get the actual view space position
 

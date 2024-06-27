@@ -1,5 +1,4 @@
 import os
-
 from src.caliber import Caliber
 from src.camera import Camera
 from src.model import Model
@@ -9,7 +8,6 @@ from src.renderer import Renderer
 from src.input_handler import InputHandler
 from src.physics import Physics
 from src.weapon import Weapon
-from text_renderer import TextRenderer
 import glm
 from src.world import World
 from src.world_objects import WorldObjects, MaterialOverride
