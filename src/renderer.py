@@ -23,6 +23,26 @@ from OpenGL.GL import *
 
 
 class Renderer:
+    """
+    OVERVIEW OF TEXTURES
+    GL_TEXTURE0:  self.volume_texture (Empty volume texture)
+    GL_TEXTURE1:  self.depth_map
+    GL_TEXTURE2:  self.volumetric_texture
+    GL_TEXTURE3:  self.scene_texture
+    GL_TEXTURE4:  self.tracer_texture
+    GL_TEXTURE5:  self.blur_texture1
+    GL_TEXTURE6:  self.blur_texture2
+    GL_TEXTURE7:  self.hud_texture
+    GL_TEXTURE8:  self.fog_texture_color_buffer
+    GL_TEXTURE9:  self.fog_texture_depth_buffer
+    GL_TEXTURE10: self.atmosphere_texture
+    GL_TEXTURE11: self.atmos_color_texture
+    GL_TEXTURE12: self.atmos_depth_texture
+
+    1. Generate a texture:               self.texture0 = glGenTextures(1)
+    2. Activate a texture unit:          glActiveTexture(GL_TEXTURE0)
+    3. Bind a texture to an active unit: glBindTexture(GL_TEXTURE0, self.texture0)
+    """
     def __init__(self, shader, camera, physics, weapons):
         # Store the provided references
         self.physics = physics
@@ -35,10 +55,15 @@ class Renderer:
         self.light_intensity = 1.0
 
         self.light_positions = [
-            glm.vec3(50.2, -10.0, 2.0),
-            glm.vec3(10.2, -20.0, 2.0),
-            glm.vec3(0.0, -20.0, -20.0)
+            glm.vec3(50.2, 10.0, 2.0),
+            glm.vec3(10.2, 20.0, 2.0),
+            glm.vec3(0.0, 20.0, -20.0)
         ]
+        # self.light_positions = [
+        #     glm.vec3(50.2, -10.0, 2.0),
+        #     glm.vec3(10.2, -20.0, 2.0),
+        #     glm.vec3(0.0, -20.0, -20.0)
+        # ]
         self.light_count = len(self.light_positions)
 
         self.light_colors = [
@@ -99,6 +124,8 @@ class Renderer:
                                                    "shaders/hud_fragment_shader.glsl")
         self.fog_shader = ShaderManager.get_shader("shaders/fog_vertex.glsl",
                                                    "shaders/fog_fragment.glsl")
+        self.atmos_shader = ShaderManager.get_shader("shaders/atmos_vertex.glsl",
+                                                     "shaders/atmos_fragment.glsl")
 
         # Set up the offscreen buffer for shader compositing
         print("Set up the offscreen buffer for shader compositing...")
@@ -112,27 +139,9 @@ class Renderer:
         self.time = 0.0
         self.setup_volume_texture()
 
-        # Setup depth framebuffer for shadow mapping
+        # Setup and configure the depth framebuffer for shadow mapping
         print("Setup depth framebuffer for shadow mapping")
         self.setup_depth_framebuffer()
-
-        # Configure the depth map texture used for shadow mapping
-        print("Configure the depth map texture used for shadow mapping")
-        glBindTexture(GL_TEXTURE_2D, self.depth_map)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, self.shadow_width, self.shadow_height, 0,
-                     GL_DEPTH_COMPONENT, GL_FLOAT, None)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER)
-        border_color = [1.0, 1.0, 1.0, 1.0]
-        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color)
-        glBindFramebuffer(GL_FRAMEBUFFER, self.depth_map_fbo)
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, self.depth_map, 0)
-        glDrawBuffer(GL_NONE)
-        glReadBuffer(GL_NONE)
-        self.check_framebuffer_status()
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
         # Initialize framebuffer for volumetric rendering
         print("Initialize framebuffer for volumetric rendering...")
@@ -151,12 +160,14 @@ class Renderer:
         self.hud_vao, self.hud_vbo = self.create_hud_buffers()
 
         # Initialize fog renderer
+        self.init_atmosphere()
         self.initialize_fog()
         self.create_fog_quad()
 
     def setup_volume_texture(self):
-        # Create an empty 3D texture
+        """ Create an empty 3D texture """
         self.volume_texture = glGenTextures(1)
+        glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_3D, self.volume_texture)
         glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F, self.noise_size, self.noise_size, self.noise_size, 0, GL_RED, GL_FLOAT,
                      None)
@@ -194,6 +205,24 @@ class Renderer:
     def setup_depth_framebuffer(self):
         self.depth_map_fbo = glGenFramebuffers(1)
         self.depth_map = glGenTextures(1)
+        glActiveTexture(GL_TEXTURE1)
+        # Configure the depth map texture used for shadow mapping
+        print("Configure the depth map texture used for shadow mapping")
+        glBindTexture(GL_TEXTURE_2D, self.depth_map)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, self.shadow_width, self.shadow_height, 0,
+                     GL_DEPTH_COMPONENT, GL_FLOAT, None)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER)
+        border_color = [1.0, 1.0, 1.0, 1.0]
+        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, border_color)
+        glBindFramebuffer(GL_FRAMEBUFFER, self.depth_map_fbo)
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, self.depth_map, 0)
+        glDrawBuffer(GL_NONE)
+        glReadBuffer(GL_NONE)
+        self.check_framebuffer_status()
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
     def setup_quad(self):
         #
@@ -256,7 +285,7 @@ class Renderer:
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * quad_vertices.itemsize, ctypes.c_void_p(0))
         glEnableVertexAttribArray(1)
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * quad_vertices.itemsize,
-                                 ctypes.c_void_p(2 * quad_vertices.itemsize))
+                              ctypes.c_void_p(2 * quad_vertices.itemsize))
 
         glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindVertexArray(0)
@@ -302,7 +331,7 @@ class Renderer:
                                  enable_bump_mapping=False,
                                  bump_scale=5,
                                  weapons=self.weapons)
-
+        self.check_opengl_errors()
         # Ensure depth test is enabled for future operations
         glEnable(GL_DEPTH_TEST)
         assert glIsEnabled(GL_DEPTH_TEST), "GL_DEPTH_TEST should be enabled for future operations"
@@ -312,27 +341,33 @@ class Renderer:
             tracer_pos, tracer_lifetime = weapon.get_tracer_positions()
             if tracer_pos.any():
                 self.draw_tracers(tracer_pos, view_matrix, projection_matrix, player_object, tracer_lifetime)
-
+        self.check_opengl_errors()
+        self.render_atmosphere_to_fbo(view_matrix, projection_matrix, player_object.position)
+        self.check_opengl_errors()
         # 4. Render volumetric effects to the framebuffer
         self.render_volumetric_effects_to_fbo(view_matrix,
                                               projection_matrix,
-                                              glow_intensity=100.1,
+                                              glow_intensity=100.0,
                                               scattering_factor=0.8,
                                               glow_falloff=100,
-                                              god_ray_intensity=100000,
+                                              god_ray_intensity=1,
                                               god_ray_decay=0.001,
-                                              god_ray_sharpness=100000)
+                                              god_ray_sharpness=1)
+        self.check_opengl_errors()
+        # 5. Render volumetric atmosphere to the framebuffer
 
-        # 5. Composite the scene and volumetric effects
-        self.update_noise(delta_time)
-        self.composite_scene_and_volumetrics(projection_matrix)
 
-        # 6. Render fog
+        # 6. Composite the scene and volumetric effects
+        self.composite_scene_and_volumetrics()
+        self.check_opengl_errors()
+        # self.debug_render_atmos(view_matrix, projection_matrix, self.camera.position)
 
+        # self.composite_atmosphere()
         # Final check for depth and blend states
         glEnable(GL_DEPTH_TEST)
         glDisable(GL_BLEND)
 
+        self.update_noise(delta_time)
         # TODO: add debug wrapper
         # Not available on all GPUs
         # self.log_memory_usage()
@@ -508,9 +543,9 @@ class Renderer:
         # Generate and bind the framebuffer
         self.volumetric_fbo = glGenFramebuffers(1)
         glBindFramebuffer(GL_FRAMEBUFFER, self.volumetric_fbo)
-
         # Generate and bind the texture for color attachment
         self.volumetric_texture = glGenTextures(1)
+        glActiveTexture(GL_TEXTURE2)
         glBindTexture(GL_TEXTURE_2D, self.volumetric_texture)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 800, 600, 0, GL_RGBA, GL_UNSIGNED_BYTE, None)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
@@ -518,45 +553,52 @@ class Renderer:
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.volumetric_texture, 0)
-
+        self.check_opengl_errors()
         # Generate and bind the renderbuffer for depth attachment
         self.volumetric_depth_buffer = glGenRenderbuffers(1)
         glBindRenderbuffer(GL_RENDERBUFFER, self.volumetric_depth_buffer)
         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, 800, 600)
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, self.volumetric_depth_buffer)
-
+        self.check_opengl_errors()
         # Check if the framebuffer is complete
         if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
             glBindFramebuffer(GL_FRAMEBUFFER, 0)
             raise Exception("Framebuffer is not complete!")
-
+        self.check_opengl_errors()
         # Unbind the framebuffer to avoid accidental modification
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
     def render_quad(self):
         if not hasattr(self, 'quad_vao'):
-            self.quad_vao = glGenVertexArrays(1)
-            self.quad_vbo = glGenBuffers(1)
-            quad_vertices = np.array([
-                -1.0, 1.0, 0.0, 1.0,
-                -1.0, -1.0, 0.0, 0.0,
-                1.0, 1.0, 1.0, 1.0,
-                1.0, -1.0, 1.0, 0.0,
-            ], dtype=np.float32)
-
-            glBindVertexArray(self.quad_vao)
-            glBindBuffer(GL_ARRAY_BUFFER, self.quad_vbo)
-            glBufferData(GL_ARRAY_BUFFER, quad_vertices.nbytes, quad_vertices, GL_STATIC_DRAW)
-            glEnableVertexAttribArray(0)
-            glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * quad_vertices.itemsize, ctypes.c_void_p(0))
-            glEnableVertexAttribArray(1)
-            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * quad_vertices.itemsize,
-                                  ctypes.c_void_p(2 * quad_vertices.itemsize))
-            glBindBuffer(GL_ARRAY_BUFFER, 0)
-            glBindVertexArray(0)
+            self.init_quad()
 
         glBindVertexArray(self.quad_vao)
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4)
+        glDrawArrays(GL_TRIANGLES, 0, 6)
+        glBindVertexArray(0)
+
+    def init_quad(self):
+        quad_vertices = np.array([
+            -1.0, 1.0, 0.0, 0.0, 1.0,
+            -1.0, -1.0, 0.0, 0.0, 0.0,
+            1.0, -1.0, 0.0, 1.0, 0.0,
+            1.0, -1.0, 0.0, 1.0, 0.0,
+            1.0, 1.0, 0.0, 1.0, 1.0,
+            -1.0, 1.0, 0.0, 0.0, 1.0,
+        ], dtype=np.float32)
+
+        self.quad_vao = glGenVertexArrays(1)
+        quad_vbo = glGenBuffers(1)
+
+        glBindVertexArray(self.quad_vao)
+        glBindBuffer(GL_ARRAY_BUFFER, quad_vbo)
+        glBufferData(GL_ARRAY_BUFFER, quad_vertices.nbytes, quad_vertices, GL_STATIC_DRAW)
+
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * quad_vertices.itemsize, ctypes.c_void_p(0))
+        glEnableVertexAttribArray(0)
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * quad_vertices.itemsize, ctypes.c_void_p(12))
+        glEnableVertexAttribArray(1)
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
         glBindVertexArray(0)
 
     def render_depth_map(self, player, world, interactables):
@@ -753,6 +795,7 @@ class Renderer:
         glBindFramebuffer(GL_FRAMEBUFFER, self.scene_fbo)
 
         self.scene_texture = glGenTextures(1)
+        glActiveTexture(GL_TEXTURE3)
         glBindTexture(GL_TEXTURE_2D, self.scene_texture)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 800, 600, 0, GL_RGB, GL_UNSIGNED_BYTE, None)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
@@ -774,6 +817,7 @@ class Renderer:
         glBindFramebuffer(GL_FRAMEBUFFER, self.volumetric_fbo)
 
         self.volumetric_texture = glGenTextures(1)
+        glActiveTexture(GL_TEXTURE2)
         glBindTexture(GL_TEXTURE_2D, self.volumetric_texture)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 800, 600, 0, GL_RGBA, GL_UNSIGNED_BYTE, None)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
@@ -790,25 +834,6 @@ class Renderer:
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
-    def draw_offscreen_texture(self):
-        glDisable(GL_DEPTH_TEST)
-        glDisable(GL_BLEND)
-        assert not glIsEnabled(GL_DEPTH_TEST), "GL_DEPTH_TEST should be disabled when drawing offscreen texture"
-        assert not glIsEnabled(GL_BLEND), "GL_BLEND should be disabled when drawing offscreen texture"
-
-        self.screen_shader.use()
-        glBindVertexArray(self.quadVAO)
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, self.volume_texture)
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
-        glBindVertexArray(0)
-
-        glEnable(GL_DEPTH_TEST)
-        glEnable(GL_BLEND)
-        assert glIsEnabled(GL_DEPTH_TEST), "GL_DEPTH_TEST should be re-enabled after drawing offscreen texture"
-        assert glIsEnabled(GL_BLEND), "GL_BLEND should be re-enabled after drawing offscreen texture"
-        print("draw_offscreen_texture complete.")
-        self.check_gl_state()
 
     def render_scene_to_fbo(self, shader, player_object, world, world_objects, interactables, light_space_matrix,
                             view_matrix, projection_matrix, enable_bump_mapping=False, bump_scale=0.0, weapons=None):
@@ -880,7 +905,7 @@ class Renderer:
         glViewport(0, 0, 800, 600)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        glDisable(GL_DEPTH_TEST)
+        #glDisable(GL_DEPTH_TEST)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
@@ -921,38 +946,46 @@ class Renderer:
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
-    def composite_scene_and_volumetrics(self, projection_matrix):
+    def composite_scene_and_volumetrics(self):
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glViewport(0, 0, 800, 600)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        # 1. Bind the scene to texture unit 0
         self.composite_shader.use()
-        glActiveTexture(GL_TEXTURE0)
+        # Pass depth information uniforms
+        glActiveTexture(GL_TEXTURE12)
+        glBindTexture(GL_TEXTURE_2D, self.atmos_depth_texture)
+        self.composite_shader.set_uniform1i("depthTexture", 12)
+        self.composite_shader.set_uniform1f("nearPlane", 0.01)
+        self.composite_shader.set_uniform1f("farPlane", 1000)
+
+        # 1. Bind the scene texture
+        glActiveTexture(GL_TEXTURE3)
         glBindTexture(GL_TEXTURE_2D, self.scene_texture)
-        self.composite_shader.set_uniform_sampler2D("sceneTexture", 0)
-
-        # 2. Bind the volumetrics texture to texture unit 1
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, self.volumetric_texture)
-        self.composite_shader.set_uniform_sampler2D("volumetricTexture", 1)
-
-        # 3. Bind the tracers texture to texture unit 2
+        self.composite_shader.set_uniform1i("sceneTexture", 3)
+        self.check_opengl_errors()
+        # 2. Bind the volumetrics texture
         glActiveTexture(GL_TEXTURE2)
+        glBindTexture(GL_TEXTURE_2D, self.volumetric_texture)
+        self.composite_shader.set_uniform1i("volumetricTexture", 2)
+        self.check_opengl_errors()
+        # 3. Bind the tracers texture
+        glActiveTexture(GL_TEXTURE4)
         glBindTexture(GL_TEXTURE_2D, self.tracer_texture)
-        self.composite_shader.set_uniform_sampler2D("tracers", 2)
-
-        # 4. Render the quad for the volumetrics
+        self.composite_shader.set_uniform1i("tracers", 4)
+        self.check_opengl_errors()
+        # 4. Bind the atmosphere texture
+        glActiveTexture(GL_TEXTURE10)
+        glBindTexture(GL_TEXTURE_3D, self.atmosphere_texture)
+        self.composite_shader.set_uniform1i("atmosphere", 10)
+        self.check_opengl_errors()
+        # 5. Render the quad for compositing
         self.render_quad()
-
-        # 5. Render the quad for the fog
-        self.render_fog_quad(self.fog_shader.program,
-                             self.fog_texture_color_buffer,
-                             self.fog_texture_depth_buffer,
-                             glm.inverse(projection_matrix), projection_matrix)
-
-        # 6. Unbind textures
+        self.check_opengl_errors()
+        # 6. Unbind all textures
         glBindTexture(GL_TEXTURE_2D, 0)
+        glBindTexture(GL_TEXTURE_3D, 0)
+        self.check_opengl_errors()
 
     def check_gl_state(self):
         depth_test_enabled = glIsEnabled(GL_DEPTH_TEST)
@@ -1179,13 +1212,15 @@ class Renderer:
         glBindFramebuffer(GL_FRAMEBUFFER, fbo)
 
         # Texture to store framebuffer data
-        texture = glGenTextures(1)
-        glBindTexture(GL_TEXTURE_2D, texture)
+        self.tracer_texture = glGenTextures(1)
+        print("tracer texture", self.tracer_texture)
+        glActiveTexture(GL_TEXTURE4)
+        glBindTexture(GL_TEXTURE_2D, self.tracer_texture)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, screen_width, screen_height, 0, GL_RGB,
                      GL_UNSIGNED_BYTE, None)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0)
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.tracer_texture, 0)
 
         # Check framebuffer completeness
         if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
@@ -1196,15 +1231,16 @@ class Renderer:
         self.tracer_vao = vao
         self.tracer_vbo = vbo
         self.tracer_fbo = fbo
-        self.tracer_texture = texture
 
         # Create and configure blur FBOs and textures
         self.blur_fbo1 = glGenFramebuffers(1)
         self.blur_texture1 = glGenTextures(1)
+        glActiveTexture(GL_TEXTURE5)
         self.configure_blur_fbo(self.blur_fbo1, self.blur_texture1, screen_width, screen_height)
 
         self.blur_fbo2 = glGenFramebuffers(1)
         self.blur_texture2 = glGenTextures(1)
+        glActiveTexture(GL_TEXTURE6)
         self.configure_blur_fbo(self.blur_fbo2, self.blur_texture2, screen_width, screen_height)
 
         print(
@@ -1228,8 +1264,9 @@ class Renderer:
         image = image.transpose(Image.FLIP_TOP_BOTTOM)
         img_data = image.tobytes()
 
-        texture_id = glGenTextures(1)
-        glBindTexture(GL_TEXTURE_2D, texture_id)
+        self.hud_texture = glGenTextures(1)
+        glActiveTexture(GL_TEXTURE7)
+        glBindTexture(GL_TEXTURE_2D, self.hud_texture)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
@@ -1237,7 +1274,7 @@ class Renderer:
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, img_data)
         glBindTexture(GL_TEXTURE_2D, 0)
 
-        return texture_id
+        return self.hud_texture
 
     def render_hud(self):
         glEnable(GL_BLEND)
@@ -1331,7 +1368,7 @@ class Renderer:
         self.fog_shader.set_uniform1f("far", 10000)
 
     def render_fog_quad(self, post_processing_program, texture_colorbuffer, texture_depthbuffer,
-                               inv_proj_matrix, projection_matrix):
+                        inv_proj_matrix, projection_matrix):
         self.render_fog(projection_matrix)
         glUseProgram(post_processing_program)
 
@@ -1370,6 +1407,7 @@ class Renderer:
 
         # Create a color attachment texture
         self.fog_texture_color_buffer = glGenTextures(1)
+        glActiveTexture(GL_TEXTURE8)
         glBindTexture(GL_TEXTURE_2D, self.fog_texture_color_buffer)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 800, 600, 0, GL_RGB, GL_UNSIGNED_BYTE, None)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
@@ -1378,6 +1416,7 @@ class Renderer:
 
         # Create a depth attachment texture
         self.fog_texture_depth_buffer = glGenTextures(1)
+        glActiveTexture(GL_TEXTURE9)
         glBindTexture(GL_TEXTURE_2D, self.fog_texture_depth_buffer)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 800, 600, 0, GL_DEPTH_COMPONENT, GL_FLOAT, None)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
@@ -1388,3 +1427,275 @@ class Renderer:
             raise Exception("Framebuffer is not complete!")
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+    def init_atmosphere(self, width=256, height=256, depth=256, density_falloff=1.0):
+        """ Generates the 3D volume and initializes the associated VAO, VBO, and EBO used to render the atmosphere """
+        print("Initializing atmosphere texture...")
+
+        # Generate a texture ID
+        self.atmosphere_texture = glGenTextures(1)
+        glActiveTexture(GL_TEXTURE10)
+        # Bind the texture
+        glBindTexture(GL_TEXTURE_3D, self.atmosphere_texture)
+
+        # Create an empty numpy array for atmosphere_data
+        atmosphere_data = np.zeros((width, height, depth, 4), dtype=np.float32)
+
+        # Define the starting and ending values
+        start_values = np.array([0, 0, 0, 0])
+        end_values = np.array([0.5, 0.7, 1.0, 1.0])
+
+        # Calculate the differences
+        diff_values = end_values - start_values
+
+        # Calculate the center of the volume
+        center_x = (width - 1) / 2.0
+        center_y = (height - 1) / 2.0
+        center_z = (depth - 1) / 2.0
+
+        # Generate grid coordinates
+        x = np.linspace(-center_x, center_x, width)
+        y = np.linspace(-center_y, center_y, height)
+        z = np.linspace(-center_z, center_z, depth)
+        xx, yy, zz = np.meshgrid(x, y, z, indexing='ij')
+
+        # Normalize the coordinates to the range [-1, 1]
+        norm_x = xx / center_x
+        norm_y = yy / center_y
+        norm_z = zz / center_z
+
+        # Calculate the average normalized distance
+        avg_norm = (np.abs(norm_x) + np.abs(norm_y) + np.abs(norm_z)) / 3
+
+        # Calculate the values based on the average normalized distance
+        atmosphere_data = start_values + avg_norm[..., np.newaxis] * diff_values
+
+        # Example to print out a slice of the array for verification
+        print(atmosphere_data[:, :, 50, :])  # Print the values at depth 50
+        # Set texture parameters and upload data
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE)
+        self.check_opengl_error()
+
+        # Correct the internal format and data type
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA32F, width, height, depth, 0, GL_RGBA, GL_FLOAT, atmosphere_data)
+        self.check_gl_state()  # Check for OpenGL errors
+        self.check_opengl_error()
+
+        # Generate and bind a dedicated framebuffer
+        self.atmos_fbo = glGenFramebuffers(1)
+        self.atmos_color_texture = glGenTextures(1)
+        self.atmos_depth_texture = glGenTextures(1)
+
+        glBindFramebuffer(GL_FRAMEBUFFER, self.atmos_fbo)
+
+        # Create color texture
+        glActiveTexture(GL_TEXTURE11)
+        glBindTexture(GL_TEXTURE_2D, self.atmos_color_texture)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 800, 600, 0, GL_RGBA, GL_UNSIGNED_BYTE, None)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.atmos_color_texture, 0)
+        self.check_opengl_error()
+        # Create depth texture
+        glActiveTexture(GL_TEXTURE12)
+        glBindTexture(GL_TEXTURE_2D, self.atmos_depth_texture)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, 800, 600, 0, GL_DEPTH_COMPONENT, GL_FLOAT, None)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, self.atmos_depth_texture, 0)
+        self.check_opengl_error()
+        # Check framebuffer completeness
+        if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
+            raise Exception("Framebuffer is not complete")
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+        # Each group of three lines corresponds to two triangles that form one face of the cube.
+        vertices, indices = self.build_volume()
+
+        atmos_vao = glGenVertexArrays(1)
+        atmos_vbo = glGenBuffers(1)
+        atmos_ebo = glGenBuffers(1)
+
+        glBindVertexArray(atmos_vao)
+
+        glBindBuffer(GL_ARRAY_BUFFER, atmos_vbo)
+        glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, atmos_ebo)
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.nbytes, indices, GL_STATIC_DRAW)
+
+        # Position attribute
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * vertices.itemsize, ctypes.c_void_p(0))
+        glEnableVertexAttribArray(0)
+
+        # Unbind VAO and buffers
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindVertexArray(0)
+
+        self.atmos_vao = atmos_vao
+        self.atmos_vbo = atmos_vbo
+        self.atmos_ebo = atmos_ebo
+
+    def debug_render_atmos(self, view_matrix, projection_matrix, camera_pos):
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        glEnable(GL_DEPTH_TEST)
+        glDepthFunc(GL_LESS)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        self.atmos_shader.use()
+
+        # Bind uniforms: vertex
+        self.atmos_shader.set_uniform_matrix4fv("model", glm.mat4(1))
+        self.atmos_shader.set_uniform_matrix4fv("view", view_matrix)
+        self.atmos_shader.set_uniform_matrix4fv("projection", projection_matrix)
+
+        # Bind uniforms: fragment
+        texture_unit_index = 10
+        glActiveTexture(GL_TEXTURE0 + texture_unit_index)
+        glBindTexture(GL_TEXTURE_3D, self.atmosphere_texture)
+        self.atmos_shader.set_uniform1i("fogTexture", texture_unit_index)
+        self.atmos_shader.set_uniform3fv("lightPosition", glm.vec3(0.0, 10.0, 0.0))
+        self.atmos_shader.set_uniform3fv("lightColor", glm.vec3(1.0, 1.0, 1.0))
+        self.atmos_shader.set_uniform1f("lightIntensity", 1.0)
+        self.atmos_shader.set_uniform3fv("cameraPosition", camera_pos)
+        self.atmos_shader.set_uniform1f("scatteringCoefficient", 0.01)
+
+
+        # Draw
+        glBindVertexArray(self.atmos_vao)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.atmos_ebo)
+
+        # Ensure the correct number of indices
+        num_indices = self.atmosphere_indices.size  # Assuming atmosphere_indices is your indices array
+        glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, None)
+
+        glBindVertexArray(0)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+        # Check for OpenGL errors
+        err = glGetError()
+        if err != GL_NO_ERROR:
+            print(f"OpenGL error: {err}")
+
+    def render_atmosphere_to_fbo(self, view_matrix, projection_matrix, camera_pos):
+        # Generate and bind a dedicated framebuffer
+        if not hasattr(self, 'atmos_fbo'):
+            self.init_atmosphere()
+
+        glBindFramebuffer(GL_FRAMEBUFFER, self.atmos_fbo)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        glEnable(GL_DEPTH_TEST)
+        glDepthFunc(GL_LESS)
+        glEnable(GL_BLEND)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+        self.atmos_shader.use()
+        # Bind uniforms: vertex
+        self.atmos_shader.set_uniform_matrix4fv("model", glm.mat4(1))
+        self.atmos_shader.set_uniform_matrix4fv("view", view_matrix)
+        self.atmos_shader.set_uniform_matrix4fv("projection", projection_matrix)
+        # Bind uniforms: fragment
+        texture_unit_index = 10
+        glActiveTexture(GL_TEXTURE0 + texture_unit_index)
+        glBindTexture(GL_TEXTURE_3D, self.atmosphere_texture)
+        self.atmos_shader.set_uniform1i("fogTexture", texture_unit_index)
+        self.atmos_shader.set_uniform3fv("lightPosition", glm.vec3(0.0, 10.0, 0.0))
+        self.atmos_shader.set_uniform3fv("lightColor", glm.vec3(1.0, 1.0, 1.0))
+        self.atmos_shader.set_uniform1f("lightIntensity", 1.0)
+        self.atmos_shader.set_uniform3fv("cameraPosition", camera_pos)
+        self.atmos_shader.set_uniform1f("scatteringCoefficient", 0.01)
+        self.atmos_shader.set_uniform_matrix4fv("viewMatrix", view_matrix)
+        self.atmos_shader.set_uniform_matrix4fv("projectionMatrix", projection_matrix)
+
+        # Draw
+        glBindVertexArray(self.atmos_vao)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.atmos_ebo)
+        glDrawElements(GL_TRIANGLES, self.atmosphere_indices.size, GL_UNSIGNED_INT, None)
+        glBindVertexArray(0)
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+        glBindVertexArray(self.quadVAO)
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
+        glBindVertexArray(0)
+        self.check_opengl_error()
+
+    def composite_atmosphere(self):
+        # Use the main shader and bind the framebuffer texture
+        self.main_shader.use()
+        glActiveTexture(GL_TEXTURE0 + 10)
+        glBindTexture(GL_TEXTURE_3D, self.atmosphere_texture)
+        self.main_shader.set_uniform1i("atmosphere", 0)
+
+        # Render a quad to composite the atmosphere texture into the main scene
+        glBindVertexArray(self.quad_vao)
+        glDrawArrays(GL_TRIANGLES, 0, 6)
+        glBindVertexArray(0)
+
+    def build_volume(self):
+        self.atmosphere_vertices = np.array([
+            # Front face
+            -500.0, -500.0, 500.0,  # Bottom-left
+            500.0, -500.0, 500.0,  # Bottom-right
+            500.0, 500.0, 500.0,  # Top-right
+            -500.0, -500.0, 500.0,  # Bottom-left
+            500.0, 500.0, 500.0,  # Top-right
+            -500.0, 500.0, 500.0,  # Top-left
+
+            # Back face
+            -500.0, -500.0, -500.0,  # Bottom-left
+            -500.0, 500.0, -500.0,  # Top-left
+            500.0, 500.0, -500.0,  # Top-right
+            -500.0, -500.0, -500.0,  # Bottom-left
+            500.0, 500.0, -500.0,  # Top-right
+            500.0, -500.0, -500.0,  # Bottom-right
+
+            # Top face
+            -500.0, 500.0, -500.0,  # Top-left
+            -500.0, 500.0, 500.0,  # Bottom-left
+            500.0, 500.0, 500.0,  # Bottom-right
+            -500.0, 500.0, -500.0,  # Top-left
+            500.0, 500.0, 500.0,  # Bottom-right
+            500.0, 500.0, -500.0,  # Top-right
+
+            # Bottom face
+            -500.0, -500.0, -500.0,  # Top-left
+            500.0, -500.0, -500.0,  # Top-right
+            500.0, -500.0, 500.0,  # Bottom-right
+            -500.0, -500.0, -500.0,  # Top-left
+            500.0, -500.0, 500.0,  # Bottom-right
+            -500.0, -500.0, 500.0,  # Bottom-left
+
+            # Right face
+            500.0, -500.0, -500.0,  # Bottom-left
+            500.0, 500.0, -500.0,  # Top-left
+            500.0, 500.0, 500.0,  # Top-right
+            500.0, -500.0, -500.0,  # Bottom-left
+            500.0, 500.0, 500.0,  # Top-right
+            500.0, -500.0, 500.0,  # Bottom-right
+
+            # Left face
+            -500.0, -500.0, -500.0,  # Bottom-left
+            -500.0, -500.0, 500.0,  # Bottom-right
+            -500.0, 500.0, 500.0,  # Top-right
+            -500.0, -500.0, -500.0,  # Bottom-left
+            -500.0, 500.0, 500.0,  # Top-right
+            -500.0, 500.0, -500.0  # Top-left
+        ], dtype=np.float32).flatten()
+
+        self.atmosphere_indices = np.array([
+            0, 1, 2, 2, 3, 0,  # Front face
+            4, 5, 6, 6, 7, 4,  # Back face
+            8, 9, 10, 10, 11, 8,  # Top face
+            12, 13, 14, 14, 15, 12,  # Bottom face
+            16, 17, 18, 18, 19, 16,  # Right face
+            20, 21, 22, 22, 23, 20  # Left face
+        ], dtype=np.uint32)
+
+        return self.atmosphere_vertices, self.atmosphere_indices
+

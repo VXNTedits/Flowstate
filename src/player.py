@@ -187,67 +187,6 @@ class Player(CompositeModel):
             self.animation_accumulator = 0.0
             self.is_shooting = False
 
-    # def ads(self, delta_time):
-    #     """Rotates the right arm such that the right hand is positioned at the view center"""
-    #     self.camera.zoom = 1.1
-    #
-    #     # The parameter to be adjusted
-    #     right_arm_model = self.models[2][0]
-    #
-    #     # Calculate the view direction vector
-    #     view_direction = glm.vec3(
-    #         glm.cos(glm.radians(-self.yaw-90)) * glm.cos(glm.radians(-self.pitch)),
-    #         glm.sin(glm.radians(-self.pitch)),
-    #         glm.sin(glm.radians(-self.yaw-90)) * glm.cos(glm.radians(-self.pitch))
-    #     )
-    #
-    #     # Calculate the desired position of the right hand in world space
-    #     shoulder_position = right_arm_model.position
-    #     desired_hand_position = shoulder_position + view_direction * 0.795
-    #
-    #     # Use IK to calculate the necessary rotation for the right arm
-    #     current_hand_position = self.right_hand_position
-    #     direction_to_target = glm.normalize(desired_hand_position - current_hand_position)
-    #     current_direction = glm.vec3(1, 0, 0)  # Assuming the arm points along the X axis
-    #
-    #     # Calculate the quaternion rotation required to align the arm with the target direction
-    #     rotation_quaternion = glm.quatLookAt(direction_to_target, glm.vec3(0, 1, 0))  # Up vector is Y
-    #
-    #     # Convert quaternion to Euler angles for the arm model
-    #     rotation_euler = glm.eulerAngles(rotation_quaternion) + glm.vec3(90, 0, 0)
-    #
-    #     # Apply the rotation to the right arm model
-    #     self.set_relative_transform(right_arm_model, glm.vec3(0, 0, 0), rotation_euler)
-    #
-    #     # Rotates the right hand model matrix to align its orientation with the view direction
-    #     self.update_right_hand_model_matrix(ads=True)
-
-    # def ads(self, delta_time):
-    #     """Rotates the right arm such that the right hand is positioned at the view center"""
-    #     self.camera.zoom = 1.1
-    #
-    #     # The parameter to be adjusted
-    #     right_arm_model = self.models[2][0]  # Can also be directly written to right_arm_model.model_matrix
-    #
-    #     # Calculate the rotation correction required based on player's pitch and yaw.
-    #     # When the player pitches, the end of the arm does not remain in the center of the view
-    #     # because the shoulder and the camera are offset from each other.
-    #     pitch_correction_function = -1 * glm.sin(glm.radians(self.pitch))
-    #     yaw_correction_function = 25 * glm.sin(glm.radians(self.yaw))
-    #     roll_corrector_function = 1 * glm.sin(glm.radians(self.pitch))
-    #
-    #     correction_vector = glm.vec3(pitch_correction_function, yaw_correction_function, roll_corrector_function)
-    #
-    #     # At zero pitch, the values glm.vec3(90, 25, 0) apply the correct rotation.
-    #     base_rotation = glm.vec3(90, 25, 0)
-    #     rotation = correction_vector + base_rotation
-    #
-    #     # Applies a relative rotation to the right arm w.r.t. the camera
-    #     self.set_relative_transform(right_arm_model, glm.vec3(0, 0, 0), rotation)
-    #
-    #     # Rotates the right hand model matrix to align its orientation with the view direction
-    #     self.update_right_hand_model_matrix(ads=True)
-
     def ads(self, delta_time):
         """Rotates the right arm such that the right hand is positioned at the view center"""
         self.camera.zoom = 1.1

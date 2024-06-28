@@ -181,6 +181,28 @@ class Shader:
         else:
             glUniform1i(location, texture_unit)
 
+    def set_uniform_sampler3D(self, name, texture_unit):
+        """
+        Sets a 3D texture sampler uniform in the shader program.
+
+        Args:
+        name (str): The name of the sampler3D uniform in the shader.
+        texture_unit (int): The texture unit to which the sampler is bound.
+        """
+        # Activate the shader program before setting the uniform
+        self.use()
+
+        # Get the location of the uniform variable
+        location = glGetUniformLocation(self.program, name)
+
+        # Check if the uniform is found
+        if location == -1:
+            print(f"Uniform '{name}' not found in shader program {self.program}. \n"
+                  f"    (Associated fragment shader: {self.name_fragment}.)")
+        else:
+            # Set the sampler to use the specified texture unit
+            glUniform1i(location, texture_unit)
+
     def set_uniform_bool(self, name, value):
         self.use()
         location = glGetUniformLocation(self.program, name)

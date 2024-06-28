@@ -51,6 +51,7 @@ class Game:
                 view_matrix = self.components.camera.get_view_matrix()
                 gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)  # Clear the screen
 
+                # self.components.renderer.debug_render_atmos(view_matrix, self.components.camera.get_projection_matrix(), self.components.camera.position)
                 self.components.renderer.render(player_object=self.components.player,
                                                 world=self.components.world,
                                                 interactables=self.components.interactables,
