@@ -12,5 +12,5 @@ uniform mat4 projection;
 void main()
 {
     gl_Position = projection * view * model * vec4(aPos, 1.0);
-    TexCoord = aTexCoord; // Passed directly as texture coordinates
+    TexCoord = aTexCoord + 0.5; // Passed directly as texture coordinates
 }

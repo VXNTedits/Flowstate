@@ -10,27 +10,22 @@ uniform vec3 lightColor;
 uniform float lightIntensity;
 uniform vec3 cameraPosition;
 uniform float scatteringCoefficient;
-uniform mat4 viewMatrix;  // Camera view matrix
-uniform mat4 projectionMatrix;  // Camera projection matrix
 
 const vec3 scatteringColor = vec3(0.5, 0.7, 1.0); // Typical blue tint for Rayleigh scattering
 
 void main()
 {
-    // Transform TexCoord to world space coordinates
-    vec4 worldCoord = inverse(viewMatrix) * vec4(TexCoord, 1.0);
-
     // Compute the vector from the camera to the fragment position for view-dependent effects
-    vec3 viewDir = normalize(cameraPosition - worldCoord.xyz);
+    vec3 viewDir = normalize(cameraPosition - TexCoord); // Assuming TexCoord is in world space
 
     // Compute the light direction from the light position to the fragment position
-    vec3 lightDir = normalize(lightPosition - worldCoord.xyz);
+    vec3 lightDir = normalize(lightPosition - TexCoord); // Assuming TexCoord is in world space
 
     // Sample the fog density from the 3D texture at the fragment's position
-    float density = texture(fogTexture, TexCoord).r;
+    float density = texture(fogTexture, TexCoord).a;
 
     // Calculate the distance from the camera to the fragment position
-    float distance = length(cameraPosition - worldCoord.xyz);
+    float distance = length(cameraPosition - TexCoord); // Assuming TexCoord is in world space
 
     // Calculate the Rayleigh scattering effect
     float scatter = exp(-scatteringCoefficient * density * distance);
@@ -46,8 +41,8 @@ void main()
     vec3 color = scatteredLight * lightIntensity * density;
 
     // Compute alpha value based on distance to simulate increasing atmospheric effect with distance
-    float alpha = clamp(distance * scatteringCoefficient * 0.5, 0.7, 1.0); // Adjust the multiplier as needed
+    float alpha = clamp(distance * scatteringCoefficient * 1.0, 1.0, 1.0); // Adjust the multiplier as needed
 
     // Output the final color with variable alpha
-    FragColor = vec4(color, alpha);
+    FragColor = vec4(color, 1.0);//alpha);
 }

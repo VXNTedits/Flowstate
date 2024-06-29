@@ -70,7 +70,7 @@ class Components:
                                           material_overrides,
                                           scales)
 
-        self.world = World("world_depth_test", air_density=1.3)
+        self.world = World("wold_depth_test_1", air_density=1.3)
         print("World initialized")
 
         self.player = Player(get_relative_path("res/body.obj"),
@@ -137,8 +137,8 @@ class Components:
 
         self.input_handler = InputHandler(self.camera, self.player, self.physics)
         print("Input handler initialized")
-        self.shader = Shader(get_relative_path("shaders/vertex_shader.glsl"),
-                             get_relative_path("shaders/fragment_shader.glsl"))
+        self.shader = Shader(get_relative_path("shaders/main_vertex.glsl"),
+                             get_relative_path("shaders/main_fragment.glsl"))
         print("Shader manager initialized")
 
         self.renderer = Renderer(self.shader, self.camera, self.physics, self.weapons)

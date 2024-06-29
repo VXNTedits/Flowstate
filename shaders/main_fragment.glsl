@@ -20,7 +20,7 @@ uniform vec3 specularColor;
 uniform float shininess;
 uniform float roughness;
 uniform float bumpScale;
-uniform sampler2D shadowMap;
+uniform sampler2D shadowMap[NUM_LIGHTS];
 uniform bool useTexture;
 uniform sampler2D texture1;
 uniform bool enableBumpMapping;
@@ -34,7 +34,6 @@ uniform float tracerLightIntensities[MAX_TRACER_LIGHTS];
 uniform vec3 fogColor;
 uniform float fogDensity;
 uniform float fogHeightFalloff;
-
 
 float hash(float n) { return fract(sin(n) * 43758.5453); }
 
@@ -64,7 +63,7 @@ vec3 getPerturbedNormal(vec3 pos, vec3 norm) {
     return normalize(norm + bumpNormal);
 }
 
-float shadowCalculation(vec4 fragPosLightSpace, vec3 norm, vec3 lightDir)
+float shadowCalculation(vec4 fragPosLightSpace, vec3 norm, vec3 lightDir, sampler2D shadowMap)
 {
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5 + 0.5;
@@ -118,7 +117,7 @@ void main()
         float spec = pow(max(dot(perturbedNormal, halfwayDir), 0.0), shininess * (1.0 - roughness));
         vec3 specular = spec * lights[i].color * specularColor;
 
-        float shadow = shadowCalculation(FragPosLightSpace[i], perturbedNormal, lightDir);
+        float shadow = shadowCalculation(FragPosLightSpace[i], perturbedNormal, lightDir, shadowMap[i]);
         result += (diffuse + specular) * (1.0 - shadow);
     }
 
@@ -140,8 +139,6 @@ void main()
         result += tracerDiffuse + tracerSpecular;
     }
 
-    // FragColor = vec4(result, 1.0);
-
     // Calculate fog factor based on the y-coordinate of FragPos
     float fogFactor = exp(-fogDensity * (1.0 - exp(-FragPos.y * fogHeightFalloff)));
     fogFactor = clamp(fogFactor, 0.0, 1.0);
@@ -150,6 +147,4 @@ void main()
     vec3 finalColor = mix(fogColor, result, fogFactor);
 
     FragColor = vec4(finalColor, 1.0);
-
-
 }
