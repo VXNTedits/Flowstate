@@ -70,7 +70,7 @@ class Components:
                                           material_overrides,
                                           scales)
 
-        self.world = World("wold_depth_test_1", air_density=1.3)
+        self.world = World("world5", air_density=1.3)
         print("World initialized")
 
         self.player = Player(get_relative_path("res/body.obj"),
