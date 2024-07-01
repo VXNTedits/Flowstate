@@ -317,29 +317,6 @@ class Model:
             self.orientation = glm.vec3(rotation_vec)
             self.update_model_matrix()
             self.set_position(pivot_point)
-            # # Convert pivot_point to glm.vec3
-            # pivot = glm.vec3(pivot_point[0], pivot_point[1], pivot_point[2])
-            #
-            # # Step 1: Translate to origin (relative to pivot)
-            # translation_to_origin = glm.translate(glm.mat4(1.0), -pivot)
-            #
-            # # Step 2: Apply rotation (using glm to handle rotations)
-            # rotation_matrix = glm.mat4(1.0)
-            # rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_vec[0]), glm.vec3(1, 0, 0))
-            # rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_vec[1]), glm.vec3(0, 1, 0))
-            # rotation_matrix = glm.rotate(rotation_matrix, glm.radians(rotation_vec[2]), glm.vec3(0, 0, 1))
-            #
-            # # Step 3: Translate back
-            # translation_back = glm.translate(glm.mat4(1.0), pivot)
-            #
-            # # Combine transformations
-            # transformation_matrix = translation_back * rotation_matrix * translation_to_origin
-            #
-            # # Apply the transformation to the position
-            # new_position = glm.vec3(transformation_matrix * glm.vec4(self.position, 1.0))
-            #
-            # # Update the position
-            # self.position = new_position
 
         # Apply the rotation to the orientation
         self.orientation = glm.vec3(rotation_vec)

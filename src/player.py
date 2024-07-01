@@ -1,6 +1,9 @@
+import math
 import time
 
 import glm
+import numpy as np
+from scipy.optimize import minimize
 
 from src.camera import Camera
 from src.composite_model import CompositeModel
@@ -15,6 +18,8 @@ class Player(CompositeModel):
     def __init__(self, body_path: str, head_path: str, right_arm_path: str, mtl_path: str, camera, default_material,
                  filepath: str, mtl_filepath: str, *args, **kwargs):
         # Player attributes
+        self.ads_phi = 0
+        self.ads_theta = 0
         self.MAX_RECOIL_ANGLE = 5
         self.ANIMATION_SPEED = 2.5
         self.RECOIL_DURATION = 1.0
@@ -34,6 +39,7 @@ class Player(CompositeModel):
         self.previous_position = self.position
         self.front = glm.vec3(0.0, 0.0, -1.0)
         self.up = glm.vec3(0.0, 1.0, 0.0)
+        self.view = glm.vec3(0.0, 0.0, -1.0)
         self.velocity = glm.vec3(0, 0, 0)
         self.accelerator = 10
         self.jump_force = glm.vec3(0, 5, 0)
@@ -78,7 +84,7 @@ class Player(CompositeModel):
     def update_player(self, delta_time: float, mouse_buttons: list, world: World):
         # Updates camera position
         self.update_camera_position()
-
+        self.update_view()
         # Updates previous position before changing current position
         self.previous_position = self.position
 
@@ -187,16 +193,50 @@ class Player(CompositeModel):
             self.animation_accumulator = 0.0
             self.is_shooting = False
 
-    def ads(self, delta_time):
-        """Rotates the right arm such that the right hand is positioned at the view center"""
+    def ads(self, delta_time, eye_to_shoulder=0.314, arm_length=0.812, shoulder_offset=0.25, alpha=0.1):
+        """Rotates the right arm such that the right hand is positioned at the view center
+           Ref: https://www.overleaf.com/read/rnchjrcnptkm#0dd5ee"""
         self.camera.zoom = 1.1
-
         right_arm_model = self.models[2][0]
+        pitch = self.pitch
+        yaw = self.yaw
+        x_v, y_v, z_v = self.view
 
-        pitch_angle = -glm.degrees(glm.tan(0.3 / 0.795)) + (-self.pitch)
-        yaw_angle = glm.degrees(glm.sin(0.25/0.795)) + (-self.yaw+90)
+        d_x = shoulder_offset * glm.cos(glm.radians(yaw))
+        d_y = -eye_to_shoulder
+        d_z = shoulder_offset * glm.sin(glm.radians(yaw))
+        l = arm_length
 
-        right_arm_model.set_orientation(glm.vec3(pitch_angle, yaw_angle, 0))
+        theta = self.ads_theta if self.ads_theta != 0 else glm.radians(self.pitch)
+        phi = self.ads_phi if self.ads_phi != 0 else glm.radians(self.yaw)
+        t = l
+        dedphi = ((l * glm.cos(theta) * ((t * x_v - d_x) * glm.sin(phi) + (d_z - t * z_v) * glm.cos(phi))) /
+                  glm.sqrt((l * glm.cos(theta) * glm.sin(phi) - t * z_v + d_z) **
+                           2 + (l * glm.cos(theta)
+                                * glm.cos(
+                              phi) - t * x_v + d_x) ** 2
+                           + (l * glm.sin(theta) - t * y_v + d_y) ** 2))
+
+        dedtheta = -(l * (((l * glm.sin(phi) ** 2 + l * glm.cos(phi) ** 2 - l) * glm.cos(theta)
+                           + (d_z - t * z_v) * glm.sin(phi) + (d_x - t * x_v) * glm.cos(phi)) * glm.sin(theta)
+                          + (t * y_v - d_y) * glm.cos(theta))) / glm.sqrt((l * glm.sin(theta)
+                                                                           - t * y_v + d_y) ** 2 + (l * glm.sin(phi)
+                                                                                                    * glm.cos(theta)
+                                                                                                    - t * z_v + d_z) ** 2
+                                                                          + (l * glm.cos(phi) * glm.cos(theta)
+                                                                             - t * x_v + d_x) ** 2)
+        self.ads_theta = theta - alpha * dedtheta
+        self.ads_phi = phi - alpha * dedphi
+
+        # debug
+        e = glm.sqrt((l * glm.sin(theta) - t * y_v + d_y)**2 + (l * glm.sin(phi) * glm.cos(theta) - t * z_v + d_z)**2
+                     + (l * glm.cos(phi) * glm.cos(theta) - t * x_v + d_x)**2)
+        # round(self.view.x,2),round(self.view.y,2),round(self.view.z,2),
+        print(round(e,3), round(self.ads_theta,3), round(self.ads_phi, 3))
+        #
+
+        right_arm_model.set_orientation(glm.vec3(glm.degrees(-self.ads_theta), glm.degrees(-self.ads_phi)+90, 0.0))
+
         # Rotates the right hand model matrix to align its orientation with the view direction
         self.update_right_hand_model_matrix(ads=True)
 
@@ -312,3 +352,16 @@ class Player(CompositeModel):
         arm_pos = glm.vec3(chest_model.position) + glm.vec3(0, 1.4, 0)  # Adjust position relative to the chest
         right_arm_model.set_position(arm_pos)
         self.update_right_hand_model_matrix()
+
+    def update_view(self):
+        # Convert pitch and yaw from degrees to radians
+        pitch_rad = glm.radians(self.pitch)  #(-self.pitch - 90)
+        yaw_rad = glm.radians(self.yaw)  #(-self.yaw + 90)
+
+        # Calculate the direction vector components
+        x = glm.cos(pitch_rad) * glm.cos(yaw_rad)
+        y = glm.sin(pitch_rad)
+        z = glm.cos(pitch_rad) * glm.sin(yaw_rad)
+
+        # Return the direction vector as a tuple
+        self.view = glm.vec3(x, y, z)
