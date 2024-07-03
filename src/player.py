@@ -205,7 +205,7 @@ class Player(CompositeModel):
         self.camera.zoom = 1.1
         right_arm_model = self.models[2][0]
         pitch = glm.radians(self.pitch)
-        yaw = glm.radians( -self.yaw + 90)
+        yaw = glm.radians( self.yaw + 90)
         v_x, v_y, v_z = self.view
 
         d_x = 0 # * glm.cos(glm.radians(yaw))
