@@ -10,7 +10,7 @@ class PIDController:
         self.time = 0.0
         self.previous_time = 0.0
 
-    def calculate(self, error, delta_time):
+    def calculate(self, error, delta_time, kp=None, ki=None, kd=None):
         current_time = delta_time
         delta_time = current_time - self.previous_time
 
@@ -20,7 +20,10 @@ class PIDController:
         else:
             derivative = 0
 
-        output = self.kp * error + self.ki * self.integral + self.kd * derivative
+        if kp is None:
+            output = self.kp * error + self.ki * self.integral + self.kd * derivative
+        else:
+            output = kp * error + ki * self.integral + kd * derivative
 
         self.previous_error = error
         self.previous_time = current_time
