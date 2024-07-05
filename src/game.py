@@ -18,7 +18,6 @@ class Game:
         self.window = Window(800, 600, "Flowstate", fullscreen)
         print('Window initialized')
         self.components = Components(self.window)
-        # self.projection_matrix = glm.perspective(glm.radians(90.0), self.window.width / self.window.height, 0.001, 10000.0)
         self.tick_rate = 1.0 / 144
         self.state = GameState.MAIN_MENU
 
