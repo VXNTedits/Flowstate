@@ -378,7 +378,7 @@ class Renderer:
         # 5. Render atmosphere to the framebuffer
         self.render_atmosphere_to_fbo(view_matrix, projection_matrix, player_object.position)
 
-        # # 6. Render the player TODO: this call doesn't work down here
+        # 6. Render the player
         self.render_player_to_fbo(player_object, view_matrix, projection_matrix)
 
         # 6. Composite the scene and volumetric effects

@@ -208,9 +208,9 @@ class Player(CompositeModel):
         yaw = glm.radians( self.yaw + 90)
         v_x, v_y, v_z = self.view
 
-        d_x = 0 # * glm.cos(glm.radians(yaw))
+        d_x = -0.25 * glm.sin(glm.radians(yaw))
         d_y = -0.314
-        d_z = -0.25 # * glm.sin(glm.radians(yaw))
+        d_z = 0 # * glm.sin(glm.radians(yaw))
         l = arm_length
 
         # x = self.ads_x if self.ads_x != 0 else x_v
