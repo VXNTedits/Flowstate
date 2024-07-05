@@ -94,7 +94,7 @@ class Components:
             print("model in components.models: ", model.name)
         print("Models initialized")
 
-        self.physics = Physics(self.world_objects, self.player, self.interactables, self.world)
+        self.physics = Physics(self.player, self.interactables, self.world)
         print("Physics initialized")
 
         fifty_ae = Caliber(initial_velocity=470, mass=0.02, drag_coefficient=0.5, bullet_area=0.000127)
