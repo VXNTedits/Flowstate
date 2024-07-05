@@ -202,6 +202,7 @@ class Player(CompositeModel):
     def ads(self, delta_time, eye_to_shoulder=0.314, arm_length=0.712, shoulder_offset=0.25, alpha=0.1):
         """Rotates the right arm such that the right hand is positioned at the view center
            Ref: https://www.overleaf.com/read/rnchjrcnptkm#0dd5ee"""
+        # TODO
         self.camera.zoom = 1.1
         right_arm_model = self.models[2][0]
         pitch = glm.radians(self.pitch)
@@ -213,93 +214,6 @@ class Player(CompositeModel):
         d_z = 0 # * glm.sin(glm.radians(yaw))
         l = arm_length
 
-        # x = self.ads_x if self.ads_x != 0 else x_v
-        # y = self.ads_y if self.ads_y != 0 else y_v
-        # z = self.ads_z if self.ads_z != 0 else z_v
-        # t = self.t if self.t != 0 else l
-        #
-        # dedx = ((l * (l * x - t * x_v + d_x)) /
-        #         glm.sqrt((l * x - t * x_v + d_x)**2 + (-t * z_v + l * z + d_z)**2 + (l * y - t * x_v + d_y)**2))
-        # dedy = ((l * (l * y - t * x_v + d_y)) /
-        #         glm.sqrt((l * y - t * x_v + d_y)**2 + (-t * z_v + l * z + d_z)**2 + (-t * x_v + l * x + d_x)**2))
-        # dedz = ((l * (l * z - t * z_v + d_z)) /
-        #         glm.sqrt((l * z - t * z_v + d_z)**2 + (l * y - t * x_v + d_y)**2 + (-t * x_v + l * x + d_x)**2))
-        # dedt = (((z_v**2 + 2 * x_v**2) * t + (-l * z - d_z) * z_v - l * x_v * y + (-l * x - d_y - d_x) * x_v) /
-        #         glm.sqrt((-z_v * t + l * z + d_z)**2 + (-x_v * t + l * y + d_y)**2 + (-x_v * t + l * x + d_x)**2))
-        #
-        # self.ads_x = x_v - alpha * dedx
-        # self.ads_y = y_v - alpha * dedy
-        # self.ads_z = z_v - alpha * dedz
-        # self.t = t - alpha * dedt
-        #
-        # self.ads_theta = glm.asin(self.ads_y)
-        # self.ads_phi = glm.asin(self.ads_z/glm.cos(self.ads_theta))
-
-        # t = self.t if self.t != 0 else 2
-        # x = (- d_x + t*x_v)/l
-        # y = (- d_y + t*y_v)/la
-        # z = (- d_z + t*z_v)/l
-        # e = glm.sqrt( (t*x_v-(l*x-d_x))**2+(t*y_v-(l*y-d_y))**2+(t*z_v-(l*z-d_z))**2 )
-        # self.t = self.pid.calculate(e,delta_time)
-        #
-        # self.ads_theta = glm.asin(y)
-        # self.ads_phi = glm.asin(z/glm.cos(self.ads_theta))
-
-        # self.ads_theta = glm.asin((1 / l) * (d_z * glm.tan(pitch) + d_y))
-        # self.ads_phi = glm.acos(d_z / (l * glm.cos(glm.asin((1 / l) * (d_z * glm.tan(pitch) + d_y))))) + yaw
-
-        # the = self.ads_theta if self.ads_theta != 0 else pitch
-        # phi = self.ads_phi if self.ads_phi != 0 else yaw
-
-        # xa = glm.cos(ads_theta) * glm.cos(ads_phi)
-        # ya = glm.sin(ads_theta)
-        # za = glm.cos(ads_theta) * glm.sin(ads_phi)
-        # a = glm.vec3(l*xa, l*ya, l*za)
-        # v = self.view
-        # e = a - (glm.dot(a,v)/glm.dot(v,v))*v - a
-
-        # dedthe = (l ** 2 * ((v_y * glm.cos(v_y * the) + (
-        #             -glm.sin(v_z * phi) - glm.cos(v_x * phi) + v_z * glm.sin(phi) + v_x * glm.cos(phi)) * glm.sin(the) - v_y * glm.cos(
-        #     the)) * glm.sin(v_y * the) + ((v_y * glm.sin(v_z * phi) + v_y * glm.cos(v_x * phi) - v_y * v_z * glm.sin(
-        #     phi) - v_x * v_y * glm.cos(phi)) * glm.cos(the) - v_y ** 2 * glm.sin(the)) * glm.cos(v_y * the) + (
-        #                                v_y * glm.sin(v_z * phi) + v_y * glm.cos(v_x * phi)) * glm.sin(the) ** 2 + (
-        #                                -glm.sin(v_z * phi) ** 2 + (
-        #                                    -2 * glm.cos(v_x * phi) + 2 * v_z * glm.sin(phi) + 2 * v_x * glm.cos(phi)) * glm.sin(
-        #                            v_z * phi) - glm.cos(v_x * phi) ** 2 + (
-        #                                            2 * v_z * glm.sin(phi) + 2 * v_x * glm.cos(phi)) * glm.cos(v_x * phi) + (
-        #                                            -v_z ** 2 - v_y ** 2 - v_x ** 2) * glm.sin(phi) ** 2 + (
-        #                                            -v_z ** 2 - v_y ** 2 - v_x ** 2) * glm.cos(
-        #                            phi) ** 2 + v_z ** 2 + v_y ** 2 + v_x ** 2) * glm.cos(the) * glm.sin(the) + (
-        #                                -v_y * glm.sin(v_z * phi) - v_y * glm.cos(v_x * phi)) * glm.cos(the) ** 2)) / (
-        #                      (v_z ** 2 + v_y ** 2 + v_x ** 2) *glm.sqrt(((v_z * (
-        #                          l * glm.sin(v_y * the) + l * glm.sin(v_z * phi) * glm.cos(the) + l * glm.cos(v_x * phi) * glm.cos(
-        #                      the))) / (v_z ** 2 + v_y ** 2 + v_x ** 2) - l * glm.sin(phi) * glm.cos(the)) ** 2 + ((v_y * (
-        #                          l * glm.sin(v_y * the) + l * glm.sin(v_z * phi) * glm.cos(the) + l * glm.cos(v_x * phi) * glm.cos(
-        #                      the))) / (v_z ** 2 + v_y ** 2 + v_x ** 2) - l * glm.sin(the)) ** 2 + ((v_x * (
-        #                          l * glm.sin(v_y * the) + l * glm.sin(v_z * phi) * glm.cos(the) + l * glm.cos(v_x * phi) * glm.cos(
-        #                      the))) / (v_z ** 2 + v_y ** 2 + v_x ** 2) - l * glm.cos(phi) * glm.cos(the)) ** 2));
-        # dedphi = (l ** 2 * glm.cos(the) * ((v_z * glm.cos(the) * glm.cos(v_z * phi) - v_x * glm.cos(the) * glm.sin(
-        #     v_x * phi) + v_x * glm.cos(the) * glm.sin(phi) - v_z * glm.cos(the) * glm.cos(phi)) * glm.sin(v_z * phi) + (
-        #                                            v_z * glm.cos(the) * glm.cos(v_x * phi) - v_z ** 2 * glm.cos(the) * glm.sin(
-        #                                        phi) - v_x * v_z * glm.cos(the) * glm.cos(phi) + v_z * glm.sin(
-        #                                        v_y * the) - v_y * v_z * glm.sin(the)) * glm.cos(v_z * phi) + (
-        #                                            -v_x * glm.cos(the) * glm.cos(v_x * phi) + v_x * v_z * glm.cos(the) * glm.sin(
-        #                                        phi) + v_x ** 2 * glm.cos(the) * glm.cos(phi) - v_x * glm.sin(
-        #                                        v_y * the) + v_x * v_y * glm.sin(the)) * glm.sin(v_x * phi) + (
-        #                                            v_x * glm.cos(the) * glm.sin(phi) - v_z * glm.cos(the) * glm.cos(phi)) * glm.cos(
-        #     v_x * phi) + v_x * glm.sin(v_y * the) * glm.sin(phi) - v_z * glm.sin(v_y * the) * glm.cos(phi))) / (
-        #                      (v_z ** 2 + v_y ** 2 + v_x ** 2) *glm.sqrt(((v_z * (
-        #                          l * glm.cos(the) * glm.sin(v_z * phi) + l * glm.cos(the) * glm.cos(v_x * phi) + l * glm.sin(
-        #                      v_y * the))) / (v_z ** 2 + v_y ** 2 + v_x ** 2) - l * glm.cos(the) * glm.sin(phi)) ** 2 + ((v_y * (
-        #                          l * glm.cos(the) * glm.sin(v_z * phi) + l * glm.cos(the) * glm.cos(v_x * phi) + l * glm.sin(
-        #                      v_y * the))) / (v_z ** 2 + v_y ** 2 + v_x ** 2) - l * glm.sin(the)) ** 2 + ((v_x * (
-        #                          l * glm.cos(the) * glm.sin(v_z * phi) + l * glm.cos(the) * glm.cos(v_x * phi) + l * glm.sin(
-        #                      v_y * the))) / (v_z ** 2 + v_y ** 2 + v_x ** 2) - l * glm.cos(the) * glm.cos(phi)) ** 2));
-        #
-        # self.ads_theta = the - alpha * dedthe
-        # self.ads_phi = phi - alpha * dedphi
-        #
-
         t = glm.sqrt(l ** 2 - glm.sqrt((d_y ** 2 + d_z ** 2)))
 
         a = glm.vec3(self.view * t - glm.vec3(d_x, d_y, d_z))
@@ -308,8 +222,6 @@ class Player(CompositeModel):
         self.ads_theta = glm.asin(a.y)
         self.ads_phi = glm.acos(a.x / glm.cos(self.ads_theta)) - yaw
 
-        print(
-            f"Pitch={round(glm.degrees(pitch), 2)},Ads pitch={round(glm.degrees(self.ads_theta), 2)},Ads yaw={round(glm.degrees(self.ads_phi), 2)}")
         right_arm_model.set_orientation(glm.vec3(glm.degrees(self.ads_theta), glm.degrees(self.ads_phi), 0.0))
 
         # Rotates the right hand model matrix to align its orientation with the view direction
