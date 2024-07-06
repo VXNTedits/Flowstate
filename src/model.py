@@ -106,6 +106,39 @@ class Model:
         if bump_scale_override is not None:
             self.materials['bumpScale'] = bump_scale_override
 
+    def convex_decomp(self, shape):
+        #TODO: Convex decomposition algorithm takes arbitrary shape
+        # and outputs a set of convex shapes which can be used to run SAT collision detection
+        def is_convex(voxel_subset):
+            # Implement convexity check logic
+            pass
+        def find_splitting_plane(voxel_subset):
+            # Implement logic to find the best splitting plane
+            pass
+        def split_along_plane(voxel_subset, plane):
+            # Implement logic to split the shape along the plane
+            pass
+        def voxelize(shape):
+            # Implement logic to convert shape to voxel representation
+            pass
+        def recursive_decomp(voxel_subset):
+            if is_convex(voxel_subset):
+                convex_shapes.append(voxel_subset)
+                return
+            splitting_plane = find_splitting_plane(voxel_subset)
+            sub_shapes = split_along_plane(voxel_subset, splitting_plane)
+            for sub_shape in sub_shapes:
+                recursive_decomp(sub_shape)
+
+        voxels = voxelize(shape)
+        convex_shapes = []
+        recursive_decomp(voxels)
+        return convex_shapes
+
+
+
+
+
     def calculate_centroid(self):
         transformed_vertices = []
         for i in range(0, len(self.vertices), 6):

@@ -87,7 +87,7 @@ class Game:
         while accumulator >= self.tick_rate:
             self.components.input_handler.process_input(self.components.player, self.tick_rate)
             self.components.player.update_player(self.tick_rate, self.components.player.mouse_buttons, self.components.world)
-            self.components.physics.update_physics(self.tick_rate, self.components.weapons, self.components.player)
+            self.components.physics.update_physics(self.tick_rate, self.components.weapons)
             self.components.update_components(self.tick_rate)
             accumulator -= self.tick_rate
 

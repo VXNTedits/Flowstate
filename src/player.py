@@ -211,7 +211,7 @@ class Player(CompositeModel):
 
         d_x = -0.25 * glm.sin(glm.radians(yaw))
         d_y = -0.314
-        d_z = 0 # * glm.sin(glm.radians(yaw))
+        d_z = -0.25 * glm.cos(glm.radians(yaw))
         l = arm_length
 
         t = glm.sqrt(l ** 2 - glm.sqrt((d_y ** 2 + d_z ** 2)))

@@ -306,21 +306,18 @@ class Physics:
         if glm.length(self.player.velocity) > max_speed:
             self.player.velocity = max_speed * glm.normalize(self.player.velocity)
 
-    def update_physics(self, delta_time: float, weapons, player):
+    def update_physics(self, delta_time: float, weapons):
         # Apply forces to the player
         self.apply_forces(delta_time)
 
         # Manage collisions
-        collision = False
         for obj in self.world.get_world_objects():
-            collision = self.check_player_collisions(obj.aabb)
+            collision = self.check_player_aabb_collision(obj.aabb)
             if collision:
-                print("Collision detected!")
-                self.resolve_collision(obj)
-        else:
-            # No collision: Accept the proposed thrust
-            self.player.velocity += self.player.thrust
-            self.apply_gravity(delta_time)
+                self.resolve_aabb_collision(obj)
+
+        self.player.velocity += self.player.thrust
+        self.apply_gravity(delta_time)
 
         # Apply speed limiter
         self.limit_speed()
@@ -378,7 +375,7 @@ class Physics:
             return True
         return False
 
-    def check_player_collisions(self, aabb2):
+    def check_player_aabb_collision(self, aabb2):
         player_bb = self.player.bounding_box
 
         # AABB1 min and max points
@@ -403,7 +400,7 @@ class Physics:
             return True
         return False
 
-    def resolve_collision(self, obj):
+    def resolve_aabb_collision(self, obj):
         player_bb = self.player.bounding_box
         # AABB1 min and max points
         min1_x, min1_y, min1_z = player_bb[0]
@@ -419,6 +416,7 @@ class Physics:
         # Case 1: Top-down collision
         if max1_y > max2_y:
             self.player.position.y += y_depth
+            self.player.is_grounded = True
             return
         # Case 2: Bottom-up collision
         if min1_y < min2_y:
