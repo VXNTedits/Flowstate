@@ -324,49 +324,44 @@ class Model:
         # Update the model matrix to reflect new position and orientation
         self.update_model_matrix()
 
-    def calculate_bounding_box(self, bounding_margin=0.1) -> list:
-        if self.is_player:
-            # Return a point at the bottom center of the player model: the player's feet
-            return [glm.vec3(0, 0, 0)]  # Assuming the player's feet are at the origin
-        else:
-            # This handles the world object
-            positions = self.vertices.reshape(-1, 6)[:, :3]
+    def calculate_bounding_box(self, bounding_margin=0.0) -> list:
+        positions = self.vertices.reshape(-1, 6)[:, :3]
 
-            if positions.size == 0:
-                print("Warning: No vertices found, cannot compute bounding box.")
-                return []
+        if positions.size == 0:
+            print("Warning: No vertices found, cannot compute bounding box.")
+            return []
 
-            min_x, min_y, min_z = np.min(positions, axis=0)
-            max_x, max_y, max_z = np.max(positions, axis=0)
+        min_x, min_y, min_z = np.min(positions, axis=0)
+        max_x, max_y, max_z = np.max(positions, axis=0)
 
-            # Add margin to the bounding box dimensions
-            min_x -= bounding_margin
-            min_y -= bounding_margin
-            min_z -= bounding_margin
-            max_x += bounding_margin
-            max_y += bounding_margin
-            max_z += bounding_margin
+        # Add margin to the bounding box dimensions
+        min_x -= bounding_margin
+        min_y -= bounding_margin
+        min_z -= bounding_margin
+        max_x += bounding_margin
+        max_y += bounding_margin
+        max_z += bounding_margin
 
-            bounding_box = [
-                glm.vec3(min_x, min_y, min_z),
-                glm.vec3(max_x, min_y, min_z),
-                glm.vec3(max_x, max_y, min_z),
-                glm.vec3(min_x, max_y, min_z),
-                glm.vec3(min_x, min_y, max_z),
-                glm.vec3(max_x, min_y, max_z),
-                glm.vec3(max_x, max_y, max_z),
-                glm.vec3(min_x, max_y, max_z)
-            ]
+        bounding_box = [
+            glm.vec3(min_x, min_y, min_z),
+            glm.vec3(max_x, min_y, min_z),
+            glm.vec3(max_x, max_y, min_z),
+            glm.vec3(min_x, max_y, min_z),
+            glm.vec3(min_x, min_y, max_z),
+            glm.vec3(max_x, min_y, max_z),
+            glm.vec3(max_x, max_y, max_z),
+            glm.vec3(min_x, max_y, max_z)
+        ]
 
-            # Transform bounding box vertices by the model matrix
-            transformed_bounding_box = []
-            for vertex in bounding_box:
-                vec4_vertex = glm.vec4(vertex, 1.0)
-                transformed_vertex = glm.vec3(self.model_matrix * vec4_vertex)
-                transformed_bounding_box.append(transformed_vertex)
+        # Transform bounding box vertices by the model matrix
+        transformed_bounding_box = []
+        for vertex in bounding_box:
+            vec4_vertex = glm.vec4(vertex, 1.0)
+            transformed_vertex = glm.vec3(self.model_matrix * vec4_vertex)
+            transformed_bounding_box.append(transformed_vertex)
 
-            print("Calculated bounding box:", transformed_bounding_box)
-            return transformed_bounding_box
+        print("Calculated bounding box:", transformed_bounding_box)
+        return transformed_bounding_box
 
     def calculate_aabb(self):
         bounding_box = self.calculate_bounding_box()

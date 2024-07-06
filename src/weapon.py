@@ -6,7 +6,6 @@ import glm
 
 from src.physics import Physics
 
-
 class Weapon(InteractableObject):
     def __init__(self,
                  fire_rate,

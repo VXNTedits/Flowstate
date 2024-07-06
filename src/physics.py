@@ -22,7 +22,7 @@ class Physics:
         self.pid_controller = PIDController(kp=0.8, ki=0.0, kd=0.0)
         self.offset = 0.1
         self.set_gravity = True
-        self.toggle_gravity = False
+        self.toggle_gravity = True
         self.active_trajectories = []
 
     def apply_gravity(self, delta_time: float):
@@ -64,23 +64,22 @@ class Physics:
         start_pos = self.player.previous_position
         end_pos = self.player.position
         player_bb = self.player.calculate_player_bounding_box(start_pos, end_pos)
-
         collisions = []
         for obj in self.world.get_world_objects():
             aabb = obj.aabb
             is_intersecting, nearest_face_name, nearest_face_vectors = (
                 self.is_bounding_box_intersecting_aabb(player_bb, aabb))
-
             if is_intersecting:
                 collisions.append((nearest_face_name, nearest_face_vectors))
+
         return collisions
 
     def handle_collisions(self, player_thrust, delta_time):
-        #self.adjust_velocity_based_on_wall_collision(player_thrust,delta_time)
 
         collisions = self.check_linear_collision()
 
         if collisions:
+            print("Collisions detected:", collisions)
             # Resolve primary collision
             nearest_face_name, nearest_face_vectors = collisions[0]
             self.simple_resolve_collision(nearest_face_vectors, player_thrust, delta_time, nearest_face_name)
@@ -254,36 +253,36 @@ class Physics:
         p2 = glm.vec3(p2)
 
         # Use p0 as the reference point on the plane
-        P = p0
-        N = glm.cross(p1 - p0, p2 - p0)
+        point_in_collision_plane = p0
+        n = glm.cross(p1 - p0, p2 - p0)
 
         # Normalize the normal vector
-        N_normalized = glm.normalize(N)
+        collision_normal = glm.normalize(n)
 
-        V = self.player.position
+        player_pos = self.player.position
 
         # Compute the vector from the player's position to the reference point on the plane
-        W = V - P
+        distance_to_reference = player_pos - point_in_collision_plane
 
-        # Compute the dot product of W and the normalized normal vector
-        dot_product = glm.dot(W, N_normalized)
+        # Compute the dot product of distance_to_reference and the normalized normal vector
+        dot_product = glm.dot(distance_to_reference, collision_normal)
 
-        # Compute the projection of W onto the normal vector
-        projection_onto_normal = dot_product * N_normalized
+        # Compute the projection of distance_to_reference onto the normal vector
+        projection_onto_normal = dot_product * collision_normal
 
         # Calculate the new position by correcting only the normal component
-        V_corrected = V - projection_onto_normal
+        V_corrected = player_pos - projection_onto_normal
 
         # The player's velocity is in the collision direction
         if (
-                (glm.dot(self.player.velocity, N_normalized) >= 0 and not self.player.is_jumping)
-                or (glm.dot(proposed_thrust, N_normalized) >= 0 and not self.player.is_jumping)
+                (glm.dot(self.player.velocity, collision_normal) >= 0 and not self.player.is_jumping)
+                or (glm.dot(proposed_thrust, collision_normal) >= 0 and not self.player.is_jumping)
         ):
             # Correct the player's position component that is normal to the plane
             self.player.position = V_corrected  # * PID_correction
 
             # Project the player's velocity onto the normal vector
-            velocity_projection_onto_normal = glm.dot(self.player.velocity, N_normalized) * N_normalized
+            velocity_projection_onto_normal = glm.dot(self.player.velocity, collision_normal) * collision_normal
 
             # Subtract the projection from the player's velocity
             proposed_thrust -= velocity_projection_onto_normal
@@ -291,6 +290,7 @@ class Physics:
 
         else:
             # The player's velocity is already moving the player in a direction away from the collision surface
+            print("The player's velocity is already moving the player in a direction away from the collision surface")
             pass
 
         if nearest_face_name == 'top':
@@ -311,12 +311,12 @@ class Physics:
         self.apply_forces(delta_time)
 
         # Manage collisions
-        nearest_face_vectors = self.check_linear_collision()
-        if nearest_face_vectors:
-            print("Collision detected!")
-            # Collision: Resolve by projecting player onto collision face.
-            #            Reject proposed thrust: Restrict entry velocity, but allow player to have exit velocity.
-            self.handle_collisions(self.player.thrust, delta_time)
+        collision = False
+        for obj in self.world.get_world_objects():
+            collision = self.check_player_collisions(obj.aabb)
+            if collision:
+                print("Collision detected!")
+                self.resolve_collision(obj)
         else:
             # No collision: Accept the proposed thrust
             self.player.velocity += self.player.thrust
@@ -324,13 +324,6 @@ class Physics:
 
         # Apply speed limiter
         self.limit_speed()
-
-        # Debugging output
-        if self.player.is_jumping:
-            print("grounded=", self.player.is_grounded, " jumping=", self.player.is_jumping, "\n",
-                  "thrust=", self.player.thrust, "\n",
-                  "proposed=", self.player.proposed_thrust, "\n",
-                  "velocity=", self.player.velocity, "\n")
 
         # Reset inputs
         self.player.reset_thrust()
@@ -375,11 +368,75 @@ class Physics:
 
     def calculate_drag_force(self, velocity, caliber):
         speed = glm.length(velocity)
-        return -0.5 * self.world.air_density * caliber.drag_coefficient * caliber.bullet_area * speed ** 2 * glm.normalize(velocity)
+        return -0.5 * self.world.air_density * caliber.drag_coefficient * caliber.bullet_area * speed ** 2 * glm.normalize(
+            velocity)
 
     def is_out_of_bounds(self, position):
         # print("Projectile displacement = ", glm.length(position))
-        if glm.length(position) > 511:
+        if glm.length(position) > 512:
             print("Projectile out of bounds.")
             return True
         return False
+
+    def check_player_collisions(self, aabb2):
+        player_bb = self.player.bounding_box
+
+        # AABB1 min and max points
+        min1_x, min1_y, min1_z = player_bb[0]
+        max1_x, max1_y, max1_z = player_bb[1]
+
+        # AABB2 min and max points
+        min2_x, min2_y, min2_z = aabb2[0]
+        max2_x, max2_y, max2_z = aabb2[1]
+
+        # Check for overlap on the x-axis
+        x_overlap = (min1_x <= max2_x) and (max1_x >= min2_x)
+
+        # Check for overlap on the y-axis
+        y_overlap = (min1_y <= max2_y) and (max1_y >= min2_y)
+
+        # Check for overlap on the z-axis
+        z_overlap = (min1_z <= max2_z) and (max1_z >= min2_z)
+
+        if x_overlap and y_overlap and z_overlap:
+            # If all overlaps are true, the AABBs are colliding
+            return True
+        return False
+
+    def resolve_collision(self, obj):
+        player_bb = self.player.bounding_box
+        # AABB1 min and max points
+        min1_x, min1_y, min1_z = player_bb[0]
+        max1_x, max1_y, max1_z = player_bb[1]
+        aabb2 = obj.aabb
+        # AABB2 min and max points
+        min2_x, min2_y, min2_z = aabb2[0]
+        max2_x, max2_y, max2_z = aabb2[1]
+        x_depth = min(max1_x, max2_x) - max(min1_x, min2_x)
+        y_depth = min(max1_y, max2_y) - max(min1_y, min2_y)
+        z_depth = min(max1_z, max2_z) - max(min1_z, min2_z)
+
+        # Case 1: Top-down collision
+        if max1_y > max2_y:
+            self.player.position.y += y_depth
+            return
+        # Case 2: Bottom-up collision
+        if min1_y < min2_y:
+            self.player.position.y -= y_depth
+            return
+        # Case 3: Left-right collision
+        if min1_x < min2_x:
+            self.player.position.x -= x_depth
+            return
+        # Case 4: Right-left collision
+        if max1_x > max2_x:
+            self.player.position.x += x_depth
+            return
+        # Case 5: Front-rear collision
+        if max1_z > max2_z:
+            self.player.position.z += z_depth
+            return
+        # Case 6: Rear-front collision
+        if min1_z < min2_z:
+            self.player.position.z -= z_depth
+            return

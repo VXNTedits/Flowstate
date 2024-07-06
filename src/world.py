@@ -28,7 +28,7 @@ class World(CompositeModel):
                 filepaths.append(filepath)
                 mtl_filepaths.append(mtl_filepath)
                 rotations.append(glm.vec3(0, 0, 0))  # Default rotation
-                translations.append(glm.vec3(0, -5, 0))  # 50, 0, -30 Default translation
+                translations.append(glm.vec3(0, -50, 0))  # 50, 0, -30 Default translation
                 material_overrides.append(None)  # Default material
                 scales.append(1)  # Default scale
 
