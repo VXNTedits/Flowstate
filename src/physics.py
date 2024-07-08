@@ -53,7 +53,6 @@ class Physics:
                     collision_point = self.calculate_collision_point(start_pos, end_pos, nearest_face_vectors)
                     print("Projectile collision detected at: ", collision_point)
                     return collision_point
-
         return None
 
     def is_bounding_box_intersecting_aabb(self, line_segment, aabb):
@@ -144,7 +143,7 @@ class Physics:
         return intersection_point
 
     def apply_forces(self, delta_time: float):
-        """ Translates proposed thrust to actual thrust by smoothing the input and finally applies it to velocity """
+        """ Translates proposed thrust to actual thrust by smoothing the input """
         # Apply lateral thrust for movement
         """ Horizontal forces"""
         if self.player.proposed_thrust.x != 0.0 or self.player.proposed_thrust.z != 0.0:
@@ -156,15 +155,13 @@ class Physics:
                     self.player.proposed_thrust.z
                 )
             )
-
             # Use a lerp function to smoothly interpolate towards the target thrust
             lerp_factor = 1 - glm.exp(-self.player.accelerator * delta_time)
 
-            self.player.thrust.x = self.player.proposed_thrust.x * (
-                    1 - lerp_factor) + max_thrust.x * lerp_factor
-
-            self.player.thrust.z = self.player.proposed_thrust.z * (
-                    1 - lerp_factor) + max_thrust.z * lerp_factor
+            self.player.thrust.x = (
+                    self.player.proposed_thrust.x * (1 - lerp_factor) + max_thrust.x * lerp_factor)
+            self.player.thrust.z = (
+                    self.player.proposed_thrust.z * (1 - lerp_factor) + max_thrust.z * lerp_factor)
         else:
             # Apply braking force to lateral movement
             deceleration = glm.exp(-self.player.accelerator * delta_time)
@@ -179,9 +176,10 @@ class Physics:
         """ Vertical forces """
         self.player.thrust.y = self.player.proposed_thrust.y
 
-        # Ensure vertical velocity does not invert due to overshooting the deceleration
-        if abs(self.player.thrust.y) < 0.01:
-            self.player.thrust.y = 0.0
+        # # Ensure vertical velocity does not invert due to overshooting the deceleration
+        # I'm not sure if this is needed. I commented it out and it seemed to have no effect…?
+        # if abs(self.player.thrust.y) < 0.001:
+        #     self.player.thrust.y = 0.0
 
     def limit_speed(self):
         max_speed = self.player.max_speed
@@ -189,21 +187,17 @@ class Physics:
             self.player.velocity = max_speed * glm.normalize(self.player.velocity)
 
     def update_physics(self, delta_time: float, weapons):
-        # Apply forces to the player
-        self.apply_forces(delta_time)
-
-        # Manage collisions
         for obj in self.world.get_world_objects():
             collision = self.check_player_aabb_collision(obj.aabb)
             if collision:
                 self.resolve_aabb_collision(obj)
+        # Currently player thrust is directly added to velocity without a translation or filter layer,
+        # but there's flexibility to add additional logic here if need be.
+        # Apply forces to the player
+        self.apply_forces(delta_time)
         self.player.velocity += self.player.thrust
         self.apply_gravity(delta_time)
-
-        # Apply speed limiter
         self.limit_speed()
-
-        # Reset inputs
         self.player.reset_thrust()
         self.update_projectile_trajectory(delta_time=delta_time, weapons=weapons)
 

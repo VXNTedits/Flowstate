@@ -119,7 +119,7 @@ class Player(CompositeModel):
         time_between_shots = 1.0 / fire_rate if fire_rate > 0 else float('inf')
 
         if fire_rate == -1 and self.last_shot_time != 0:
-            # Single-fire mode: ensure only one bullet is fired
+            # TODO: Single-fire mode: ensure only one bullet is fired
             return
 
         if current_time - self.last_shot_time >= time_between_shots:
@@ -137,30 +137,29 @@ class Player(CompositeModel):
         self.thrust = glm.vec3(0.0, 0.0, 0.0)
         self.proposed_thrust = glm.vec3(0.0, 0.0, 0.0)
 
-    def propose_updated_thrust(self, directions: list, delta_time: float):
+    def propose_updated_thrust(self, directions: list):
         front = glm.vec3(glm.cos(glm.radians(self.yaw)), 0, glm.sin(glm.radians(self.yaw)))
         right = glm.normalize(glm.cross(front, self.up))
         proposed_thrust = glm.vec3(0, 0, 0)
 
         for direction in directions:
             if direction == 'FORWARD':
-                proposed_thrust += front  # * self.accelerator
+                proposed_thrust += front
             if direction == 'BACKWARD':
-                proposed_thrust += -front  # * self.accelerator
+                proposed_thrust += -front
             if direction == 'LEFT':
-                proposed_thrust += -right  # * self.accelerator
+                proposed_thrust += -right
             if direction == 'RIGHT':
-                proposed_thrust += right  # * self.accelerator
+                proposed_thrust += right
             if direction == 'JUMP' and self.is_grounded:
                 self.is_jumping = True
                 proposed_thrust += self.jump_force
                 self.is_grounded = False
-                print('jump: updated proposed_thrust to', proposed_thrust, "is jumping=", self.is_jumping)
             if direction == 'INTERACT':
                 self.interact = True
                 print("Player interacted")
 
-        self.proposed_thrust = proposed_thrust
+        self.proposed_thrust += proposed_thrust
 
     def update_right_hand_model_matrix(self, ads=False):
         local_hand_vec4 = glm.vec4(self.local_hand_position, 1.0)
@@ -346,8 +345,8 @@ class Player(CompositeModel):
 
     def update_view(self):
         # Convert pitch and yaw from degrees to radians
-        pitch_rad = glm.radians(self.pitch)  #(-self.pitch - 90)
-        yaw_rad = glm.radians(self.yaw)  #(-self.yaw + 90)
+        pitch_rad = glm.radians(self.pitch)
+        yaw_rad = glm.radians(self.yaw)
 
         # Calculate the direction vector components
         x = glm.cos(pitch_rad) * glm.cos(yaw_rad)

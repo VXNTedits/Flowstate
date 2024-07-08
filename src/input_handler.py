@@ -85,8 +85,8 @@ class InputHandler:
             directions.append('INTERACT')
 
         if directions:
-            self.handle_input(directions, delta_time)
+            self.handle_input(directions)
 
-    def handle_input(self, directions, delta_time):
+    def handle_input(self, directions):
         # print(directions)
-        self.player.propose_updated_thrust(directions, delta_time)
+        self.player.propose_updated_thrust(directions)
