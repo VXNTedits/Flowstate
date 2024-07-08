@@ -67,6 +67,7 @@ class Player(CompositeModel):
         self.MAX_RECOIL_ANGLE = 5
         self.ANIMATION_SPEED = 2.5
         self.RECOIL_DURATION = 1.0
+        self.v = 0
 
         # Models and transformations      # +left +up  +fwd
         self.local_hand_position = glm.vec3(-0.25, -0.3, 0.6)
@@ -204,11 +205,11 @@ class Player(CompositeModel):
             self.animation_accumulator = 0.0
             self.is_shooting = False
 
-    def ads(self, delta_time, eye_to_shoulder=0.314, arm_length=0.712, shoulder_offset=0.25, alpha=0.1):
+    def ads(self, delta_time):
         """Rotates the right arm such that the right hand is positioned at the view center
            Ref: https://www.overleaf.com/read/rnchjrcnptkm#0dd5ee"""
         # This is a stupid non-analytical solution because my brain is too small to solve it analytically
-        self.camera.zoom = 1.1
+        self.camera.zoom = 1.2
         right_arm_model = self.models[2][0]
         pitch = glm.radians(self.pitch)
         yaw = glm.radians(-self.yaw)
@@ -217,8 +218,16 @@ class Player(CompositeModel):
         self.ads_phi = (0.1558137 * self.ads_theta**4 + 0.30030977 * self.ads_theta**3 + 0.32617528 * self.ads_theta**2
                         + 0.15878894 * self.ads_theta + 1.99810689 + yaw)
 
-        right_arm_model.set_orientation(glm.vec3(glm.degrees(self.ads_theta), glm.degrees(self.ads_phi), 0.0))
-
+        target = glm.vec3(glm.degrees(self.ads_theta), glm.degrees(self.ads_phi), 0.0)
+        current = right_arm_model.orientation
+        f_natural = 10
+        damping = 0.03
+        omega_d = f_natural * glm.sqrt(1 - damping ** 2)
+        e = current - target
+        a = -2 * damping * f_natural * self.v - omega_d ** 2 * e
+        self.v += a * delta_time
+        current += self.v * delta_time
+        right_arm_model.set_orientation(current)
         # Rotates the right hand model matrix to align its orientation with the view direction
         self.update_right_hand_model_matrix(ads=True)
 
