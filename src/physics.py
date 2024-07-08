@@ -56,68 +56,6 @@ class Physics:
 
         return None
 
-    def check_linear_collision(self):
-        """
-        Checks if the player's movement intersects with any object in the world.
-        Returns all intersecting faces and their vectors.
-        """
-        start_pos = self.player.previous_position
-        end_pos = self.player.position
-        player_bb = self.player.calculate_player_bounding_box(start_pos, end_pos)
-        collisions = []
-        for obj in self.world.get_world_objects():
-            aabb = obj.aabb
-            is_intersecting, nearest_face_name, nearest_face_vectors = (
-                self.is_bounding_box_intersecting_aabb(player_bb, aabb))
-            if is_intersecting:
-                collisions.append((nearest_face_name, nearest_face_vectors))
-
-        return collisions
-
-    def handle_collisions(self, player_thrust, delta_time):
-
-        collisions = self.check_linear_collision()
-
-        if collisions:
-            print("Collisions detected:", collisions)
-            # Resolve primary collision
-            nearest_face_name, nearest_face_vectors = collisions[0]
-            self.simple_resolve_collision(nearest_face_vectors, player_thrust, delta_time, nearest_face_name)
-
-            # Check and resolve secondary collisions
-            for face_name, face_vectors in collisions[1:]:
-                if self.is_secondary_collision(face_vectors):
-                    print("Secondary collision detected!")
-                    self.simple_resolve_collision(face_vectors, player_thrust, delta_time, face_name)
-
-    def is_secondary_collision(self, face_vectors):
-        """
-        Check if there is still a collision after resolving the primary collision.
-        """
-        p0, p1, p2 = face_vectors
-
-        p0 = glm.vec3(p0)
-        p1 = glm.vec3(p1)
-        p2 = glm.vec3(p2)
-
-        # Use p0 as the reference point on the plane
-        P = p0
-        N = glm.cross(p1 - p0, p2 - p0)
-
-        # Normalize the normal vector
-        N_normalized = glm.normalize(N)
-
-        V = self.player.position
-
-        # Compute the vector from the player's position to the reference point on the plane
-        W = V - P
-
-        # Compute the dot product of W and the normalized normal vector
-        dot_product = glm.dot(W, N_normalized)
-
-        # If the dot product is close to zero, there's no collision
-        return abs(dot_product) > 1e-5
-
     def is_bounding_box_intersecting_aabb(self, line_segment, aabb):
         (start_pos, end_pos) = line_segment
         (min_x, min_y, min_z), (max_x, max_y, max_z) = aabb
@@ -244,62 +182,6 @@ class Physics:
         # Ensure vertical velocity does not invert due to overshooting the deceleration
         if abs(self.player.thrust.y) < 0.01:
             self.player.thrust.y = 0.0
-
-    def simple_resolve_collision(self, collision_face, proposed_thrust, delta_time, nearest_face_name):
-        p0, p1, p2 = collision_face
-
-        p0 = glm.vec3(p0)
-        p1 = glm.vec3(p1)
-        p2 = glm.vec3(p2)
-
-        # Use p0 as the reference point on the plane
-        point_in_collision_plane = p0
-        n = glm.cross(p1 - p0, p2 - p0)
-
-        # Normalize the normal vector
-        collision_normal = glm.normalize(n)
-
-        player_pos = self.player.position
-
-        # Compute the vector from the player's position to the reference point on the plane
-        distance_to_reference = player_pos - point_in_collision_plane
-
-        # Compute the dot product of distance_to_reference and the normalized normal vector
-        dot_product = glm.dot(distance_to_reference, collision_normal)
-
-        # Compute the projection of distance_to_reference onto the normal vector
-        projection_onto_normal = dot_product * collision_normal
-
-        # Calculate the new position by correcting only the normal component
-        V_corrected = player_pos - projection_onto_normal
-
-        # The player's velocity is in the collision direction
-        if (
-                (glm.dot(self.player.velocity, collision_normal) >= 0 and not self.player.is_jumping)
-                or (glm.dot(proposed_thrust, collision_normal) >= 0 and not self.player.is_jumping)
-        ):
-            # Correct the player's position component that is normal to the plane
-            self.player.position = V_corrected  # * PID_correction
-
-            # Project the player's velocity onto the normal vector
-            velocity_projection_onto_normal = glm.dot(self.player.velocity, collision_normal) * collision_normal
-
-            # Subtract the projection from the player's velocity
-            proposed_thrust -= velocity_projection_onto_normal
-            self.player.velocity -= velocity_projection_onto_normal
-
-        else:
-            # The player's velocity is already moving the player in a direction away from the collision surface
-            print("The player's velocity is already moving the player in a direction away from the collision surface")
-            pass
-
-        if nearest_face_name == 'top':
-            self.player.is_grounded = True
-            self.player.velocity.y = 0.0
-        else:
-            self.player.is_grounded = False
-
-        self.player.velocity += proposed_thrust
 
     def limit_speed(self):
         max_speed = self.player.max_speed
