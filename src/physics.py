@@ -315,7 +315,6 @@ class Physics:
             collision = self.check_player_aabb_collision(obj.aabb)
             if collision:
                 self.resolve_aabb_collision(obj)
-
         self.player.velocity += self.player.thrust
         self.apply_gravity(delta_time)
 

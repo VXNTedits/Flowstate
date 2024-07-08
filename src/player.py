@@ -177,10 +177,16 @@ class Player(CompositeModel):
 
         if ads:
             # TODO: Compensate for arm's rotation to align the hand model matrix with the view
-            self.right_hand_orientation = glm.vec3(self.models[0][0].orientation) + glm.vec3(0, 90, 0)
-
+            self.right_hand_orientation = glm.vec3(self.models[0][0].orientation - glm.vec3(self.ads_theta-90, self.ads_phi, 0))
         else:
-            self.right_hand_orientation = glm.vec3(self.models[2][0].orientation) + glm.vec3(0, 90, 0)
+            self.right_hand_orientation = glm.vec3(self.models[2][0].orientation)
+        rx = glm.rotate(glm.mat4(1.0), glm.radians(self.right_hand_orientation[0]), glm.vec3(1.0, 0.0, 0.0))
+        ry = glm.rotate(glm.mat4(1.0), glm.radians(self.right_hand_orientation[1]), glm.vec3(0.0, 1.0, 0.0))
+        rz = glm.rotate(glm.mat4(1.0), glm.radians(self.right_hand_orientation[2]), glm.vec3(0.0, 0.0, 1.0))
+        rotation_matrix = rz * ry * rx
+        self.right_hand_model_matrix[0] = rotation_matrix[0]
+        self.right_hand_model_matrix[1] = rotation_matrix[1]
+        self.right_hand_model_matrix[2] = rotation_matrix[2]
 
     def animate_hipfire_recoil(self, delta_time):
         models = self.get_objects()
@@ -190,7 +196,6 @@ class Player(CompositeModel):
             recoil_angle = -self.MAX_RECOIL_ANGLE * (
                     self.RECOIL_DURATION - self.animation_accumulator) / self.RECOIL_DURATION
             recoil_rotation = glm.vec3(recoil_angle, 0, 0)
-            #self.set_relative_transform(arm_right, self.right_arm_offset, recoil_rotation)
             print(recoil_rotation)
             arm_right.set_orientation(arm_right.orientation + recoil_rotation)
             self.animation_accumulator += delta_time * self.ANIMATION_SPEED
@@ -202,25 +207,15 @@ class Player(CompositeModel):
     def ads(self, delta_time, eye_to_shoulder=0.314, arm_length=0.712, shoulder_offset=0.25, alpha=0.1):
         """Rotates the right arm such that the right hand is positioned at the view center
            Ref: https://www.overleaf.com/read/rnchjrcnptkm#0dd5ee"""
-        # TODO
+        # This is a stupid non-analytical solution because my brain is too small to solve it analytically
         self.camera.zoom = 1.1
         right_arm_model = self.models[2][0]
         pitch = glm.radians(self.pitch)
-        yaw = glm.radians( self.yaw + 90)
-        v_x, v_y, v_z = self.view
+        yaw = glm.radians(-self.yaw)
 
-        d_x = -0.25 * glm.sin(glm.radians(yaw))
-        d_y = -0.314
-        d_z = -0.25 * glm.cos(glm.radians(yaw))
-        l = arm_length
-
-        t = glm.sqrt(l ** 2 - glm.sqrt((d_y ** 2 + d_z ** 2)))
-
-        a = glm.vec3(self.view * t - glm.vec3(d_x, d_y, d_z))
-        a = glm.normalize(a)
-        print(a)
-        self.ads_theta = glm.asin(a.y)
-        self.ads_phi = glm.acos(a.x / glm.cos(self.ads_theta)) - yaw
+        self.ads_theta = -0.07837593 * pitch**3 + 0.2462961 * pitch**2 - 1.04105928 * pitch - 0.51165938
+        self.ads_phi = (0.1558137 * self.ads_theta**4 + 0.30030977 * self.ads_theta**3 + 0.32617528 * self.ads_theta**2
+                        + 0.15878894 * self.ads_theta + 1.99810689 + yaw)
 
         right_arm_model.set_orientation(glm.vec3(glm.degrees(self.ads_theta), glm.degrees(self.ads_phi), 0.0))
 

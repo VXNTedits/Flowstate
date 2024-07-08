@@ -135,10 +135,6 @@ class Model:
         recursive_decomp(voxels)
         return convex_shapes
 
-
-
-
-
     def calculate_centroid(self):
         transformed_vertices = []
         for i in range(0, len(self.vertices), 6):
