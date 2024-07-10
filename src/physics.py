@@ -184,11 +184,6 @@ class Physics:
         # if abs(self.player.thrust.y) < 0.01:
         #     self.player.thrust.y = 0.0
 
-    # def limit_speed(self):
-    #     max_speed = self.player.max_speed
-    #     if (self.player.velocity.x ** 2 + self.player.velocity.z ** 2) > max_speed:
-    #         #self.player.velocity = max_speed * glm.normalize(self.player.velocity)
-
     def update_physics(self, delta_time: float, weapons):
         for obj in self.world.get_world_objects():
             collision = self.check_player_aabb_collision(obj.aabb)
@@ -237,7 +232,6 @@ class Physics:
         # Increment the lifetime of each tracer position
         for tracer in weapon.tracers:
             tracer['lifetime'] += delta_time
-
         # Remove tracers whose positions have exceeded their lifetime
         weapon.tracers = [tracer for tracer in weapon.tracers if tracer['lifetime'] < weapon.tracer_lifetime]
 
@@ -254,24 +248,18 @@ class Physics:
 
     def check_player_aabb_collision(self, aabb2):
         player_bb = self.player.bounding_box
-
         # AABB1 min and max points
         min1_x, min1_y, min1_z = player_bb[0]
         max1_x, max1_y, max1_z = player_bb[1]
-
         # AABB2 min and max points
         min2_x, min2_y, min2_z = aabb2[0]
         max2_x, max2_y, max2_z = aabb2[1]
-
         # Check for overlap on the x-axis
         x_overlap = (min1_x <= max2_x) and (max1_x >= min2_x)
-
         # Check for overlap on the y-axis
         y_overlap = (min1_y <= max2_y) and (max1_y >= min2_y)
-
         # Check for overlap on the z-axis
         z_overlap = (min1_z <= max2_z) and (max1_z >= min2_z)
-
         if x_overlap and y_overlap and z_overlap:
             # If all overlaps are true, the AABBs are colliding
             return True
@@ -289,7 +277,6 @@ class Physics:
         x_depth = min(max1_x, max2_x) - max(min1_x, min2_x)
         y_depth = min(max1_y, max2_y) - max(min1_y, min2_y)
         z_depth = min(max1_z, max2_z) - max(min1_z, min2_z)
-
         # Case 1: Top-down collision
         if max1_y > max2_y:
             self.player.position.y += y_depth
@@ -319,12 +306,15 @@ class Physics:
     def set_velocity(self):
         vt = self.player.velocity
         if glm.sqrt(vt.x ** 2 + vt.z ** 2) < self.player.max_speed:
-            vt += self.player.thrust
+            vt.x += self.player.thrust.x
+            vt.z += self.player.thrust.z
         else:
             if glm.dot(self.player.thrust, vt) <= 0:
-                vt += self.player.thrust
+                vt.x += self.player.thrust.x
+                vt.z += self.player.thrust.z
             else:
                 vn = glm.normalize(glm.cross(vt, self.player.up))
                 t = glm.dot(self.player.thrust, vn) * vn
-                self.player.velocity += t
-
+                vt.x += t.x
+                vt.z += t.z
+        vt.y += self.player.thrust.y
