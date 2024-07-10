@@ -70,7 +70,7 @@ class Components:
                                           material_overrides,
                                           scales)
 
-        self.world = World("world2", air_density=1.3)
+        self.world = World("world_mov_test", air_density=1.3)
         print("World initialized")
 
         self.player = Player(get_relative_path("res/body.obj"),
@@ -143,12 +143,6 @@ class Components:
 
         self.renderer = Renderer(self.shader, self.camera, self.physics, self.weapons)
         print("Renderer initialized")
-
-        # TESTING
-        #print("vertices before add_crater:\n", test_cube_interactable.vertices)
-        #test_cube_interactable.add_crater(glm.vec3(1.5,1.5,1.5),0.1,0.1)
-        #print("vertices after add_crater:\n", test_cube_interactable.vertices)
-        # --//--
 
     def set_input_callbacks(self):
         self.window.set_callbacks(self.input_handler.key_callback,

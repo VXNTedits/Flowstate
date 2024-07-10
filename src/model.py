@@ -7,7 +7,7 @@ import glm
 from typing import List, Tuple
 from OpenGL.GL import *
 from utils.file_utils import get_relative_path
-
+from scipy.spatial import ConvexHull
 
 @dataclass
 class MaterialOverride:
@@ -106,34 +106,38 @@ class Model:
         if bump_scale_override is not None:
             self.materials['bumpScale'] = bump_scale_override
 
-    def convex_decomp(self, shape):
-        #TODO: Convex decomposition algorithm takes arbitrary shape
-        # and outputs a set of convex shapes which can be used to run SAT collision detection
-        def is_convex(voxel_subset):
-            # Implement convexity check logic
-            pass
-        def find_splitting_plane(voxel_subset):
-            # Implement logic to find the best splitting plane
-            pass
-        def split_along_plane(voxel_subset, plane):
-            # Implement logic to split the shape along the plane
-            pass
-        def voxelize(shape):
-            # Implement logic to convert shape to voxel representation
-            pass
-        def recursive_decomp(voxel_subset):
-            if is_convex(voxel_subset):
-                convex_shapes.append(voxel_subset)
-                return
-            splitting_plane = find_splitting_plane(voxel_subset)
-            sub_shapes = split_along_plane(voxel_subset, splitting_plane)
-            for sub_shape in sub_shapes:
-                recursive_decomp(sub_shape)
+    def convex_decomposition(self, vertices):
+        def quickhull(vertices):
+            hull = ConvexHull(vertices)
+            return hull.vertices, hull.simplices
 
-        voxels = voxelize(shape)
-        convex_shapes = []
-        recursive_decomp(voxels)
-        return convex_shapes
+        def split_non_convex(vertices):
+            # This function should implement the logic to split non-convex parts
+            # This is a placeholder for the actual implementation
+            # The implementation might include finding a plane and splitting the vertices into two sets
+            pass
+
+        def is_convex(vertices):
+            # Check if a set of vertices forms a convex shape
+            hull = ConvexHull(vertices)
+            return len(hull.vertices) == len(vertices)
+        # Step 1: Compute the initial convex hull
+        convex_parts = []
+        hull_vertices, hull_simplices = quickhull(vertices)
+        convex_parts.append(vertices[hull_vertices])
+
+        # Step 2: Decompose non-convex parts
+        non_convex_parts = [vertices]
+
+        while non_convex_parts:
+            part = non_convex_parts.pop()
+            if not is_convex(part):
+                subparts = split_non_convex(part)
+                non_convex_parts.extend(subparts)
+            else:
+                convex_parts.append(part)
+
+        return convex_parts
 
     def calculate_centroid(self):
         transformed_vertices = []
@@ -306,15 +310,9 @@ class Model:
     def draw(self, camera=None):
         assert self.vao is not None, "VAO should not be None."
         assert len(self.indices) > 0, "Indices should not be empty."
-        # if camera:
-        #     if camera.first_person:
-        #         if self.name == 'head':
-        #             return
         glBindVertexArray(self.vao)
         glDrawElements(GL_TRIANGLES, len(self.indices), GL_UNSIGNED_INT, None)
         glBindVertexArray(0)
-
-        # Check for OpenGL errors
         error = glGetError()
         if error != GL_NO_ERROR:
             print(f"OpenGL error during draw: {error}")
