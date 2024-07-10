@@ -107,6 +107,7 @@ class Model:
             self.materials['bumpScale'] = bump_scale_override
 
     def convex_decomposition(self, vertices):
+        # TODO
         def quickhull(vertices):
             hull = ConvexHull(vertices)
             return hull.vertices, hull.simplices
