@@ -54,10 +54,11 @@ class Window:
             glfw.destroy_window(self.window)
         glfw.terminate()
 
-    def set_callbacks(self, key_callback, mouse_callback, mouse_button_callback):
+    def set_callbacks(self, key_callback, mouse_callback, mouse_button_callback, scroll_callback):
         glfw.set_key_callback(self.window, key_callback)
         glfw.set_cursor_pos_callback(self.window, mouse_callback)
         glfw.set_mouse_button_callback(self.window, mouse_button_callback)
+        glfw.set_scroll_callback(self.window, scroll_callback)
         glfw.set_input_mode(self.window, glfw.CURSOR, glfw.CURSOR_DISABLED)
 
     def should_close(self):

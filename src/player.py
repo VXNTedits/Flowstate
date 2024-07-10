@@ -157,7 +157,6 @@ class Player(CompositeModel):
                 self.is_grounded = False
             if direction == 'INTERACT':
                 self.interact = True
-                print("Player interacted")
 
         self.proposed_thrust += proposed_thrust
 
@@ -207,16 +206,16 @@ class Player(CompositeModel):
     def ads(self, delta_time):
         """Rotates the right arm such that the right hand is positioned at the view center
            Ref: https://www.overleaf.com/read/rnchjrcnptkm#0dd5ee"""
-        # This is a stupid non-analytical solution because my brain is too small to solve it analytically
+
         self.camera.zoom = 1.2
         right_arm_model = self.models[2][0]
         pitch = glm.radians(self.pitch)
         yaw = glm.radians(-self.yaw)
-
+        # This is a stupid non-analytical solution because my brain is too small to solve it analytically
         self.ads_theta = -0.07837593 * pitch**3 + 0.2462961 * pitch**2 - 1.04105928 * pitch - 0.51165938
         self.ads_phi = (0.1558137 * self.ads_theta**4 + 0.30030977 * self.ads_theta**3 + 0.32617528 * self.ads_theta**2
                         + 0.15878894 * self.ads_theta + 1.99810689 + yaw)
-
+        # Mimic an underdamped system
         target = glm.vec3(glm.degrees(self.ads_theta), glm.degrees(self.ads_phi), 0.0)
         current = right_arm_model.orientation
         f_natural = 10

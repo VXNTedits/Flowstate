@@ -16,6 +16,7 @@ class InputHandler:
         }
         self.left_mouse_button_pressed = False
         self.right_mouse_button_pressed = False
+        self.scroll_dn = False
 
     def key_callback(self, window, key, scancode, action, mods):
         if action == glfw.PRESS:
@@ -60,33 +61,30 @@ class InputHandler:
                 self.right_mouse_button_pressed = False
                 self.player.handle_right_click(self.right_mouse_button_pressed)
 
+    def scroll_callback(self, window, xoffset, yoffset):
+        self.scroll_dn = True
+
     def is_left_mouse_button_pressed(self):
         return self.left_mouse_button_pressed
 
     def process_input(self, player, delta_time):
         directions = []
-
         if self.keys.get(glfw.KEY_W):
             directions.append('FORWARD')
-
         if self.keys.get(glfw.KEY_S):
             directions.append('BACKWARD')
-
         if self.keys.get(glfw.KEY_A):
             directions.append('LEFT')
-
         if self.keys.get(glfw.KEY_D):
             directions.append('RIGHT')
-
-        if self.keys.get(glfw.KEY_SPACE):
+        if self.keys.get(glfw.KEY_SPACE) or self.scroll_dn:
             directions.append('JUMP')
-
         if self.keys.get(glfw.KEY_F):
             directions.append('INTERACT')
-
         if directions:
             self.handle_input(directions)
 
     def handle_input(self, directions):
-        # print(directions)
         self.player.propose_updated_thrust(directions)
+        self.scroll_dn = False
+

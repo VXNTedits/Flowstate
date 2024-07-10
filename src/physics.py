@@ -142,11 +142,13 @@ class Physics:
         intersection_point = start_pos + line_dir * t
         return intersection_point
 
-    def apply_forces(self, delta_time: float):
+    def convert_thrust(self, delta_time: float):
         """ Translates proposed thrust to actual thrust by smoothing the input """
+
         # Apply lateral thrust for movement
         """ Horizontal forces"""
         if self.player.proposed_thrust.x != 0.0 or self.player.proposed_thrust.z != 0.0:
+
             # Calculate desired lateral thrust
             max_thrust = self.player.max_speed * glm.normalize(
                 glm.vec3(
@@ -155,6 +157,7 @@ class Physics:
                     self.player.proposed_thrust.z
                 )
             )
+
             # Use a lerp function to smoothly interpolate towards the target thrust
             lerp_factor = 1 - glm.exp(-self.player.accelerator * delta_time)
 
@@ -178,13 +181,13 @@ class Physics:
 
         # # Ensure vertical velocity does not invert due to overshooting the deceleration
         # I'm not sure if this is needed. I commented it out and it seemed to have no effect…?
-        # if abs(self.player.thrust.y) < 0.001:
+        # if abs(self.player.thrust.y) < 0.01:
         #     self.player.thrust.y = 0.0
 
-    def limit_speed(self):
-        max_speed = self.player.max_speed
-        if glm.length(self.player.velocity) > max_speed:
-            self.player.velocity = max_speed * glm.normalize(self.player.velocity)
+    # def limit_speed(self):
+    #     max_speed = self.player.max_speed
+    #     if (self.player.velocity.x ** 2 + self.player.velocity.z ** 2) > max_speed:
+    #         #self.player.velocity = max_speed * glm.normalize(self.player.velocity)
 
     def update_physics(self, delta_time: float, weapons):
         for obj in self.world.get_world_objects():
@@ -194,10 +197,10 @@ class Physics:
         # Currently player thrust is directly added to velocity without a translation or filter layer,
         # but there's flexibility to add additional logic here if need be.
         # Apply forces to the player
-        self.apply_forces(delta_time)
-        self.player.velocity += self.player.thrust
+        self.convert_thrust(delta_time)
+        self.set_velocity()
         self.apply_gravity(delta_time)
-        self.limit_speed()
+        # self.limit_speed()
         self.player.reset_thrust()
         self.update_projectile_trajectory(delta_time=delta_time, weapons=weapons)
 
@@ -244,7 +247,6 @@ class Physics:
             velocity)
 
     def is_out_of_bounds(self, position):
-        # print("Projectile displacement = ", glm.length(position))
         if glm.length(position) > 512:
             print("Projectile out of bounds.")
             return True
@@ -313,3 +315,16 @@ class Physics:
         if min1_z < min2_z:
             self.player.position.z -= z_depth
             return
+
+    def set_velocity(self):
+        vt = self.player.velocity
+        if glm.sqrt(vt.x ** 2 + vt.z ** 2) < self.player.max_speed:
+            vt += self.player.thrust
+        else:
+            if glm.dot(self.player.thrust, vt) <= 0:
+                vt += self.player.thrust
+            else:
+                vn = glm.normalize(glm.cross(vt, self.player.up))
+                t = glm.dot(self.player.thrust, vn) * vn
+                self.player.velocity += t
+

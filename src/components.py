@@ -153,7 +153,8 @@ class Components:
     def set_input_callbacks(self):
         self.window.set_callbacks(self.input_handler.key_callback,
                                   self.input_handler.mouse_callback,
-                                  self.input_handler.mouse_button_callback)
+                                  self.input_handler.mouse_button_callback,
+                                  self.input_handler.scroll_callback)
 
     def update_components(self, delta_time: float):
         self.world_objects.update(delta_time)
