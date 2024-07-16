@@ -28,7 +28,7 @@ class Weapon(InteractableObject):
         self.shoot = False
         self.physics = physics
         self.initial_position = glm.vec3(0, 0, 0)
-        self.tracer_lifetime = 0.5
+        self.tracer_lifetime = 5.0
         self.tracers = []
         self.name = name
         self.player_owner = player_owner
@@ -39,7 +39,6 @@ class Weapon(InteractableObject):
 
     def initialize_trajectory(self, initial_position, player_pitch, player_yaw, delta_time):
         self.shoot = True
-        print("Initializing trajectory...")
         if not self.physics:
             print("Physics context is not available. Skipping trajectory initialization.")
             return  # Skip the trajectory computation if physics is None
@@ -75,6 +74,8 @@ class Weapon(InteractableObject):
     def animate_shoot(self, delta_time):
         if self.name == 'deagle':
             self.shoot_deagle(delta_time)
+        if self.name == "superi":
+            self.shoot_superi(delta_time)
 
     def shoot_deagle(self, delta_time):
         models = super().get_objects()
@@ -93,3 +94,20 @@ class Weapon(InteractableObject):
             self.shoot = False
             self.animation_accumulator = 0.0
 
+    def shoot_superi(self, delta_time):
+        # TODO
+        models = super().get_objects()
+        root = models[0]
+        child = models[1]
+
+        if self.animation_accumulator <= 0.2:
+            root.set_relative_transform(child,
+                                        glm.vec3(-0.1 + self.animation_accumulator, 0, 0),
+                                        glm.vec3(0, 0, 0))
+            self.animation_accumulator += delta_time * 1.0
+        else:
+            root.set_relative_transform(child,
+                                        glm.vec3(0, 0, 0),
+                                        glm.vec3(0, 0, 0))
+            self.shoot = False
+            self.animation_accumulator = 0.0

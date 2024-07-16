@@ -74,7 +74,7 @@ class InteractableObject(CompositeModel):
         if self.interactable:
             self.set_composite_position(glm.vec3(0, 0, 0))
             self.update_composite_model_matrix()
-            self.set_composite_rotation(glm.vec3(0, -90, 0))
+            self.set_composite_rotation(glm.vec3(0, 0, 0)) #-90y for the deag model
             self.update_composite_model_matrix()
             print(f"{self.name} picked up by {player.name}.")
             player.inventory.append(self)

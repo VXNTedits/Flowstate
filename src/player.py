@@ -123,7 +123,6 @@ class Player(CompositeModel):
             return
 
         if current_time - self.last_shot_time >= time_between_shots:
-            print("Player shot.")
             weapon.animate_shoot(delta_time)
             weapon.initialize_trajectory(
                 initial_position=self.right_hand_position,
@@ -206,7 +205,6 @@ class Player(CompositeModel):
     def ads(self, delta_time):
         """Rotates the right arm such that the right hand is positioned at the view center
            Ref: https://www.overleaf.com/read/rnchjrcnptkm#0dd5ee"""
-
         self.camera.zoom = 1.2
         right_arm_model = self.models[2][0]
         pitch = glm.radians(self.pitch)
@@ -219,7 +217,7 @@ class Player(CompositeModel):
         target = glm.vec3(glm.degrees(self.ads_theta), glm.degrees(self.ads_phi), 0.0)
         current = right_arm_model.orientation
         f_natural = 10
-        damping = 0.03
+        damping = 0.07
         omega_d = f_natural * glm.sqrt(1 - damping ** 2)
         e = current - target
         a = -2 * damping * f_natural * self.v - omega_d ** 2 * e
@@ -279,7 +277,8 @@ class Player(CompositeModel):
                 self.shoot(self.inventory[0], delta_time, world)
             self.inventory[0].update_weapon(delta_time)
             if self.is_shooting:
-                self.animate_hipfire_recoil(delta_time)
+                if not self.ads:
+                    self.animate_hipfire_recoil(delta_time)
             if mouse_buttons[1]:
                 self.ads(delta_time)
             elif not mouse_buttons[1]:

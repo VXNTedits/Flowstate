@@ -191,26 +191,6 @@ class Renderer:
     def update_noise(self, delta_time):
         self.time += delta_time
 
-    def generate_noise_texture(self, size, time):
-        noise_texture = np.zeros((size, size, size), dtype=np.float32)
-        scale = 1024.0
-
-        for x in range(size):
-            for y in range(size):
-                for z in range(size):
-                    nx, ny, nz = x / size - 0.5, y / size - 0.5, z / size - 0.5
-                    noise_texture[x, y, z] = self.simplex.noise4(nx * scale, ny * scale, nz * scale, time)
-
-        # Normalize the noise texture to be in the range [0, 1]
-        normalized_texture = self.normalize_noise_texture(noise_texture)
-        return normalized_texture
-
-    def normalize_noise_texture(self, noise_texture):
-        min_val = np.min(noise_texture)
-        max_val = np.max(noise_texture)
-        normalized_texture = (noise_texture - min_val) / (max_val - min_val)
-        return normalized_texture
-
     def setup_depth_framebuffer(self, num_lights):
         print("Initializing depth maps for shadow rendering")
         self.depth_map_fbos = []
@@ -245,7 +225,6 @@ class Renderer:
             self.shadow_maps.append(shadow_map)
 
     def setup_quad(self):
-        #
         self.quadVertices = [
             # Positions        # Texture Coords
             -1.0, 1.0, 0.0, 0.0, 1.0,
@@ -376,10 +355,7 @@ class Renderer:
         self.check_opengl_errors()
 
         # 5. Render atmosphere to the framebuffer
-        self.render_atmosphere_to_fbo(view_matrix, projection_matrix, player_object.position)
-
-        # 6. Render the player
-        self.render_player_to_fbo(player_object, view_matrix, projection_matrix)
+        # self.render_atmosphere_to_fbo(view_matrix, projection_matrix, player_object.position)
 
         # 6. Composite the scene and volumetric effects
         self.composite_scene_and_volumetrics()
@@ -963,7 +939,6 @@ class Renderer:
         glViewport(0, 0, 800, 600)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        #glDisable(GL_DEPTH_TEST)
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
@@ -1098,85 +1073,6 @@ class Renderer:
         if current_memory - total_memory > 1000000:
             print("GPU memory warning:", current_memory - total_memory, "KB used")
 
-    def log_buffer_allocation(self, buffer_name):
-        current_memory = glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX)
-        print(f"Allocated {buffer_name}, current available GPU memory: {current_memory} KB")
-
-    def render_procedural_volumetrics(self, view_matrix, projection_matrix):
-        glBindFramebuffer(GL_FRAMEBUFFER, self.volumetric_fbo)
-        glViewport(0, 0, 800, 600)
-        glClear(GL_COLOR_BUFFER_BIT)
-
-        glDisable(GL_DEPTH_TEST)
-        glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
-        self.procedural_shader.use()
-
-        # Get uniform locations
-        cam_pos_location = glGetUniformLocation(self.procedural_shader.program, "camPos")
-        volume_min_location = glGetUniformLocation(self.procedural_shader.program, "volumeMin")
-        volume_max_location = glGetUniformLocation(self.procedural_shader.program, "volumeMax")
-        num_lights_location = glGetUniformLocation(self.procedural_shader.program, "numLights")
-        light_positions_location = [glGetUniformLocation(self.procedural_shader.program, f"lightPositions[{i}]") for i
-                                    in
-                                    range(len(self.light_positions))]
-        lightColors_location = [glGetUniformLocation(self.procedural_shader.program, f"lightColors[{i}]") for i in
-                                range(len(self.light_colors))]
-        density_location = glGetUniformLocation(self.procedural_shader.program, "density")
-
-        # Set uniform values
-        cam_pos = glm.vec3(view_matrix[3][0], view_matrix[3][1], view_matrix[3][2])
-        glUniform3fv(cam_pos_location, 1, glm.value_ptr(cam_pos))
-        glUniform3fv(volume_min_location, 1, glm.value_ptr(self.volume_min))
-        glUniform3fv(volume_max_location, 1, glm.value_ptr(self.volume_max))
-        glUniform1i(num_lights_location, len(self.light_positions))
-
-        print(f"Camera Position: {cam_pos}")
-        print(f"Volume Min: {self.volume_min}, Volume Max: {self.volume_max}")
-        print(f"Number of Lights: {len(self.light_positions)}")
-
-        for i, pos in enumerate(self.light_positions):
-            glUniform3fv(light_positions_location[i], 1, glm.value_ptr(pos))
-            print(f"Light {i} Position: {pos}")
-        for i, color in enumerate(self.light_colors):
-            glUniform3fv(lightColors_location[i], 1, glm.value_ptr(color))
-            print(f"Light {i} Color: {color}")
-
-        glUniform1f(density_location, 0.1)  # Example density value
-        print(f"Density: 0.1")
-
-        glBindVertexArray(self.quadVAO)
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, None)
-        glBindVertexArray(0)
-
-        glDisable(GL_BLEND)
-        glEnable(GL_DEPTH_TEST)
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0)
-
-    def init_projectile_buffers(self):
-        self.projectile_vao = glGenVertexArrays(1)
-        self.projectile_vbo = glGenBuffers(1)
-
-        glBindVertexArray(self.projectile_vao)
-        glBindBuffer(GL_ARRAY_BUFFER, self.projectile_vbo)
-
-        # Allocate buffer memory, 10,000 points, 3 floats per point
-        glBufferData(GL_ARRAY_BUFFER, 30000 * ctypes.sizeof(ctypes.c_float), None, GL_DYNAMIC_DRAW)
-
-        # Define the vertex data layout
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, ctypes.c_void_p(0))
-        glEnableVertexAttribArray(0)
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0)
-        glBindVertexArray(0)
-
-        # Check for OpenGL errors during initialization
-        error = glGetError()
-        if error != GL_NO_ERROR:
-            raise RuntimeError(f"OpenGL error during buffer initialization: {gluErrorString(error).decode()}")
-
     def draw_tracers(self, tracer_positions, view_matrix, projection_matrix, player, lifetimes):
         # Update the VBO with new tracer positions
 
@@ -1250,16 +1146,6 @@ class Renderer:
         error = glGetError()
         if error != GL_NO_ERROR:
             print(f"OpenGL error: {gluErrorString(error).decode()}")
-
-    def set_ssbo(self, binding, data, usage=GL_DYNAMIC_DRAW):
-        ssbo = glGenBuffers(1)
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo)
-        glBufferData(GL_SHADER_STORAGE_BUFFER, data.nbytes, data, usage)
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, ssbo)
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0)
-        print(f"SSBO Data (binding {binding}): {data.tolist()}")
-        self.check_opengl_errors()
-        return ssbo
 
     def initialize_tracer_renderer(self, screen_width, screen_height):
         """Function to initialize the tracer renderer"""
@@ -1368,13 +1254,6 @@ class Renderer:
             [0, 0, -2.0 / (far - near), 0],
             [-(right + left) / (right - left), -(top + bottom) / (top - bottom), -(far + near) / (far - near), 1]
         ], dtype=np.float32)
-
-    def glm_ortho(self, left, right, bottom, top, near, far):
-        return glm.mat4(
-            [2.0 / (right - left), 0, 0, 0],
-            [0, 2.0 / (top - bottom), 0, 0],
-            [0, 0, -2.0 / (far - near), 0],
-            [-(right + left) / (right - left), -(top + bottom) / (top - bottom), -(far + near) / (far - near), 1])
 
     def create_hud_buffers(self):
         vertices = np.array([
@@ -1591,8 +1470,6 @@ class Renderer:
         self.atmos_shader.set_uniform1f("lightIntensity", 1.0)
         self.atmos_shader.set_uniform3fv("cameraPosition", camera_pos)
         self.atmos_shader.set_uniform1f("scatteringCoefficient", 0.01)
-        # self.atmos_shader.set_uniform_matrix4fv("viewMatrix", view_matrix)
-        # self.atmos_shader.set_uniform_matrix4fv("projectionMatrix", projection_matrix)
 
         # Draw the atmosphere
         glBindVertexArray(self.atmos_vao)
@@ -1674,7 +1551,7 @@ class Renderer:
 
     def render_player_to_fbo(self, player_object, view_matrix, projection_matrix):
         glBindFramebuffer(GL_FRAMEBUFFER, self.scene_fbo)
-        # glDisable(GL_DEPTH_TEST)
+
         # Render player
         for player_model in player_object.get_objects():
             self.update_uniforms(player_model.model_matrix, view_matrix, projection_matrix, player_model)
@@ -1682,4 +1559,3 @@ class Renderer:
             player_model.draw(self.camera)
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
-        # glEnable(GL_DEPTH_TEST)

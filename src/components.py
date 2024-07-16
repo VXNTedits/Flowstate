@@ -98,6 +98,7 @@ class Components:
         print("Physics initialized")
 
         fifty_ae = Caliber(initial_velocity=470, mass=0.02, drag_coefficient=0.5, bullet_area=0.000127)
+        nine_mm = Caliber(initial_velocity=312, mass=0.006, drag_coefficient=0.5, bullet_area=0.000063585)
 
         deagle = Weapon(
             name='deagle',
@@ -125,15 +126,17 @@ class Components:
                               relative_position=glm.vec3(0.0, 0.0, 0.0),
                               relative_rotation=glm.vec3(0.0, 0.0, 0.0))
 
-        test_cube_interactable = InteractableObject(filepath=get_relative_path("res/10cube.obj"),
-                                                    mtl_filepath=get_relative_path("res/10cube.mtl"),
-                                                    use_composite=False,
-                                                    shift_to_centroid=False,
-                                                    translation=glm.vec3(20, 5, -20))
+        superi = Weapon((750/60), 1, nine_mm, self.physics, 'superi', self.player,
+                        filepath=get_relative_path("res/superi_main.obj"),
+                        mtl_filepath=get_relative_path("res/superi_main.mtl"), use_composite=True)
+
+        superi_mag = Model(filepath=get_relative_path("res/superi_mag.obj"),
+                           mtl_filepath=get_relative_path("res/superi_mag.mtl"))
+        superi.add_comp_model(model=superi_mag)
 
         # TODO: Events are only polled for the first interactable in the list ???
-        self.add_interactable(deagle)
-        self.add_interactable(test_cube_interactable)
+        #self.add_interactable(deagle)
+        self.add_interactable(superi)
 
         self.input_handler = InputHandler(self.camera, self.player, self.physics)
         print("Input handler initialized")
